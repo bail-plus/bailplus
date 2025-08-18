@@ -50,8 +50,8 @@ export function ReceiptModal({ open, onOpenChange, onSuccess }: ReceiptModalProp
       leaseId: "",
       periodMonth: new Date().getMonth() + 1,
       periodYear: new Date().getFullYear(),
-      amountHC: 0,
-      charges: 0,
+      amountHC: 850,
+      charges: 100,
     },
   })
 
@@ -176,7 +176,12 @@ export function ReceiptModal({ open, onOpenChange, onSuccess }: ReceiptModalProp
                   <FormItem>
                     <FormLabel>Année</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="2024" {...field} />
+                     <Input 
+                       type="number" 
+                       placeholder="2024" 
+                       {...field}
+                       onChange={(e) => field.onChange(Number(e.target.value))}
+                     />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -191,7 +196,12 @@ export function ReceiptModal({ open, onOpenChange, onSuccess }: ReceiptModalProp
                 <FormItem>
                   <FormLabel>Loyer hors charges (€)</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="1200" {...field} />
+                     <Input 
+                       type="number" 
+                       placeholder="1200" 
+                       {...field}
+                       onChange={(e) => field.onChange(Number(e.target.value))}
+                     />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -205,7 +215,12 @@ export function ReceiptModal({ open, onOpenChange, onSuccess }: ReceiptModalProp
                 <FormItem>
                   <FormLabel>Charges (€)</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="200" {...field} />
+                     <Input 
+                       type="number" 
+                       placeholder="200" 
+                       {...field}
+                       onChange={(e) => field.onChange(Number(e.target.value))}
+                     />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

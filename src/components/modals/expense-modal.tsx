@@ -50,7 +50,7 @@ export function ExpenseModal({ open, onOpenChange, onSuccess }: ExpenseModalProp
     resolver: zodResolver(expenseSchema),
     defaultValues: {
       propertyId: "",
-      amount: 0,
+      amount: 100,
       date: new Date().toISOString().split('T')[0],
       category: "",
       description: "",

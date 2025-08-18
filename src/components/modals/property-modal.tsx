@@ -30,7 +30,7 @@ const propertySchema = z.object({
   address: z.string().min(5, "L'adresse doit contenir au moins 5 caractères"),
   city: z.string().min(2, "La ville doit contenir au moins 2 caractères"),
   postalCode: z.string().min(5, "Le code postal doit contenir 5 caractères"),
-  surface: z.coerce.number().min(1, "La surface doit être supérieure à 0"),
+  surface: z.number().min(1, "La surface doit être supérieure à 0"),
 })
 
 type PropertyForm = z.infer<typeof propertySchema>
@@ -52,7 +52,7 @@ export function PropertyModal({ open, onOpenChange, onSuccess }: PropertyModalPr
       address: "",
       city: "",
       postalCode: "",
-      surface: 0,
+      surface: 50,
     },
   })
 
@@ -189,7 +189,12 @@ export function PropertyModal({ open, onOpenChange, onSuccess }: PropertyModalPr
                 <FormItem>
                   <FormLabel>Surface (m²)</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="65" {...field} />
+                     <Input 
+                       type="number" 
+                       placeholder="65" 
+                       {...field}
+                       onChange={(e) => field.onChange(Number(e.target.value))}
+                     />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

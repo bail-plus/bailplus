@@ -51,9 +51,9 @@ export function LeaseModal({ open, onOpenChange, onSuccess }: LeaseModalProps) {
       unitId: "",
       tenantId: "",
       startDate: "",
-      rentHC: 0,
-      charges: 0,
-      depositAmount: 0,
+      rentHC: 800,
+      charges: 50,
+      depositAmount: 800,
     },
   })
 
@@ -176,7 +176,12 @@ export function LeaseModal({ open, onOpenChange, onSuccess }: LeaseModalProps) {
                   <FormItem>
                     <FormLabel>Loyer HC (€)</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="1200" {...field} />
+                     <Input 
+                       type="number" 
+                       placeholder="1200" 
+                       {...field}
+                       onChange={(e) => field.onChange(Number(e.target.value))}
+                     />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -190,7 +195,12 @@ export function LeaseModal({ open, onOpenChange, onSuccess }: LeaseModalProps) {
                   <FormItem>
                     <FormLabel>Charges (€)</FormLabel>
                     <FormControl>
-                      <Input type="number" placeholder="200" {...field} />
+                     <Input 
+                       type="number" 
+                       placeholder="200" 
+                       {...field}
+                       onChange={(e) => field.onChange(Number(e.target.value))}
+                     />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -205,7 +215,12 @@ export function LeaseModal({ open, onOpenChange, onSuccess }: LeaseModalProps) {
                 <FormItem>
                   <FormLabel>Dépôt de garantie (€)</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="1200" {...field} />
+                     <Input 
+                       type="number" 
+                       placeholder="1200" 
+                       {...field}
+                       onChange={(e) => field.onChange(Number(e.target.value))}
+                     />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
