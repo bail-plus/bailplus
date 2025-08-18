@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Users, Plus, Search, Phone, Mail, MapPin, FileText, User, Wrench } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 const MOCK_PEOPLE = [
   {
@@ -63,6 +64,7 @@ export default function People() {
   const [searchTerm, setSearchTerm] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
   const [selectedPerson, setSelectedPerson] = useState<any>(null)
+  const { toast } = useToast()
 
   const filteredPeople = MOCK_PEOPLE.filter(person => {
     const matchesSearch = 
@@ -294,7 +296,17 @@ export default function People() {
                     </TableCell>
                     
                     <TableCell>
-                      <Button variant="ghost" size="sm">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          toast({
+                            title: "Voir la personne",
+                            description: `${person.firstName} ${person.lastName}`
+                          })
+                        }}
+                      >
                         Voir
                       </Button>
                     </TableCell>
@@ -367,14 +379,35 @@ export default function People() {
             </Tabs>
             
             <div className="flex gap-2 pt-4 border-t">
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => toast({
+                  title: "Modifier la personne",
+                  description: `${selectedPerson.firstName} ${selectedPerson.lastName}`
+                })}
+              >
                 Modifier
               </Button>
-              <Button variant="outline" size="sm">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => toast({
+                  title: "Message envoyé",
+                  description: `Message envoyé à ${selectedPerson.firstName} ${selectedPerson.lastName}`
+                })}
+              >
                 Envoyer message
               </Button>
               {selectedPerson.type === "TENANT" && (
-                <Button variant="outline" size="sm">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => toast({
+                    title: "Ticket créé",
+                    description: `Ticket créé pour ${selectedPerson.firstName} ${selectedPerson.lastName}`
+                  })}
+                >
                   Créer ticket
                 </Button>
               )}

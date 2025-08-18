@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { TrendingUp, TrendingDown, Download, Calendar, Building, Euro, AlertTriangle } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
 
 // Mock data for reports
 const VACANCY_DATA = [
@@ -50,6 +51,7 @@ const EXPENSE_CATEGORIES = [
 export default function Reports() {
   const [period, setPeriod] = useState("6months")
   const [entityFilter, setEntityFilter] = useState("all")
+  const { toast } = useToast()
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('fr-FR', {
@@ -111,7 +113,14 @@ export default function Reports() {
             </SelectContent>
           </Select>
           
-          <Button variant="outline" className="gap-2">
+          <Button 
+            variant="outline" 
+            className="gap-2"
+            onClick={() => toast({
+              title: "Export en cours",
+              description: "Export CSV en cours de préparation..."
+            })}
+          >
             <Download className="w-4 h-4" />
             Exporter CSV
           </Button>
@@ -340,7 +349,14 @@ export default function Reports() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Button variant="outline" className="h-auto p-4 flex flex-col items-center gap-2">
+            <Button 
+              variant="outline" 
+              className="h-auto p-4 flex flex-col items-center gap-2"
+              onClick={() => toast({
+                title: "Génération du rapport",
+                description: "Rapport PDF en cours de génération..."
+              })}
+            >
               <Download className="w-6 h-6" />
               <div className="text-center">
                 <div className="font-medium">Rapport mensuel</div>
@@ -348,7 +364,14 @@ export default function Reports() {
               </div>
             </Button>
             
-            <Button variant="outline" className="h-auto p-4 flex flex-col items-center gap-2">
+            <Button 
+              variant="outline" 
+              className="h-auto p-4 flex flex-col items-center gap-2"
+              onClick={() => toast({
+                title: "Export des données",
+                description: "Export CSV en cours..."
+              })}
+            >
               <Calendar className="w-6 h-6" />
               <div className="text-center">
                 <div className="font-medium">Données brutes</div>
@@ -356,7 +379,14 @@ export default function Reports() {
               </div>
             </Button>
             
-            <Button variant="outline" className="h-auto p-4 flex flex-col items-center gap-2">
+            <Button 
+              variant="outline" 
+              className="h-auto p-4 flex flex-col items-center gap-2"
+              onClick={() => toast({
+                title: "Analyse fiscale",
+                description: "Génération de l'analyse fiscale..."
+              })}
+            >
               <Building className="w-6 h-6" />
               <div className="text-center">
                 <div className="font-medium">Analyse fiscale</div>

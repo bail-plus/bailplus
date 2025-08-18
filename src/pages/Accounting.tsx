@@ -6,7 +6,9 @@ import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Calculator, Plus, Download, Upload, Euro, Receipt, FileText, TrendingUp, AlertCircle } from "lucide-react"
+import { Calculator, Plus, Download, Upload, Euro, Receipt, FileText, TrendingUp, AlertCircle, CreditCard } from "lucide-react"
+import { BankConnectionModal } from "@/components/bank-connection-modal"
+import { useToast } from "@/hooks/use-toast"
 
 const MOCK_RENT_INVOICES = [
   {
@@ -99,6 +101,7 @@ const MOCK_DEPOSITS = [
 
 export default function Accounting() {
   const [activeTab, setActiveTab] = useState("receipts")
+  const { toast } = useToast()
 
   const getStatusBadge = (status: string) => {
     const statuses = {
@@ -150,7 +153,22 @@ export default function Accounting() {
         </div>
         
         <div className="flex items-center gap-2">
-          <Button variant="outline" className="gap-2">
+          <BankConnectionModal 
+            trigger={
+              <Button variant="outline" className="gap-2">
+                <CreditCard className="w-4 h-4" />
+                Connecter banque
+              </Button>
+            }
+          />
+          <Button 
+            variant="outline" 
+            className="gap-2"
+            onClick={() => toast({
+              title: "Export en cours",
+              description: "Export des données comptables..."
+            })}
+          >
             <Download className="w-4 h-4" />
             Exporter
           </Button>

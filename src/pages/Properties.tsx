@@ -8,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useToast } from "@/hooks/use-toast"
 
 const properties = [
   {
@@ -67,6 +68,8 @@ const statusConfig = {
 }
 
 const Properties = () => {
+  const { toast } = useToast()
+  
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Page Header */}
@@ -77,7 +80,13 @@ const Properties = () => {
             Gérez vos propriétés et lots
           </p>
         </div>
-        <Button className="bg-gradient-primary">
+        <Button 
+          className="bg-gradient-primary"
+          onClick={() => toast({
+            title: "Fonctionnalité en développement",
+            description: "Cette fonctionnalité sera bientôt disponible"
+          })}
+        >
           <Plus className="w-4 h-4 mr-2" />
           Ajouter un bien
         </Button>
@@ -164,11 +173,27 @@ const Properties = () => {
                 </div>
                 
                 <div className="flex items-center gap-2 pt-2">
-                  <Button variant="outline" size="sm" className="flex-1">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1"
+                    onClick={() => toast({
+                      title: "Voir le bien",
+                      description: property.title
+                    })}
+                  >
                     <Eye className="w-4 h-4 mr-2" />
                     Voir
                   </Button>
-                  <Button variant="outline" size="sm" className="flex-1">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1"
+                    onClick={() => toast({
+                      title: "Modifier le bien",
+                      description: property.title
+                    })}
+                  >
                     <Edit className="w-4 h-4 mr-2" />
                     Modifier
                   </Button>
@@ -179,9 +204,24 @@ const Properties = () => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
-                      <DropdownMenuItem>Dupliquer</DropdownMenuItem>
-                      <DropdownMenuItem>Archiver</DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive">Supprimer</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => toast({
+                        title: "Bien dupliqué",
+                        description: "Le bien a été dupliqué avec succès"
+                      })}>Dupliquer</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => toast({
+                        title: "Bien archivé",
+                        description: "Le bien a été archivé"
+                      })}>Archiver</DropdownMenuItem>
+                      <DropdownMenuItem 
+                        className="text-destructive"
+                        onClick={() => toast({
+                          title: "Bien supprimé",
+                          description: "Le bien a été supprimé définitivement",
+                          variant: "destructive"
+                        })}
+                      >
+                        Supprimer
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
