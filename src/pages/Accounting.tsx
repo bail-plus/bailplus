@@ -8,6 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Calculator, Plus, Download, Upload, Euro, Receipt, FileText, TrendingUp, AlertCircle, CreditCard } from "lucide-react"
 import { BankConnectionModal } from "@/components/bank-connection-modal"
+import BatchReceiptGenerator from "@/components/batch-receipt-generator"
+import ExpenseManager from "@/components/expense-manager"
+import DepositManager from "@/components/deposit-manager"
 import { useToast } from "@/hooks/use-toast"
 
 const MOCK_RENT_INVOICES = [
@@ -320,154 +323,19 @@ export default function Accounting() {
           </Card>
         </TabsContent>
 
-        {/* Quittances Tab */}
+        {/* Sprint 2 Implementation */}
         <TabsContent value="quittances" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base font-semibold">Génération et suivi des quittances</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-4">
-                <Button className="gap-2">
-                  <FileText className="w-4 h-4" />
-                  Générer quittances janvier 2024
-                </Button>
-                <Button variant="outline" className="gap-2">
-                  <Download className="w-4 h-4" />
-                  Télécharger toutes
-                </Button>
-              </div>
-              
-              <div className="text-sm text-muted-foreground">
-                <p>• 2 quittances générées et envoyées ce mois</p>
-                <p>• 1 quittance en attente de génération</p>
-                <p>• Modèle PDF conforme aux obligations légales françaises</p>
-              </div>
-            </CardContent>
-          </Card>
+          <BatchReceiptGenerator />
         </TabsContent>
 
         {/* Charges Tab */}
         <TabsContent value="charges" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-base font-semibold">Dépenses et charges</CardTitle>
-              <Button size="sm" className="gap-2">
-                <Plus className="w-4 h-4" />
-                Nouvelle dépense
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Fournisseur</TableHead>
-                    <TableHead>Bien</TableHead>
-                    <TableHead>Catégorie</TableHead>
-                    <TableHead>Montant HT</TableHead>
-                    <TableHead>TVA</TableHead>
-                    <TableHead>Déductible</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {MOCK_EXPENSES.map((expense) => (
-                    <TableRow key={expense.id}>
-                      <TableCell>{formatDate(expense.date)}</TableCell>
-                      <TableCell>{expense.description}</TableCell>
-                      <TableCell>{expense.vendor}</TableCell>
-                      <TableCell>{expense.property}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {expense.category}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{formatCurrency(expense.amount / (1 + expense.vatRate / 100))}</TableCell>
-                      <TableCell>{expense.vatRate}%</TableCell>
-                      <TableCell>
-                        {expense.deductible ? (
-                          <Badge variant="default" className="text-xs">Oui</Badge>
-                        ) : (
-                          <Badge variant="secondary" className="text-xs">Non</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Button size="sm" variant="ghost">
-                          Voir
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base font-semibold">Régularisation annuelle</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-sm text-muted-foreground space-y-2">
-                <p>• Calcul automatique des charges récupérables</p>
-                <p>• Répartition selon les tantièmes ou surface</p>
-                <p>• Génération des régularisations de charges</p>
-                <Button variant="outline" className="mt-4">
-                  Lancer régularisation 2023
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <ExpenseManager />
         </TabsContent>
 
         {/* Deposits Tab */}
         <TabsContent value="deposits" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base font-semibold">Dépôts de garantie</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Locataire</TableHead>
-                    <TableHead>Bien</TableHead>
-                    <TableHead>Montant</TableHead>
-                    <TableHead>Encaissé le</TableHead>
-                    <TableHead>Statut</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {MOCK_DEPOSITS.map((deposit) => (
-                    <TableRow key={deposit.id}>
-                      <TableCell className="font-medium">{deposit.tenant}</TableCell>
-                      <TableCell>{deposit.property}</TableCell>
-                      <TableCell className="font-medium">{formatCurrency(deposit.amount)}</TableCell>
-                      <TableCell>{formatDate(deposit.receivedAt)}</TableCell>
-                      <TableCell>
-                        <Badge {...getStatusBadge(deposit.status)} className="text-xs">
-                          {getStatusBadge(deposit.status).label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline">
-                            Restituer
-                          </Button>
-                          <Button size="sm" variant="ghost">
-                            Détail
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <DepositManager />
         </TabsContent>
 
         {/* Revisions Tab */}
