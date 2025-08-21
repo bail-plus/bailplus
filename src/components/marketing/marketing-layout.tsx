@@ -30,6 +30,7 @@ const navigation = [
 ];
 
 export function MarketingLayout({ children }: MarketingLayoutProps) {
+  console.log('📄 MarketingLayout loading correctly!', { pathname: window.location.pathname });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
 

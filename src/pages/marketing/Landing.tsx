@@ -102,6 +102,8 @@ const stats = [
 ];
 
 export default function Landing() {
+  console.log('🎉 Landing page loading correctly!');
+  
   return (
     <div className="flex flex-col">
       {/* Hero Section */}
