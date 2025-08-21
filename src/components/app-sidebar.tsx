@@ -10,7 +10,8 @@ import {
   FileText, 
   MessageCircle, 
   TrendingUp, 
-  Settings 
+  Settings,
+  Target 
 } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 
@@ -38,6 +39,7 @@ const items = [
   { title: "Documents", url: "/documents", icon: FileText },
   { title: "Communications", url: "/communications", icon: MessageCircle },
   { title: "Rapports", url: "/reports", icon: TrendingUp },
+  { title: "TRI (simulateur)", url: "/tools/tri", icon: Target },
   { title: "Paramètres", url: "/settings", icon: Settings },
 ]
 

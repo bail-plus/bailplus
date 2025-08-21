@@ -22,6 +22,7 @@ import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import TRISimulator from "./pages/TRISimulator";
 
 // Marketing pages
 import Landing from "./pages/marketing/Landing";
@@ -67,6 +68,7 @@ const AuthenticatedApp = () => {
         <Route path="/documents" element={<Documents />} />
         <Route path="/communications" element={<Communications />} />
         <Route path="/reports" element={<Reports />} />
+        <Route path="/tools/tri" element={<TRISimulator />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
