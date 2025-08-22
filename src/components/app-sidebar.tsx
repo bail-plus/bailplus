@@ -29,18 +29,18 @@ import {
 } from "@/components/ui/sidebar"
 
 const items = [
-  { title: "Accueil", url: "/", icon: BarChart3 },
-  { title: "Calendrier", url: "/calendar", icon: Calendar },
-  { title: "Parc", url: "/properties", icon: Building2 },
-  { title: "Location", url: "/leasing", icon: UserCheck },
-  { title: "Personnes", url: "/people", icon: Users },
-  { title: "Maintenance", url: "/maintenance", icon: Wrench },
-  { title: "Comptabilité", url: "/accounting", icon: Calculator },
-  { title: "Documents", url: "/documents", icon: FileText },
-  { title: "Communications", url: "/communications", icon: MessageCircle },
-  { title: "Rapports", url: "/reports", icon: TrendingUp },
-  { title: "TRI (simulateur)", url: "/tools/tri", icon: Target },
-  { title: "Paramètres", url: "/settings", icon: Settings },
+  { title: "Accueil", url: "/app", icon: BarChart3 },
+  { title: "Calendrier", url: "/app/calendar", icon: Calendar },
+  { title: "Parc", url: "/app/properties", icon: Building2 },
+  { title: "Location", url: "/app/leasing", icon: UserCheck },
+  { title: "Personnes", url: "/app/people", icon: Users },
+  { title: "Maintenance", url: "/app/maintenance", icon: Wrench },
+  { title: "Comptabilité", url: "/app/accounting", icon: Calculator },
+  { title: "Documents", url: "/app/documents", icon: FileText },
+  { title: "Communications", url: "/app/communications", icon: MessageCircle },
+  { title: "Rapports", url: "/app/reports", icon: TrendingUp },
+  { title: "TRI (simulateur)", url: "/app/tools/tri", icon: Target },
+  { title: "Paramètres", url: "/app/settings", icon: Settings },
 ]
 
 export function AppSidebar() {
@@ -50,8 +50,8 @@ export function AppSidebar() {
   const collapsed = state === "collapsed"
 
   const isActive = (path: string) => {
-    if (path === "/") {
-      return currentPath === "/"
+    if (path === "/app") {
+      return currentPath === "/app"
     }
     return currentPath.startsWith(path)
   }
@@ -97,7 +97,7 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     <NavLink 
                       to={item.url} 
-                      end={item.url === "/"}
+                      end={item.url === "/app"}
                       className={`
                         ${getNavClassName(item.url)}
                         flex items-center gap-3 px-3 py-2.5 rounded-lg
