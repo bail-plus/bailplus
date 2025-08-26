@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { Navigate, Link, useLocation } from 'react-router-dom';
+import { Navigate, Link, useLocation, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,13 +12,12 @@ export default function Login() {
   const { user, signIn, loading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const offerParam = searchParams.get('offer');
   
-  // Get the intended destination from state, default to /offers
-  const from = location.state?.from?.pathname || '/offers';
-
-  // Redirect if already authenticated - let ProtectedRoute handle subscription check
+  // Redirect if already authenticated
   if (user) {
-    return <Navigate to={from} replace />;
+    return <Navigate to="/offers" replace />;
   }
 
   const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -31,7 +30,8 @@ export default function Login() {
     
     const { error } = await signIn(email, password);
     if (!error) {
-      // Navigation will be handled by the Navigate component above after user state updates
+      console.log('✅ Login successful, redirecting to offers...');
+      window.location.href = '/offers';
     }
     setIsLoading(false);
   };
@@ -52,7 +52,12 @@ export default function Login() {
             <Building2 className="w-6 h-6 text-white" />
           </div>
           <CardTitle>Connexion</CardTitle>
-          <CardDescription>Connectez-vous à votre compte BailloGenius</CardDescription>
+          <CardDescription>
+            {offerParam 
+              ? `Connectez-vous pour souscrire à l'offre ${offerParam.charAt(0).toUpperCase() + offerParam.slice(1)}`
+              : 'Connectez-vous à votre compte BailloGenius'
+            }
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignIn} className="space-y-4">
@@ -84,15 +89,15 @@ export default function Login() {
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">
               Pas encore de compte ?{" "}
-              <Link to="/signup" className="text-primary hover:underline">
-                Créer un compte
+              <Link to={`/signup${offerParam ? `?offer=${offerParam}` : ''}`} className="text-primary hover:underline">
+                S'inscrire
               </Link>
             </p>
           </div>
           
           <div className="mt-4 text-center">
-            <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
-              ← Retour à l'accueil
+            <Link to="/offers" className="text-sm text-muted-foreground hover:text-foreground">
+              ← Voir les offres
             </Link>
           </div>
         </CardContent>

@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { Navigate, Link } from 'react-router-dom';
+import { Navigate, Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,9 +11,11 @@ import { Building2 } from 'lucide-react';
 export default function Signup() {
   const { user, signUp, loading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [searchParams] = useSearchParams();
+  const offerParam = searchParams.get('offer');
 
-  // Redirect if already authenticated - check subscription status
-  if (user) {
+  // Only redirect if user is authenticated AND there's no offer to process
+  if (user && !offerParam) {
     return <Navigate to="/offers" replace />;
   }
 
@@ -29,8 +31,9 @@ export default function Signup() {
     
     const { error } = await signUp(email, password, firstName, lastName);
     if (!error) {
-      // Don't redirect immediately - let the auth state listener handle it
-      console.log('✅ Signup successful, waiting for auth state...');
+      // Redirect to offers page after successful signup
+      console.log('✅ Signup successful, redirecting to offers...');
+      window.location.href = '/offers';
     }
     setIsLoading(false);
   };
@@ -51,7 +54,12 @@ export default function Signup() {
             <Building2 className="w-6 h-6 text-white" />
           </div>
           <CardTitle>Créer un compte</CardTitle>
-          <CardDescription>Rejoignez BailloGenius et simplifiez votre gestion locative</CardDescription>
+          <CardDescription>
+            {offerParam 
+              ? `Créez votre compte pour souscrire à l'offre ${offerParam.charAt(0).toUpperCase() + offerParam.slice(1)}`
+              : 'Rejoignez BailloGenius et simplifiez votre gestion locative'
+            }
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSignUp} className="space-y-4">
@@ -104,15 +112,15 @@ export default function Signup() {
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">
               Déjà un compte ?{" "}
-              <Link to="/login" className="text-primary hover:underline">
+              <Link to={`/login${offerParam ? `?offer=${offerParam}` : ''}`} className="text-primary hover:underline">
                 Se connecter
               </Link>
             </p>
           </div>
           
           <div className="mt-4 text-center">
-            <Link to="/" className="text-sm text-muted-foreground hover:text-foreground">
-              ← Retour à l'accueil
+            <Link to="/offers" className="text-sm text-muted-foreground hover:text-foreground">
+              ← Voir les offres
             </Link>
           </div>
         </CardContent>

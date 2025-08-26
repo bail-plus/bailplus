@@ -27,6 +27,63 @@ export default function Offers() {
   const [isLoading, setIsLoading] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   
+  const processStoredOffer = async (offerId: string) => {
+    console.log('🔍 Processing stored offer:', { offerId, userId: user?.id, sessionExists: !!session });
+    setSelectedOffer(offerId);
+    setIsLoading(true);
+
+    try {
+      console.log('📤 Calling create-checkout function with:', { tier: offerId });
+      
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: { tier: offerId },
+        headers: {
+          Authorization: `Bearer ${session!.access_token}`,
+        },
+      });
+
+      console.log('📥 Function response:', { data, error });
+
+      if (error) {
+        console.error('❌ Function error details:', {
+          name: error.name,
+          message: error.message,
+          context: error.context,
+          stack: error.stack
+        });
+        throw error;
+      }
+
+      if (data?.url) {
+        console.log('✅ Redirecting to Stripe:', data.url);
+        // Open Stripe checkout in a new tab
+        window.open(data.url, '_blank');
+      } else {
+        console.error('❌ No URL in response:', data);
+        throw new Error('Aucune URL de paiement reçue');
+      }
+    } catch (error) {
+      console.error('❌ Error creating checkout:', error);
+      toast.error('Erreur lors de la création de la session de paiement');
+    } finally {
+      setIsLoading(false);
+      setSelectedOffer(null);
+    }
+  };
+
+  // Check if user just came back from auth and has a stored offer
+  useEffect(() => {
+    const storedOffer = sessionStorage.getItem('selectedOffer');
+    if (user && session && storedOffer) {
+      console.log('🔄 User returned from auth, processing stored offer:', storedOffer);
+      sessionStorage.removeItem('selectedOffer');
+      // Auto-trigger the offer selection after a short delay
+      setTimeout(() => {
+        processStoredOffer(storedOffer);
+      }, 1000);
+    }
+  }, [user, session]);
+
   // Handle checkout status messages
   useEffect(() => {
     const checkoutStatus = searchParams.get('checkout');
@@ -64,8 +121,12 @@ export default function Offers() {
   }
 
   const handleSelectOffer = async (offerId: string) => {
+    // If user is not authenticated, redirect to signup with offer info
     if (!user || !session) {
-      toast.error('Vous devez être connecté pour souscrire à une offre');
+      console.log('🔄 User not authenticated, redirecting to signup with offer:', offerId);
+      // Store the selected offer in sessionStorage for after auth
+      sessionStorage.setItem('selectedOffer', offerId);
+      window.location.href = `/signup?offer=${offerId}`;
       return;
     }
 
@@ -118,43 +179,15 @@ export default function Offers() {
     }
   };
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-surface">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle>Accès restreint</CardTitle>
-            <CardDescription>
-              Vous devez être connecté pour accéder à cette page.
-              <br />
-              <small className="text-xs mt-2 block">
-                Si vous venez de vous inscrire, vérifiez vos emails pour confirmer votre compte.
-              </small>
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button asChild className="w-full">
-              <Link to="/login">Se connecter</Link>
-            </Button>
-            <Button variant="outline" asChild className="w-full">
-              <Link to="/signup">Créer un compte</Link>
-            </Button>
-            <div className="text-center text-sm text-muted-foreground mt-4">
-              <p>Debug: User={user ? 'Connected' : 'Not connected'}, Session={session ? 'Active' : 'None'}</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
+  // Add debug info to console if authenticated
+  if (user) {
+    console.log('🔍 Offers page - User authenticated:', { 
+      userId: user.id, 
+      email: user.email, 
+      emailConfirmed: user.email_confirmed_at,
+      sessionActive: !!session 
+    });
   }
-
-  // Add debug info to console
-  console.log('🔍 Offers page - User authenticated:', { 
-    userId: user.id, 
-    email: user.email, 
-    emailConfirmed: user.email_confirmed_at,
-    sessionActive: !!session 
-  });
 
   return (
     <div className="min-h-screen bg-gradient-surface py-12">
@@ -223,11 +256,11 @@ export default function Offers() {
                   {isLoading && selectedOffer === offer.id ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Redirection...
+                      {user ? 'Redirection...' : 'Redirection vers inscription...'}
                     </>
                   ) : (
                     <>
-                      Choisir cette offre
+                      {user ? 'Choisir cette offre' : 'S\'abonner'}
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </>
                   )}
