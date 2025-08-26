@@ -29,8 +29,10 @@ export default function Signup() {
     
     const { error } = await signUp(email, password, firstName, lastName);
     if (!error) {
-      // Redirect to offers page after successful signup
-      window.location.href = '/offers';
+      // Wait a bit for auth state to propagate, then redirect
+      setTimeout(() => {
+        window.location.href = '/offers';
+      }, 1000);
     }
     setIsLoading(false);
   };
