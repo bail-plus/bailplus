@@ -1,13 +1,15 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Layout } from "@/components/layout";
-import { MarketingLayout } from "@/components/marketing/marketing-layout";
-import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { PublicLayout } from "@/components/PublicLayout";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AuthProvider } from "@/hooks/useAuth";
 
-// App pages
+// App pages (protected)
 import Index from "./pages/Index";
 import Calendar from "./pages/Calendar";
 import Properties from "./pages/Properties";
@@ -20,11 +22,13 @@ import Documents from "./pages/Documents";
 import Communications from "./pages/Communications";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
-import Auth from "./pages/Auth";
-import NotFound from "./pages/NotFound";
 import TRISimulator from "./pages/TRISimulator";
 
-// Marketing pages
+// Auth pages
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+
+// Public/Marketing pages
 import Landing from "./pages/marketing/Landing";
 import Features from "./pages/marketing/Features";
 import Pricing from "./pages/marketing/Pricing";
@@ -35,77 +39,147 @@ import Resources from "./pages/marketing/Resources";
 import Terms from "./pages/marketing/legal/Terms";
 import Privacy from "./pages/marketing/legal/Privacy";
 import Imprint from "./pages/marketing/legal/Imprint";
-import MarketingNotFound from "./pages/marketing/NotFound";
+
+// 404 pages
+import NotFoundPublic from "./pages/NotFoundPublic";
+import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
-
-const AuthenticatedApp = () => {
-  const { user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">Chargement...</div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Auth />;
-  }
-
-  return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<Index />} />
-        <Route path="/calendar" element={<Calendar />} />
-        <Route path="/properties" element={<Properties />} />
-        <Route path="/leasing" element={<Leasing />} />
-        <Route path="/leases/:id" element={<LeaseDetail />} />
-        <Route path="/people" element={<People />} />
-        <Route path="/maintenance" element={<Maintenance />} />
-        <Route path="/accounting" element={<Accounting />} />
-        <Route path="/documents" element={<Documents />} />
-        <Route path="/communications" element={<Communications />} />
-        <Route path="/reports" element={<Reports />} />
-        <Route path="/tools/tri" element={<TRISimulator />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-    </Layout>
-  );
-};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
-        <Routes>
-          {/* Marketing routes (public) */}
-          <Route path="/" element={<MarketingLayout><Landing /></MarketingLayout>} />
-          <Route path="/features" element={<MarketingLayout><Features /></MarketingLayout>} />
-          <Route path="/pricing" element={<MarketingLayout><Pricing /></MarketingLayout>} />
-          <Route path="/faq" element={<MarketingLayout><FAQ /></MarketingLayout>} />
-          <Route path="/about" element={<MarketingLayout><About /></MarketingLayout>} />
-          <Route path="/contact" element={<MarketingLayout><Contact /></MarketingLayout>} />
-          <Route path="/resources" element={<MarketingLayout><Resources /></MarketingLayout>} />
-          <Route path="/legal/terms" element={<MarketingLayout><Terms /></MarketingLayout>} />
-          <Route path="/legal/privacy" element={<MarketingLayout><Privacy /></MarketingLayout>} />
-          <Route path="/legal/imprint" element={<MarketingLayout><Imprint /></MarketingLayout>} />
-          
-          {/* App routes (authenticated) */}
-          <Route path="/app/*" element={
-            <AuthProvider>
-              <AuthenticatedApp />
-            </AuthProvider>
-          } />
-          
-          {/* 404 */}
-          <Route path="*" element={<MarketingLayout><MarketingNotFound /></MarketingLayout>} />
-        </Routes>
-      </BrowserRouter>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Redirect /App to /app (legacy route) */}
+            <Route path="/App/*" element={<Navigate to="/app" replace />} />
+            
+            {/* Public routes */}
+            <Route path="/" element={<PublicLayout><Landing /></PublicLayout>} />
+            <Route path="/features" element={<PublicLayout><Features /></PublicLayout>} />
+            <Route path="/pricing" element={<PublicLayout><Pricing /></PublicLayout>} />
+            <Route path="/faq" element={<PublicLayout><FAQ /></PublicLayout>} />
+            <Route path="/about" element={<PublicLayout><About /></PublicLayout>} />
+            <Route path="/contact" element={<PublicLayout><Contact /></PublicLayout>} />
+            <Route path="/resources" element={<PublicLayout><Resources /></PublicLayout>} />
+            <Route path="/legal/terms" element={<PublicLayout><Terms /></PublicLayout>} />
+            <Route path="/legal/privacy" element={<PublicLayout><Privacy /></PublicLayout>} />
+            <Route path="/legal/imprint" element={<PublicLayout><Imprint /></PublicLayout>} />
+            
+            {/* Auth routes */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            
+            {/* Protected app routes */}
+            <Route path="/app" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Index />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/app/calendar" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Calendar />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/app/properties" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Properties />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/app/leasing" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Leasing />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/app/leases/:id" element={
+              <ProtectedRoute>
+                <Layout>
+                  <LeaseDetail />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/app/people" element={
+              <ProtectedRoute>
+                <Layout>
+                  <People />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/app/maintenance" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Maintenance />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/app/accounting" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Accounting />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/app/documents" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Documents />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/app/communications" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Communications />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/app/reports" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Reports />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/app/tools/tri" element={
+              <ProtectedRoute>
+                <Layout>
+                  <TRISimulator />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/app/settings" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Settings />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            {/* 404 for app routes */}
+            <Route path="/app/*" element={
+              <ProtectedRoute>
+                <Layout>
+                  <NotFound />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            
+            {/* 404 for public routes */}
+            <Route path="*" element={<PublicLayout><NotFoundPublic /></PublicLayout>} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
