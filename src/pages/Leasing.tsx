@@ -1,10 +1,11 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Calendar, MapPin, Plus, Search, User, FileText } from "lucide-react"
+import { supabase } from "@/integrations/supabase/client"
 
 const KANBAN_COLUMNS = [
   { id: "to_publish", title: "À diffuser", color: "bg-muted" },
@@ -16,45 +17,59 @@ const KANBAN_COLUMNS = [
   { id: "active", title: "Actif", color: "bg-emerald-50" }
 ]
 
-const MOCK_UNITS = [
-  {
-    id: "1",
-    property: "25 rue de la Paix",
-    label: "Appartement T3",
-    surface: 65,
-    targetRent: 1200,
-    status: "to_publish",
-    city: "Paris 2e"
-  },
-  {
-    id: "2", 
-    property: "10 avenue Mozart",
-    label: "Studio",
-    surface: 25,
-    targetRent: 800,
-    status: "leads",
-    city: "Paris 16e",
-    leads: 3
-  },
-  {
-    id: "3",
-    property: "25 rue de la Paix", 
-    label: "T2 avec balcon",
-    surface: 45,
-    targetRent: 1100,
-    status: "visits",
-    city: "Paris 2e",
-    nextVisit: "2024-01-20 14:00"
-  }
-]
+interface LeasingUnit {
+  id: string
+  property_name: string
+  unit_number: string
+  type: string
+  surface: number | null
+  status: string
+  target_rent?: number
+}
 
 export default function Leasing() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedUnit, setSelectedUnit] = useState<any>(null)
+  const [units, setUnits] = useState<LeasingUnit[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const filteredUnits = MOCK_UNITS.filter(unit =>
-    unit.property.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    unit.label.toLowerCase().includes(searchTerm.toLowerCase())
+  useEffect(() => {
+    loadUnits()
+  }, [])
+
+  const loadUnits = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('units')
+        .select(`
+          *,
+          properties!inner(name, address)
+        `)
+      
+      if (error) throw error
+
+      const formattedUnits = (data || []).map((unit: any) => ({
+        id: unit.id,
+        property_name: unit.properties?.name || 'N/A',
+        unit_number: unit.unit_number,
+        type: unit.type || 'N/A',
+        surface: unit.surface,
+        status: 'to_publish', // Default status since we don't have leasing status yet
+        target_rent: 1000 // Placeholder
+      }))
+
+      setUnits(formattedUnits)
+    } catch (error) {
+      console.error('Error loading units:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredUnits = units.filter(unit =>
+    unit.property_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    unit.unit_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    unit.type.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   const getStatusBadge = (status: string) => {
@@ -68,6 +83,14 @@ export default function Leasing() {
       active: { label: "Actif", variant: "default" as const }
     }
     return statusConfig[status as keyof typeof statusConfig] || { label: status, variant: "secondary" as const }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-muted-foreground">Chargement des biens...</div>
+      </div>
+    )
   }
 
   return (
@@ -131,68 +154,61 @@ export default function Leasing() {
 
               {/* Column Cards */}
               <div className="space-y-3">
-                {columnUnits.map(unit => (
-                  <Card 
-                    key={unit.id} 
-                    className={`cursor-pointer transition-shadow hover:shadow-md ${column.color}`}
-                    onClick={() => setSelectedUnit(unit)}
-                  >
-                    <CardContent className="p-4">
-                      <div className="space-y-3">
-                        {/* Title */}
-                        <div>
-                          <h4 className="font-semibold text-sm">{unit.label}</h4>
-                          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                            <MapPin className="w-3 h-3" />
-                            {unit.property}, {unit.city}
-                          </p>
-                        </div>
-
-                        {/* Details */}
-                        <div className="space-y-2">
-                          <div className="text-xs text-muted-foreground">
-                            {unit.surface}m² • {unit.targetRent}€/mois
+                {columnUnits.length === 0 && column.id === "to_publish" && filteredUnits.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileText className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-xs">Aucun bien disponible</p>
+                  </div>
+                ) : (
+                  columnUnits.map(unit => (
+                    <Card 
+                      key={unit.id} 
+                      className={`cursor-pointer transition-shadow hover:shadow-md ${column.color}`}
+                      onClick={() => setSelectedUnit(unit)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          {/* Title */}
+                          <div>
+                            <h4 className="font-semibold text-sm">{unit.type} - {unit.unit_number}</h4>
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                              <MapPin className="w-3 h-3" />
+                              {unit.property_name}
+                            </p>
                           </div>
-                          
-                          <Badge {...getStatusBadge(unit.status)} className="text-xs" />
-                          
-                          {unit.leads && (
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <User className="w-3 h-3" />
-                              {unit.leads} lead(s)
-                            </div>
-                          )}
-                          
-                          {unit.nextVisit && (
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <Calendar className="w-3 h-3" />
-                              {unit.nextVisit}
-                            </div>
-                          )}
-                        </div>
 
-                        {/* Quick Actions */}
-                        <div className="flex gap-2 pt-2 border-t">
-                          {column.id === "leads" && (
-                            <Button size="sm" variant="outline" className="text-xs h-7 px-2">
-                              Planifier visite
-                            </Button>
-                          )}
-                          {column.id === "visits" && (
-                            <Button size="sm" variant="outline" className="text-xs h-7 px-2">
-                              Créer bail
-                            </Button>
-                          )}
-                          {column.id === "draft_lease" && (
-                            <Button size="sm" variant="outline" className="text-xs h-7 px-2">
-                              Envoyer signature
-                            </Button>
-                          )}
+                          {/* Details */}
+                          <div className="space-y-2">
+                            <div className="text-xs text-muted-foreground">
+                              {unit.surface ? `${unit.surface}m²` : 'N/A'} • {unit.target_rent || 'N/A'}€/mois
+                            </div>
+                            
+                            <Badge {...getStatusBadge(unit.status)} className="text-xs" />
+                          </div>
+
+                          {/* Quick Actions */}
+                          <div className="flex gap-2 pt-2 border-t">
+                            {column.id === "leads" && (
+                              <Button size="sm" variant="outline" className="text-xs h-7 px-2">
+                                Planifier visite
+                              </Button>
+                            )}
+                            {column.id === "visits" && (
+                              <Button size="sm" variant="outline" className="text-xs h-7 px-2">
+                                Créer bail
+                              </Button>
+                            )}
+                            {column.id === "draft_lease" && (
+                              <Button size="sm" variant="outline" className="text-xs h-7 px-2">
+                                Envoyer signature
+                              </Button>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
               </div>
             </div>
           )
@@ -213,10 +229,10 @@ export default function Leasing() {
             <div className="space-y-4 pt-4">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="font-medium">Surface:</span> {selectedUnit.surface}m²
+                  <span className="font-medium">Surface:</span> {selectedUnit.surface ? `${selectedUnit.surface}m²` : 'N/A'}
                 </div>
                 <div>
-                  <span className="font-medium">Loyer cible:</span> {selectedUnit.targetRent}€
+                  <span className="font-medium">Loyer cible:</span> {selectedUnit.target_rent || 'N/A'}€
                 </div>
                 <div>
                   <span className="font-medium">Statut:</span>

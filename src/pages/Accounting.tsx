@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -7,104 +7,73 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Calculator, Plus, Download, Upload, Euro, Receipt, FileText, TrendingUp, AlertCircle, CreditCard } from "lucide-react"
+import { supabase } from "@/integrations/supabase/client"
 import { BankConnectionModal } from "@/components/bank-connection-modal"
 import BatchReceiptGenerator from "@/components/batch-receipt-generator"
 import ExpenseManager from "@/components/expense-manager"
 import DepositManager from "@/components/deposit-manager"
 import { useToast } from "@/hooks/use-toast"
 
-const MOCK_RENT_INVOICES = [
-  {
-    id: "1",
-    leaseId: "lease1",
-    tenant: "Marie Dubois",
-    property: "25 rue de la Paix - T3",
-    periodMonth: 1,
-    periodYear: 2024,
-    rentAmount: 1100,
-    charges: 150,
-    total: 1250,
-    status: "PAID",
-    dueDate: "2024-01-05",
-    paidDate: "2024-01-03"
-  },
-  {
-    id: "2",
-    leaseId: "lease2",
-    tenant: "Pierre Martin",
-    property: "10 avenue Mozart - Studio",
-    periodMonth: 1,
-    periodYear: 2024,
-    rentAmount: 750,
-    charges: 80,
-    total: 830,
-    status: "DUE",
-    dueDate: "2024-01-05"
-  },
-  {
-    id: "3",
-    leaseId: "lease1",
-    tenant: "Marie Dubois",
-    property: "25 rue de la Paix - T3",
-    periodMonth: 12,
-    periodYear: 2023,
-    rentAmount: 1100,
-    charges: 150,
-    total: 1250,
-    status: "OVERDUE",
-    dueDate: "2023-12-05"
-  }
-]
+interface RentInvoice {
+  id: string
+  lease_id: string
+  tenant_name?: string
+  property_name?: string
+  period_month: number
+  period_year: number
+  rent_amount: number
+  charges_amount: number
+  total_amount: number
+  status: string
+  due_date: string
+  paid_date?: string
+}
 
-const MOCK_EXPENSES = [
-  {
-    id: "1",
-    date: "2024-01-15",
-    description: "Réparation plomberie - T3",
-    vendor: "Jean Plombier",
-    property: "25 rue de la Paix",
-    category: "Maintenance",
-    amount: 250,
-    vatRate: 20,
-    deductible: true
-  },
-  {
-    id: "2", 
-    date: "2024-01-10",
-    description: "Électricité parties communes",
-    vendor: "EDF",
-    property: "25 rue de la Paix",
-    category: "Charges",
-    amount: 45,
-    vatRate: 20,
-    deductible: true
-  }
-]
+interface Expense {
+  id: string
+  description: string
+  category: string
+  amount: number
+  expense_date: string
+}
 
-const MOCK_DEPOSITS = [
-  {
-    id: "1",
-    leaseId: "lease1",
-    tenant: "Marie Dubois",
-    property: "25 rue de la Paix - T3",
-    amount: 2200,
-    receivedAt: "2023-06-01",
-    status: "HELD"
-  },
-  {
-    id: "2",
-    leaseId: "lease2", 
-    tenant: "Pierre Martin",
-    property: "10 avenue Mozart - Studio",
-    amount: 1500,
-    receivedAt: "2023-09-15",
-    status: "HELD"
-  }
-]
+interface Deposit {
+  id: string
+  lease_id: string
+  amount: number
+  status: string
+  created_at: string
+}
 
 export default function Accounting() {
   const [activeTab, setActiveTab] = useState("receipts")
+  const [rentInvoices, setRentInvoices] = useState<RentInvoice[]>([])
+  const [expenses, setExpenses] = useState<Expense[]>([])
+  const [deposits, setDeposits] = useState<Deposit[]>([])
+  const [loading, setLoading] = useState(true)
   const { toast } = useToast()
+
+  useEffect(() => {
+    loadAccountingData()
+  }, [])
+
+  const loadAccountingData = async () => {
+    try {
+      const [rentResult, expensesResult, depositsResult] = await Promise.all([
+        supabase.from('rent_invoices').select('*'),
+        supabase.from('expenses').select('*'), 
+        supabase.from('deposits').select('*')
+      ])
+
+      setRentInvoices(rentResult.data || [])
+      setExpenses(expensesResult.data || [])
+      setDeposits(depositsResult.data || [])
+    } catch (error) {
+      console.error('Error loading accounting data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const getStatusBadge = (status: string) => {
     const statuses = {
@@ -130,19 +99,27 @@ export default function Accounting() {
   }
 
   // Calculate stats
-  const totalRentDue = MOCK_RENT_INVOICES
-    .filter(invoice => invoice.status === "DUE" || invoice.status === "OVERDUE")
-    .reduce((sum, invoice) => sum + invoice.total, 0)
+  const totalRentDue = rentInvoices
+    .filter(invoice => invoice.status === "pending" || invoice.status === "overdue")
+    .reduce((sum, invoice) => sum + invoice.total_amount, 0)
 
-  const totalOverdue = MOCK_RENT_INVOICES
-    .filter(invoice => invoice.status === "OVERDUE")
-    .reduce((sum, invoice) => sum + invoice.total, 0)
+  const totalOverdue = rentInvoices
+    .filter(invoice => invoice.status === "overdue")
+    .reduce((sum, invoice) => sum + invoice.total_amount, 0)
 
-  const totalExpenses = MOCK_EXPENSES.reduce((sum, expense) => sum + expense.amount, 0)
+  const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0)
 
-  const totalDeposits = MOCK_DEPOSITS
-    .filter(deposit => deposit.status === "HELD")
+  const totalDeposits = deposits
+    .filter(deposit => deposit.status === "held")
     .reduce((sum, deposit) => sum + deposit.amount, 0)
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-muted-foreground">Chargement des données comptables...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -206,7 +183,7 @@ export default function Accounting() {
             </div>
             <div className="text-2xl font-bold">{formatCurrency(totalRentDue)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {MOCK_RENT_INVOICES.filter(i => i.status === "DUE").length} facture(s)
+              {rentInvoices.filter(i => i.status === "pending").length} facture(s)
             </p>
           </CardContent>
         </Card>
@@ -219,7 +196,7 @@ export default function Accounting() {
             </div>
             <div className="text-2xl font-bold text-destructive">{formatCurrency(totalOverdue)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {MOCK_RENT_INVOICES.filter(i => i.status === "OVERDUE").length} en retard
+              {rentInvoices.filter(i => i.status === "overdue").length} en retard
             </p>
           </CardContent>
         </Card>
@@ -232,7 +209,7 @@ export default function Accounting() {
             </div>
             <div className="text-2xl font-bold">{formatCurrency(totalExpenses)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {MOCK_EXPENSES.length} dépense(s)
+              {expenses.length} dépense(s)
             </p>
           </CardContent>
         </Card>
@@ -245,7 +222,7 @@ export default function Accounting() {
             </div>
             <div className="text-2xl font-bold">{formatCurrency(totalDeposits)}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {MOCK_DEPOSITS.filter(d => d.status === "HELD").length} détenu(s)
+              {deposits.filter(d => d.status === "held").length} détenu(s)
             </p>
           </CardContent>
         </Card>
@@ -287,36 +264,44 @@ export default function Accounting() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {MOCK_RENT_INVOICES.map((invoice) => (
-                    <TableRow key={invoice.id}>
-                      <TableCell className="font-medium">{invoice.tenant}</TableCell>
-                      <TableCell>{invoice.property}</TableCell>
-                      <TableCell>
-                        {String(invoice.periodMonth).padStart(2, '0')}/{invoice.periodYear}
-                      </TableCell>
-                      <TableCell>{formatCurrency(invoice.rentAmount)}</TableCell>
-                      <TableCell>{formatCurrency(invoice.charges)}</TableCell>
-                      <TableCell className="font-medium">{formatCurrency(invoice.total)}</TableCell>
-                      <TableCell>
-                        <Badge {...getStatusBadge(invoice.status)} className="text-xs">
-                          {getStatusBadge(invoice.status).label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{formatDate(invoice.dueDate)}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          {invoice.status !== "PAID" && (
-                            <Button size="sm" variant="outline">
-                              Enregistrer paiement
-                            </Button>
-                          )}
-                          <Button size="sm" variant="ghost">
-                            Quittance
-                          </Button>
-                        </div>
+                  {rentInvoices.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                        Aucune facture de loyer trouvée
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    rentInvoices.map((invoice) => (
+                      <TableRow key={invoice.id}>
+                        <TableCell className="font-medium">{invoice.tenant_name || 'N/A'}</TableCell>
+                        <TableCell>{invoice.property_name || 'N/A'}</TableCell>
+                        <TableCell>
+                          {String(invoice.period_month).padStart(2, '0')}/{invoice.period_year}
+                        </TableCell>
+                        <TableCell>{formatCurrency(invoice.rent_amount)}</TableCell>
+                        <TableCell>{formatCurrency(invoice.charges_amount || 0)}</TableCell>
+                        <TableCell className="font-medium">{formatCurrency(invoice.total_amount)}</TableCell>
+                        <TableCell>
+                          <Badge {...getStatusBadge(invoice.status.toUpperCase())} className="text-xs">
+                            {getStatusBadge(invoice.status.toUpperCase()).label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{formatDate(invoice.due_date)}</TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            {invoice.status !== "paid" && (
+                              <Button size="sm" variant="outline">
+                                Enregistrer paiement
+                              </Button>
+                            )}
+                            <Button size="sm" variant="ghost">
+                              Quittance
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </CardContent>

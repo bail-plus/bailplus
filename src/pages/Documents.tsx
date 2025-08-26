@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -7,64 +7,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { FileText, Plus, Search, Download, Upload, Eye, File, Folder, Image } from "lucide-react"
+import { supabase } from "@/integrations/supabase/client"
 
-const MOCK_DOCUMENTS = [
-  {
-    id: "1",
-    name: "Bail Marie Dubois - T3 rue de la Paix",
-    type: "LEASE",
-    category: "Contrats",
-    entityType: "Lease",
-    entityId: "lease1",
-    size: "245 KB",
-    createdAt: "2023-06-01T10:00:00Z",
-    downloadUrl: "#"
-  },
-  {
-    id: "2",
-    name: "Quittance Janvier 2024 - Marie Dubois",
-    type: "RECEIPT",
-    category: "Quittances",
-    entityType: "RentInvoice",
-    entityId: "invoice1",
-    size: "128 KB",
-    createdAt: "2024-01-05T14:30:00Z",
-    downloadUrl: "#"
-  },
-  {
-    id: "3",
-    name: "État des lieux entrée - T3 rue de la Paix",
-    type: "EDL",
-    category: "États des lieux",
-    entityType: "Lease",
-    entityId: "lease1",
-    size: "512 KB",
-    createdAt: "2023-05-28T16:20:00Z",
-    downloadUrl: "#"
-  },
-  {
-    id: "4",
-    name: "Dossier locataire - Pierre Martin",
-    type: "OTHER",
-    category: "KYC",
-    entityType: "Person",
-    entityId: "person2",
-    size: "1.2 MB",
-    createdAt: "2023-09-10T11:15:00Z",
-    downloadUrl: "#"
-  },
-  {
-    id: "5",
-    name: "Facture plomberie - Janvier 2024",
-    type: "OTHER",
-    category: "Factures",
-    entityType: "Expense",
-    entityId: "expense1",
-    size: "89 KB",
-    createdAt: "2024-01-15T09:45:00Z",
-    downloadUrl: "#"
-  }
-]
+interface Document {
+  id: string
+  name: string
+  type: string
+  category: string | null
+  file_size: number | null
+  created_at: string
+  file_url: string
+}
 
 const DOCUMENT_CATEGORIES = [
   { value: "all", label: "Tous les documents" },
@@ -80,8 +33,30 @@ export default function Documents() {
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [selectedDocument, setSelectedDocument] = useState<any>(null)
+  const [documents, setDocuments] = useState<Document[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const filteredDocuments = MOCK_DOCUMENTS.filter(doc => {
+  useEffect(() => {
+    loadDocuments()
+  }, [])
+
+  const loadDocuments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('*')
+        .order('created_at', { ascending: false })
+      
+      if (error) throw error
+      setDocuments(data || [])
+    } catch (error) {
+      console.error('Error loading documents:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredDocuments = documents.filter(doc => {
     const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesCategory = categoryFilter === "all" || doc.category === categoryFilter
     return matchesSearch && matchesCategory
@@ -119,16 +94,28 @@ export default function Documents() {
     })
   }
 
-  const formatFileSize = (size: string) => {
-    return size
+  const formatFileSize = (size: number | null) => {
+    if (!size) return 'N/A'
+    if (size < 1024) return `${size} B`
+    if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`
+    return `${Math.round(size / (1024 * 1024))} MB`
   }
 
   // Calculate stats
-  const totalDocuments = MOCK_DOCUMENTS.length
-  const documentsByCategory = MOCK_DOCUMENTS.reduce((acc, doc) => {
-    acc[doc.category] = (acc[doc.category] || 0) + 1
+  const totalDocuments = documents.length
+  const documentsByCategory = documents.reduce((acc, doc) => {
+    const category = doc.category || 'Autres'
+    acc[category] = (acc[category] || 0) + 1
     return acc
   }, {} as Record<string, number>)
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-muted-foreground">Chargement des documents...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -330,61 +317,70 @@ export default function Documents() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredDocuments.map((document) => {
-                const IconComponent = getDocumentIcon(document.type)
-                const badgeConfig = getDocumentBadge(document.type)
-                
-                return (
-                  <TableRow 
-                    key={document.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => setSelectedDocument(document)}
-                  >
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <IconComponent className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                        <div className="min-w-0">
-                          <div className="font-medium text-sm truncate">{document.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            ID: {document.id}
+              {filteredDocuments.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    Aucun document trouvé
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredDocuments.map((document) => {
+                  const IconComponent = getDocumentIcon(document.type)
+                  const badgeConfig = getDocumentBadge(document.type)
+                  
+                  return (
+                    <TableRow 
+                      key={document.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => setSelectedDocument(document)}
+                    >
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <IconComponent className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          <div className="min-w-0">
+                            <div className="font-medium text-sm truncate">{document.name}</div>
+                            <div className="text-xs text-muted-foreground">
+                              ID: {document.id}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <Badge variant={badgeConfig.variant} className="text-xs">
-                        {badgeConfig.label}
-                      </Badge>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <span className="text-sm">{document.category}</span>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <span className="text-sm text-muted-foreground">{formatFileSize(document.size)}</span>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <span className="text-sm text-muted-foreground">{formatDate(document.createdAt)}</span>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button size="sm" variant="ghost" className="gap-1">
-                          <Eye className="w-3 h-3" />
-                          Voir
-                        </Button>
-                        <Button size="sm" variant="ghost" className="gap-1">
-                          <Download className="w-3 h-3" />
-                          Télécharger
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
+                      </TableCell>
+                      
+                      <TableCell>
+                        <Badge variant={badgeConfig.variant} className="text-xs">
+                          {badgeConfig.label}
+                        </Badge>
+                      </TableCell>
+                      
+                      <TableCell>
+                        <span className="text-sm">{document.category || 'N/A'}</span>
+                      </TableCell>
+                      
+                      <TableCell>
+                        <span className="text-sm text-muted-foreground">{formatFileSize(document.file_size)}</span>
+                      </TableCell>
+                      
+                      <TableCell>
+                        <span className="text-sm text-muted-foreground">{formatDate(document.created_at)}</span>
+                      </TableCell>
+                      
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" variant="ghost" className="gap-1">
+                            <Eye className="w-3 h-3" />
+                            Voir
+                          </Button>
+                          <Button size="sm" variant="ghost" className="gap-1">
+                            <Download className="w-3 h-3" />
+                            Télécharger
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
+              )}
             </TableBody>
           </Table>
         </CardContent>

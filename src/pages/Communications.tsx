@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -9,75 +9,28 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Mail, MessageSquare, Plus, Search, Send, Eye, Clock, CheckCircle, AlertCircle } from "lucide-react"
+import { supabase } from "@/integrations/supabase/client"
 
-const MOCK_MESSAGES = [
-  {
-    id: "1",
-    channel: "EMAIL",
-    to: "marie.dubois@email.com",
-    toName: "Marie Dubois",
-    subject: "Quittance de loyer - Janvier 2024",
-    body: "Bonjour Madame Dubois, veuillez trouver ci-joint votre quittance de loyer pour le mois de janvier 2024.",
-    templateId: "quittance_monthly",
-    sentAt: "2024-01-05T14:30:00Z",
-    status: "DELIVERED",
-    messageType: "AUTO"
-  },
-  {
-    id: "2", 
-    channel: "SMS",
-    to: "06 12 34 56 78",
-    toName: "Pierre Martin",
-    subject: null,
-    body: "Bonjour, votre loyer du mois de janvier est échu. Merci de régulariser votre situation. Cordialement.",
-    templateId: "reminder_payment",
-    sentAt: "2024-01-10T09:15:00Z",
-    status: "DELIVERED",
-    messageType: "MANUAL"
-  },
-  {
-    id: "3",
-    channel: "EMAIL",
-    to: "pierre.martin@email.com", 
-    toName: "Pierre Martin",
-    subject: "Relance - Loyer en retard",
-    body: "Monsieur Martin, nous constatons que votre loyer n'est toujours pas réglé. Merci de procéder au paiement dans les plus brefs délais.",
-    templateId: "reminder_overdue",
-    sentAt: "2024-01-15T16:45:00Z",
-    status: "PENDING",
-    messageType: "AUTO"
-  }
-]
+interface CommunicationLog {
+  id: string
+  recipient_type: string
+  recipient_email: string | null
+  recipient_phone: string | null
+  subject: string | null
+  content: string
+  status: string | null
+  sent_at: string | null
+  template_id: string | null
+}
 
-const MOCK_TEMPLATES = [
-  {
-    id: "quittance_monthly",
-    name: "Envoi quittance mensuelle",
-    channel: "EMAIL",
-    subject: "Quittance de loyer - {{month}} {{year}}",
-    body: "Bonjour {{tenant.firstName}},\n\nVeuillez trouver ci-joint votre quittance de loyer pour le mois de {{month}} {{year}}.\n\nMontant: {{invoice.total}}€\nPériode: {{invoice.period}}\n\nCordialement,\n{{landlord.name}}",
-    variables: ["tenant.firstName", "month", "year", "invoice.total", "invoice.period", "landlord.name"],
-    usage: 5
-  },
-  {
-    id: "reminder_payment",
-    name: "Rappel paiement loyer",
-    channel: "SMS",
-    subject: null,
-    body: "Bonjour {{tenant.firstName}}, votre loyer du mois de {{month}} est échu. Merci de régulariser. Cordialement.",
-    variables: ["tenant.firstName", "month"],
-    usage: 2
-  },
-  {
-    id: "reminder_overdue",
-    name: "Relance impayé",
-    channel: "EMAIL", 
-    subject: "Relance - Loyer en retard",
-    body: "{{tenant.title}} {{tenant.lastName}},\n\nNous constatons que votre loyer de {{invoice.total}}€ pour la période {{invoice.period}} n'est toujours pas réglé.\n\nMerci de procéder au paiement dans les plus brefs délais pour éviter des pénalités.\n\nCordialement,\n{{landlord.name}}",
-    variables: ["tenant.title", "tenant.lastName", "invoice.total", "invoice.period", "landlord.name"],
-    usage: 1
-  }
-]
+interface CommunicationTemplate {
+  id: string
+  name: string
+  type: string
+  subject: string | null
+  content: string
+  variables: any
+}
 
 export default function Communications() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -85,14 +38,38 @@ export default function Communications() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [selectedMessage, setSelectedMessage] = useState<any>(null)
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null)
+  const [messages, setMessages] = useState<CommunicationLog[]>([])
+  const [templates, setTemplates] = useState<CommunicationTemplate[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const filteredMessages = MOCK_MESSAGES.filter(message => {
+  useEffect(() => {
+    loadCommunicationData()
+  }, [])
+
+  const loadCommunicationData = async () => {
+    try {
+      const [messagesResult, templatesResult] = await Promise.all([
+        supabase.from('communication_logs').select('*').order('sent_at', { ascending: false }),
+        supabase.from('communication_templates').select('*').order('created_at', { ascending: false })
+      ])
+
+      setMessages(messagesResult.data || [])
+      setTemplates(templatesResult.data || [])
+    } catch (error) {
+      console.error('Error loading communication data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredMessages = messages.filter(message => {
     const matchesSearch = 
-      message.toName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (message.recipient_email && message.recipient_email.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (message.subject && message.subject.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      message.body.toLowerCase().includes(searchTerm.toLowerCase())
+      message.content.toLowerCase().includes(searchTerm.toLowerCase())
     
-    const matchesChannel = channelFilter === "all" || message.channel === channelFilter
+    const messageChannel = message.recipient_email ? "EMAIL" : "SMS"
+    const matchesChannel = channelFilter === "all" || messageChannel === channelFilter
     const matchesStatus = statusFilter === "all" || message.status === statusFilter
     
     return matchesSearch && matchesChannel && matchesStatus
@@ -138,10 +115,18 @@ export default function Communications() {
   }
 
   // Calculate stats
-  const totalMessages = MOCK_MESSAGES.length
-  const deliveredMessages = MOCK_MESSAGES.filter(m => m.status === "DELIVERED").length
-  const pendingMessages = MOCK_MESSAGES.filter(m => m.status === "PENDING").length
-  const emailMessages = MOCK_MESSAGES.filter(m => m.channel === "EMAIL").length
+  const totalMessages = messages.length
+  const deliveredMessages = messages.filter(m => m.status === "sent").length
+  const pendingMessages = messages.filter(m => m.status === "pending").length
+  const emailMessages = messages.filter(m => m.recipient_email).length
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-muted-foreground">Chargement des communications...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -200,7 +185,7 @@ export default function Communications() {
                     <SelectValue placeholder="Choisir un modèle (optionnel)" />
                   </SelectTrigger>
                   <SelectContent>
-                    {MOCK_TEMPLATES.map(template => (
+                  {templates.map(template => (
                       <SelectItem key={template.id} value={template.id}>
                         {template.name}
                       </SelectItem>
@@ -351,75 +336,86 @@ export default function Communications() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredMessages.map((message) => {
-                    const ChannelIcon = getChannelIcon(message.channel)
-                    const channelBadge = getChannelBadge(message.channel)
-                    const statusBadge = getStatusBadge(message.status)
-                    const typeBadge = getMessageTypeBadge(message.messageType)
-                    
-                    return (
-                      <TableRow 
-                        key={message.id}
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => setSelectedMessage(message)}
-                      >
-                        <TableCell>
-                          <div>
-                            <div className="font-medium text-sm">{message.toName}</div>
-                            <div className="text-xs text-muted-foreground">{message.to}</div>
-                          </div>
-                        </TableCell>
-                        
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <ChannelIcon className="w-4 h-4 text-muted-foreground" />
-                            <Badge variant={channelBadge.variant} className="text-xs">
-                              {channelBadge.label}
-                            </Badge>
-                          </div>
-                        </TableCell>
-                        
-                        <TableCell>
-                          <div className="max-w-xs">
-                            {message.subject && (
-                              <div className="font-medium text-sm truncate">{message.subject}</div>
-                            )}
-                            <div className="text-xs text-muted-foreground truncate">
-                              {message.body}
+                  {filteredMessages.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        <Mail className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                        Aucun message trouvé
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredMessages.map((message) => {
+                      const messageChannel = message.recipient_email ? "EMAIL" : "SMS"
+                      const ChannelIcon = getChannelIcon(messageChannel)
+                      const channelBadge = getChannelBadge(messageChannel)
+                      const statusBadge = getStatusBadge(message.status || "pending")
+                      
+                      return (
+                        <TableRow 
+                          key={message.id}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => setSelectedMessage(message)}
+                        >
+                          <TableCell>
+                            <div>
+                              <div className="font-medium text-sm">{message.recipient_type}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {message.recipient_email || message.recipient_phone || 'N/A'}
+                              </div>
                             </div>
-                          </div>
-                        </TableCell>
-                        
-                        <TableCell>
-                          <Badge variant={typeBadge.variant} className="text-xs">
-                            {typeBadge.label}
-                          </Badge>
-                        </TableCell>
-                        
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <statusBadge.icon className="w-4 h-4" />
-                            <Badge variant={statusBadge.variant} className="text-xs">
-                              {statusBadge.label}
+                          </TableCell>
+                          
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <ChannelIcon className="w-4 h-4 text-muted-foreground" />
+                              <Badge variant={channelBadge.variant} className="text-xs">
+                                {channelBadge.label}
+                              </Badge>
+                            </div>
+                          </TableCell>
+                          
+                          <TableCell>
+                            <div className="max-w-xs">
+                              {message.subject && (
+                                <div className="font-medium text-sm truncate">{message.subject}</div>
+                              )}
+                              <div className="text-xs text-muted-foreground truncate">
+                                {message.content}
+                              </div>
+                            </div>
+                          </TableCell>
+                          
+                          <TableCell>
+                            <Badge variant="secondary" className="text-xs">
+                              {message.template_id ? "Auto" : "Manuel"}
                             </Badge>
-                          </div>
-                        </TableCell>
-                        
-                        <TableCell>
-                          <span className="text-sm text-muted-foreground">
-                            {formatDate(message.sentAt)}
-                          </span>
-                        </TableCell>
-                        
-                        <TableCell>
-                          <Button size="sm" variant="ghost" className="gap-1">
-                            <Eye className="w-3 h-3" />
-                            Voir
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
+                          </TableCell>
+                          
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <statusBadge.icon className="w-4 h-4" />
+                              <Badge variant={statusBadge.variant} className="text-xs">
+                                {statusBadge.label}
+                              </Badge>
+                            </div>
+                          </TableCell>
+                          
+                          <TableCell>
+                            <span className="text-sm text-muted-foreground">
+                              {message.sent_at ? formatDate(message.sent_at) : 'N/A'}
+                            </span>
+                          </TableCell>
+                          
+                          <TableCell>
+                            <Button size="sm" variant="ghost" className="gap-1">
+                              <Eye className="w-3 h-3" />
+                              Voir
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -457,9 +453,16 @@ export default function Communications() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {MOCK_TEMPLATES.map((template) => {
-              const ChannelIcon = getChannelIcon(template.channel)
-              const channelBadge = getChannelBadge(template.channel)
+            {templates.length === 0 ? (
+              <div className="col-span-full text-center py-8 text-muted-foreground">
+                <Mail className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p>Aucun modèle trouvé</p>
+                <p className="text-xs mt-2">Créez votre premier modèle de message</p>
+              </div>
+            ) : (
+              templates.map((template) => {
+                const ChannelIcon = getChannelIcon(template.type)
+                const channelBadge = getChannelBadge(template.type)
               
               return (
                 <Card 
@@ -480,29 +483,30 @@ export default function Communications() {
                   </CardHeader>
                   <CardContent className="pt-0">
                     <div className="space-y-3">
-                      {template.subject && (
+                        {template.subject && (
+                          <div>
+                            <div className="text-xs font-medium text-muted-foreground mb-1">Sujet</div>
+                            <div className="text-sm truncate">{template.subject}</div>
+                          </div>
+                        )}
+                        
                         <div>
-                          <div className="text-xs font-medium text-muted-foreground mb-1">Sujet</div>
-                          <div className="text-sm truncate">{template.subject}</div>
+                          <div className="text-xs font-medium text-muted-foreground mb-1">Contenu</div>
+                          <div className="text-sm text-muted-foreground line-clamp-3">
+                            {template.content}
+                          </div>
                         </div>
-                      )}
-                      
-                      <div>
-                        <div className="text-xs font-medium text-muted-foreground mb-1">Contenu</div>
-                        <div className="text-sm text-muted-foreground line-clamp-3">
-                          {template.body}
+                        
+                        <div className="flex items-center justify-between pt-2 border-t text-xs text-muted-foreground">
+                          <span>{template.variables ? JSON.parse(template.variables).length : 0} variable(s)</span>
+                          <span>Modèle actif</span>
                         </div>
                       </div>
-                      
-                      <div className="flex items-center justify-between pt-2 border-t text-xs text-muted-foreground">
-                        <span>{template.variables.length} variable(s)</span>
-                        <span>Utilisé {template.usage} fois</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
+                    </CardContent>
+                  </Card>
+                )
+              })
+            )}
           </div>
         </TabsContent>
       </Tabs>

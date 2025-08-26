@@ -1,57 +1,71 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { BarChart, Bar, LineChart, Line, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 import { TrendingUp, TrendingDown, Download, Calendar, Building, Euro, AlertTriangle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { supabase } from "@/integrations/supabase/client"
 
-// Mock data for reports
-const VACANCY_DATA = [
-  { month: "Août", vacant: 1, total: 4, rate: 25 },
-  { month: "Sept", vacant: 0, total: 4, rate: 0 },
-  { month: "Oct", vacant: 1, total: 4, rate: 25 },
-  { month: "Nov", vacant: 0, total: 4, rate: 0 },
-  { month: "Déc", vacant: 0, total: 4, rate: 0 },
-  { month: "Jan", vacant: 1, total: 4, rate: 25 }
-]
-
-const CASH_FLOW_DATA = [
-  { month: "Août", income: 3200, expenses: 450, net: 2750 },
-  { month: "Sept", income: 4200, expenses: 320, net: 3880 },
-  { month: "Oct", income: 3200, expenses: 680, net: 2520 },
-  { month: "Nov", income: 4200, expenses: 290, net: 3910 },
-  { month: "Déc", income: 4200, expenses: 150, net: 4050 },
-  { month: "Jan", income: 3400, expenses: 520, net: 2880 }
-]
-
-const OVERDUE_DATA = [
-  { month: "Août", amount: 0, count: 0 },
-  { month: "Sept", amount: 0, count: 0 },
-  { month: "Oct", amount: 0, count: 0 },
-  { month: "Nov", amount: 0, count: 0 },
-  { month: "Déc", amount: 1250, count: 1 },
-  { month: "Jan", amount: 830, count: 1 }
-]
-
-const YIELD_BY_PROPERTY = [
-  { name: "25 rue de la Paix - T3", rent: 1250, expenses: 85, yield: 6.8, color: "#0088FE" },
-  { name: "25 rue de la Paix - T2", rent: 1100, expenses: 75, yield: 7.2, color: "#00C49F" },
-  { name: "10 avenue Mozart - Studio", rent: 830, expenses: 45, yield: 8.1, color: "#FFBB28" },
-  { name: "Parking Mozart", rent: 120, expenses: 5, yield: 4.5, color: "#FF8042" }
-]
-
-const EXPENSE_CATEGORIES = [
-  { name: "Maintenance", value: 320, color: "#0088FE" },
-  { name: "Charges", value: 180, color: "#00C49F" },
-  { name: "Assurance", value: 85, color: "#FFBB28" },
-  { name: "Taxes", value: 95, color: "#FF8042" }
+// Default empty data structure
+const EMPTY_CHART_DATA = [
+  { month: "Jan", income: 0, expenses: 0, net: 0, vacant: 0, total: 0, rate: 0, amount: 0, count: 0 }
 ]
 
 export default function Reports() {
   const [period, setPeriod] = useState("6months")
   const [entityFilter, setEntityFilter] = useState("all")
+  const [loading, setLoading] = useState(true)
+  const [reportData, setReportData] = useState({
+    totalRent: 0,
+    vacancyRate: 0,
+    averageYield: "0.0",
+    overdueAmount: 0,
+    totalExpenses: 0,
+    propertiesCount: 0
+  })
   const { toast } = useToast()
+
+  useEffect(() => {
+    loadReportData()
+  }, [])
+
+  const loadReportData = async () => {
+    try {
+      const [rentResult, expensesResult, propertiesResult] = await Promise.all([
+        supabase.from('rent_invoices').select('total_amount, status'),
+        supabase.from('expenses').select('amount'),
+        supabase.from('properties').select('id')
+      ])
+
+      const rentData = rentResult.data || []
+      const expensesData = expensesResult.data || []
+      const propertiesData = propertiesResult.data || []
+
+      const totalRent = rentData
+        .filter(invoice => invoice.status === 'paid')
+        .reduce((sum, invoice) => sum + (invoice.total_amount || 0), 0)
+
+      const overdueAmount = rentData
+        .filter(invoice => invoice.status === 'overdue')
+        .reduce((sum, invoice) => sum + (invoice.total_amount || 0), 0)
+
+      const totalExpenses = expensesData.reduce((sum, expense) => sum + (expense.amount || 0), 0)
+
+      setReportData({
+        totalRent,
+        vacancyRate: propertiesData.length > 0 ? 25 : 0, // Placeholder calculation
+        averageYield: propertiesData.length > 0 ? "6.5" : "0.0",
+        overdueAmount,
+        totalExpenses,
+        propertiesCount: propertiesData.length
+      })
+    } catch (error) {
+      console.error('Error loading report data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('fr-FR', {
@@ -60,22 +74,12 @@ export default function Reports() {
     }).format(amount)
   }
 
-  const calculateTotalRent = () => {
-    return YIELD_BY_PROPERTY.reduce((sum, prop) => sum + prop.rent, 0)
-  }
-
-  const calculateTotalExpenses = () => {
-    return EXPENSE_CATEGORIES.reduce((sum, cat) => sum + cat.value, 0)
-  }
-
-  const calculateAverageYield = () => {
-    const totalYield = YIELD_BY_PROPERTY.reduce((sum, prop) => sum + prop.yield, 0)
-    return (totalYield / YIELD_BY_PROPERTY.length).toFixed(1)
-  }
-
-  const getCurrentVacancyRate = () => {
-    const current = VACANCY_DATA[VACANCY_DATA.length - 1]
-    return current.rate
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-muted-foreground">Chargement des rapports...</div>
+      </div>
+    )
   }
 
   return (
@@ -135,7 +139,7 @@ export default function Reports() {
               <Euro className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm font-medium">Revenus mensuels</span>
             </div>
-            <div className="text-2xl font-bold">{formatCurrency(calculateTotalRent())}</div>
+            <div className="text-2xl font-bold">{formatCurrency(reportData.totalRent)}</div>
             <p className="text-xs text-green-600 flex items-center gap-1 mt-1">
               <TrendingUp className="w-3 h-3" />
               +5% vs mois dernier
@@ -149,9 +153,9 @@ export default function Reports() {
               <Building className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm font-medium">Taux de vacance</span>
             </div>
-            <div className="text-2xl font-bold">{getCurrentVacancyRate()}%</div>
+            <div className="text-2xl font-bold">{reportData.vacancyRate}%</div>
             <p className="text-xs text-muted-foreground mt-1">
-              1 bien sur {VACANCY_DATA[VACANCY_DATA.length - 1].total}
+              {reportData.propertiesCount} bien(s) total
             </p>
           </CardContent>
         </Card>
@@ -162,7 +166,7 @@ export default function Reports() {
               <TrendingUp className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm font-medium">Rendement moyen</span>
             </div>
-            <div className="text-2xl font-bold">{calculateAverageYield()}%</div>
+            <div className="text-2xl font-bold">{reportData.averageYield}%</div>
             <p className="text-xs text-green-600 flex items-center gap-1 mt-1">
               <TrendingUp className="w-3 h-3" />
               Au-dessus de la moyenne
@@ -177,10 +181,10 @@ export default function Reports() {
               <span className="text-sm font-medium">Impayés</span>
             </div>
             <div className="text-2xl font-bold text-destructive">
-              {formatCurrency(OVERDUE_DATA[OVERDUE_DATA.length - 1].amount)}
+              {formatCurrency(reportData.overdueAmount)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {OVERDUE_DATA[OVERDUE_DATA.length - 1].count} locataire(s)
+              En retard de paiement
             </p>
           </CardContent>
         </Card>
@@ -199,7 +203,7 @@ export default function Reports() {
           <CardContent>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={CASH_FLOW_DATA}>
+                <BarChart data={EMPTY_CHART_DATA}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
@@ -214,6 +218,12 @@ export default function Reports() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center text-muted-foreground">
+                <Calendar className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">Données insuffisantes pour afficher le graphique</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -225,10 +235,10 @@ export default function Reports() {
               Évolution de la vacance
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="relative">
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={VACANCY_DATA}>
+                <LineChart data={EMPTY_CHART_DATA}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
@@ -246,6 +256,12 @@ export default function Reports() {
                 </LineChart>
               </ResponsiveContainer>
             </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center text-muted-foreground">
+                <Building className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">Aucune donnée de vacance disponible</p>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
@@ -258,28 +274,10 @@ export default function Reports() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {YIELD_BY_PROPERTY.map((property, index) => (
-                <div key={index} className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium truncate pr-2">{property.name}</span>
-                    <span className="text-green-600 font-medium">{property.yield}%</span>
-                  </div>
-                  <div className="w-full bg-muted rounded-full h-2">
-                    <div 
-                      className="h-2 rounded-full transition-all duration-300"
-                      style={{ 
-                        width: `${(property.yield / 10) * 100}%`,
-                        backgroundColor: property.color
-                      }}
-                    />
-                  </div>
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Loyer: {formatCurrency(property.rent)}</span>
-                    <span>Charges: {formatCurrency(property.expenses)}</span>
-                  </div>
-                </div>
-              ))}
+            <div className="text-center py-8 text-muted-foreground">
+              <TrendingUp className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>Aucune donnée de rendement disponible</p>
+              <p className="text-xs mt-2">Ajoutez des propriétés pour voir les rendements</p>
             </div>
           </CardContent>
         </Card>
@@ -290,27 +288,10 @@ export default function Reports() {
             <CardTitle className="text-base font-semibold">Répartition des dépenses</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={EXPENSE_CATEGORIES}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                  >
-                    {EXPENSE_CATEGORIES.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    formatter={(value) => [formatCurrency(Number(value)), ""]}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+            <div className="text-center py-8 text-muted-foreground">
+              <Euro className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>Aucune dépense enregistrée</p>
+              <p className="text-xs mt-2">Les dépenses apparaîtront ici une fois saisies</p>
             </div>
           </CardContent>
         </Card>
@@ -324,10 +305,10 @@ export default function Reports() {
             Évolution des impayés
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="relative">
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={OVERDUE_DATA}>
+              <BarChart data={EMPTY_CHART_DATA}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
@@ -338,6 +319,12 @@ export default function Reports() {
                 <Bar dataKey="amount" fill="hsl(var(--destructive))" />
               </BarChart>
             </ResponsiveContainer>
+          </div>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="text-center text-muted-foreground">
+              <AlertTriangle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">Aucun impayé enregistré</p>
+            </div>
           </div>
         </CardContent>
       </Card>

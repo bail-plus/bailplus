@@ -289,6 +289,63 @@ export type Database = {
         }
         Relationships: []
       }
+      events: {
+        Row: {
+          attendees: string | null
+          created_at: string
+          description: string | null
+          end_date: string | null
+          end_time: string | null
+          event_type: string
+          id: string
+          location: string | null
+          property_id: string | null
+          start_date: string
+          start_time: string | null
+          status: string | null
+          tenant_id: string | null
+          title: string
+          unit_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          attendees?: string | null
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          end_time?: string | null
+          event_type?: string
+          id?: string
+          location?: string | null
+          property_id?: string | null
+          start_date: string
+          start_time?: string | null
+          status?: string | null
+          tenant_id?: string | null
+          title: string
+          unit_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attendees?: string | null
+          created_at?: string
+          description?: string | null
+          end_date?: string | null
+          end_time?: string | null
+          event_type?: string
+          id?: string
+          location?: string | null
+          property_id?: string | null
+          start_date?: string
+          start_time?: string | null
+          status?: string | null
+          tenant_id?: string | null
+          title?: string
+          unit_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       expenses: {
         Row: {
           amount: number
