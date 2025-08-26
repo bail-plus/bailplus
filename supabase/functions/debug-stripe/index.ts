@@ -20,20 +20,22 @@ serve(async (req) => {
   try {
     logStep("=== DEBUG STRIPE FUNCTION STARTED ===");
     
-    // Check all environment variables
+    // Check all environment variables with more detailed logging
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     const priceId = Deno.env.get("STRIPE_PRICE_STARTER");
     
     logStep("Environment check", {
       hasStripeKey: !!stripeKey,
       stripeKeyLength: stripeKey?.length || 0,
-      stripeKeyPrefix: stripeKey?.substring(0, 10) || "NONE",
+      stripeKeyPrefix: stripeKey?.substring(0, 7) || "NONE",
       hasPriceId: !!priceId,
-      priceId: priceId || "NONE"
+      priceId: priceId || "NONE",
+      allEnvKeys: Object.keys(Deno.env.toObject()).filter(key => key.includes('STRIPE'))
     });
     
     if (!stripeKey) {
-      throw new Error("STRIPE_SECRET_KEY is missing");
+      logStep("ERROR: STRIPE_SECRET_KEY is missing - available env vars:", Object.keys(Deno.env.toObject()));
+      throw new Error("STRIPE_SECRET_KEY not found");
     }
     
     if (!priceId) {
