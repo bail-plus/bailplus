@@ -101,8 +101,8 @@ serve(async (req) => {
         },
       ],
       mode: "subscription",
-      success_url: `${req.headers.get("origin")}/app?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.get("origin")}/offers?canceled=true`,
+      success_url: `${req.headers.get("origin")}/offers?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${req.headers.get("origin")}/offers?checkout=cancel`,
       metadata: {
         user_id: user.id,
         tier: tier

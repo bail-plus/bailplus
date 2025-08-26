@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,6 +25,31 @@ export default function Offers() {
   const { user, session, loading } = useAuth();
   const [selectedOffer, setSelectedOffer] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  
+  // Handle checkout status messages
+  useEffect(() => {
+    const checkoutStatus = searchParams.get('checkout');
+    if (checkoutStatus === 'success') {
+      toast.success('Paiement réussi ! Votre abonnement est maintenant actif.');
+      // Remove the checkout parameter from URL
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('checkout');
+      newParams.delete('session_id');
+      setSearchParams(newParams, { replace: true });
+      
+      // Redirect to app after a short delay to show the success message
+      setTimeout(() => {
+        window.location.href = '/app';
+      }, 2000);
+    } else if (checkoutStatus === 'cancel') {
+      toast.error('Paiement annulé. Vous pouvez reprendre le processus à tout moment.');
+      // Remove the checkout parameter from URL
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('checkout');
+      setSearchParams(newParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   // Show loading state while auth is being determined
   if (loading) {
@@ -136,58 +161,13 @@ export default function Offers() {
       <div className="container mx-auto px-6">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-foreground mb-4">
-            Choisissez votre offre
+            Choisissez votre abonnement
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Sélectionnez l'offre qui correspond le mieux à vos besoins pour commencer à utiliser BailloGenius
+            Sélectionnez l'offre Starter pour commencer à utiliser BailloGenius et simplifier votre gestion locative
           </p>
           
-          {/* Test buttons for debugging */}
-          <div className="mt-4 space-y-2">
-            <Button 
-              variant="outline" 
-              onClick={async () => {
-                console.log('🧪 Testing edge function connectivity...');
-                try {
-                  const { data, error } = await supabase.functions.invoke('test-connection');
-                  console.log('🧪 Test result:', { data, error });
-                  if (data) {
-                    toast.success(`Test réussi ! Stripe: ${data.stripe_key_configured ? '✅' : '❌'}`);
-                  }
-                } catch (err) {
-                  console.error('🧪 Test failed:', err);
-                  toast.error('Test de connexion échoué');
-                }
-              }}
-            >
-              🧪 Test Connexion
-            </Button>
-            
-            <Button 
-              variant="outline" 
-              onClick={async () => {
-                console.log('🔍 Testing Stripe API...');
-                try {
-                  const { data, error } = await supabase.functions.invoke('debug-stripe', {
-                    headers: session ? {
-                      Authorization: `Bearer ${session.access_token}`,
-                    } : {},
-                  });
-                  console.log('🔍 Stripe debug result:', { data, error });
-                  if (data) {
-                    toast.success(`Stripe API: ${data.stripe_api_working ? '✅' : '❌'}`);
-                  } else if (error) {
-                    toast.error(`Erreur Stripe: ${error.message || 'Inconnue'}`);
-                  }
-                } catch (err) {
-                  console.error('🔍 Stripe debug failed:', err);
-                  toast.error('Test Stripe échoué');
-                }
-              }}
-            >
-              🔍 Test Stripe API
-            </Button>
-          </div>
+          {/* Remove debug buttons from production */}
         </div>
 
         <div className="flex justify-center max-w-lg mx-auto">

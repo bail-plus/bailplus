@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +19,6 @@ import {
   Clock,
   DollarSign
 } from "lucide-react";
-import { Link } from "react-router-dom";
 import { siteConfig } from "@/config/site";
 
 const testimonials = [
@@ -310,7 +311,7 @@ export default function Landing() {
               </CardHeader>
               <CardContent>
                 <CardDescription className="text-base">
-                  À partir de 29€/mois pour 2 lots. Découvrez nos offres sur la page tarifs.
+                  À partir de 29€/mois pour 2 lots. <Link to="/offers" className="text-primary hover:underline">Découvrez nos offres</Link>.
                 </CardDescription>
               </CardContent>
             </Card>

@@ -426,7 +426,7 @@ export default function Features() {
               </a>
             </Button>
             <Button size="lg" variant="outline" asChild>
-              <a href="/pricing">
+              <a href="/offers">
                 Voir les tarifs
               </a>
             </Button>

@@ -32,7 +32,7 @@ import Offers from "./pages/Offers";
 // Public/Marketing pages
 import Landing from "./pages/marketing/Landing";
 import Features from "./pages/marketing/Features";
-import Pricing from "./pages/marketing/Pricing";
+// Pricing page replaced by Offers
 import FAQ from "./pages/marketing/FAQ";
 import About from "./pages/marketing/About";
 import Contact from "./pages/marketing/Contact";
@@ -61,7 +61,12 @@ const App = () => (
             {/* Public routes */}
             <Route path="/" element={<PublicLayout><Landing /></PublicLayout>} />
             <Route path="/features" element={<PublicLayout><Features /></PublicLayout>} />
-            <Route path="/pricing" element={<PublicLayout><Pricing /></PublicLayout>} />
+            {/* Redirects to /offers for all subscription-related routes */}
+            <Route path="/pricing" element={<Navigate to="/offers" replace />} />
+            <Route path="/tarifs" element={<Navigate to="/offers" replace />} />
+            <Route path="/plans" element={<Navigate to="/offers" replace />} />
+            <Route path="/subscription" element={<Navigate to="/offers" replace />} />
+            <Route path="/abonnement" element={<Navigate to="/offers" replace />} />
             <Route path="/faq" element={<PublicLayout><FAQ /></PublicLayout>} />
             <Route path="/about" element={<PublicLayout><About /></PublicLayout>} />
             <Route path="/contact" element={<PublicLayout><Contact /></PublicLayout>} />

@@ -29,7 +29,7 @@ export function PublicNavbar() {
             <Link to="/features" className="text-muted-foreground hover:text-foreground transition-colors">
               Fonctionnalités
             </Link>
-            <Link to="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">
+            <Link to="/offers" className="text-muted-foreground hover:text-foreground transition-colors">
               Tarifs
             </Link>
             <Link to="/faq" className="text-muted-foreground hover:text-foreground transition-colors">

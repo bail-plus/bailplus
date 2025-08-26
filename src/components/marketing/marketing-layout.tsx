@@ -22,7 +22,7 @@ interface MarketingLayoutProps {
 const navigation = [
   { name: "Accueil", href: "/", icon: Home },
   { name: "Fonctionnalités", href: "/features", icon: Star },
-  { name: "Tarifs", href: "/pricing", icon: Calculator },
+  { name: "Tarifs", href: "/offers", icon: Calculator },
   { name: "FAQ", href: "/faq", icon: HelpCircle },
   { name: "Ressources", href: "/resources", icon: FileText },
   { name: "À propos", href: "/about", icon: Info },
@@ -177,7 +177,7 @@ export function MarketingLayout({ children }: MarketingLayoutProps) {
               <h3 className="text-sm font-semibold">Produit</h3>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li><Link to="/features" className="hover:text-foreground">Fonctionnalités</Link></li>
-                <li><Link to="/pricing" className="hover:text-foreground">Tarifs</Link></li>
+                <li><Link to="/offers" className="hover:text-foreground">Tarifs</Link></li>
                 <li><Link to="/changelog" className="hover:text-foreground">Nouveautés</Link></li>
                 <li><a href={siteConfig.appUrl} className="hover:text-foreground">Démo</a></li>
               </ul>
