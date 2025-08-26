@@ -74,41 +74,29 @@ serve(async (req) => {
       logStep("Creating new customer");
     }
 
-    // Define pricing based on tier
-    let unitAmount;
-    let productName;
-    
-    switch (tier) {
-      case 'starter':
-        unitAmount = 2900; // 29€
-        productName = "Starter - Jusqu'à 2 lots";
-        break;
-      case 'pro':
-        unitAmount = 6900; // 69€
-        productName = "Pro - Jusqu'à 10 lots";
-        break;
-      case 'enterprise':
-        unitAmount = 19900; // 199€
-        productName = "Enterprise - Lots illimités";
-        break;
-      default:
-        logStep("ERROR: Invalid tier", { tier });
-        throw new Error(`Invalid tier: ${tier}`);
+    // For now, only handle starter tier
+    if (tier !== 'starter') {
+      logStep("ERROR: Only starter tier is supported", { tier });
+      throw new Error(`Seule l'offre starter est disponible pour le moment`);
     }
 
-    logStep("Creating checkout session", { tier, unitAmount, productName });
+    // Get price from environment variable
+    const starterPriceId = Deno.env.get("STRIPE_PRICE_STARTER");
+    if (!starterPriceId) {
+      logStep("ERROR: STRIPE_PRICE_STARTER is not set");
+      throw new Error("STRIPE_PRICE_STARTER is not set");
+    }
+    
+    logStep("Using Stripe price ID", { starterPriceId });
+
+    logStep("Creating checkout session", { tier, priceId: starterPriceId });
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
       line_items: [
         {
-          price_data: {
-            currency: "eur",
-            product_data: { name: productName },
-            unit_amount: unitAmount,
-            recurring: { interval: "month" },
-          },
+          price: starterPriceId,
           quantity: 1,
         },
       ],

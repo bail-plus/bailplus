@@ -17,25 +17,7 @@ const offers = [
     description: siteConfig.pricing.starter.description,
     features: siteConfig.pricing.starter.features,
     maxProperties: siteConfig.pricing.starter.maxProperties,
-    popular: false
-  },
-  {
-    id: 'pro',
-    name: siteConfig.pricing.pro.name,
-    price: siteConfig.pricing.pro.price.monthly,
-    description: siteConfig.pricing.pro.description,
-    features: siteConfig.pricing.pro.features,
-    maxProperties: siteConfig.pricing.pro.maxProperties,
-    popular: siteConfig.pricing.pro.popular
-  },
-  {
-    id: 'enterprise',
-    name: siteConfig.pricing.enterprise.name,
-    price: siteConfig.pricing.enterprise.price.monthly,
-    description: siteConfig.pricing.enterprise.description,
-    features: siteConfig.pricing.enterprise.features,
-    maxProperties: siteConfig.pricing.enterprise.maxProperties,
-    popular: false
+    popular: true
   }
 ];
 
@@ -208,7 +190,7 @@ export default function Offers() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+        <div className="flex justify-center max-w-lg mx-auto">
           {offers.map((offer) => (
             <Card 
               key={offer.id} 
