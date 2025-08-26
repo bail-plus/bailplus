@@ -118,6 +118,28 @@ export default function Offers() {
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             Sélectionnez l'offre qui correspond le mieux à vos besoins pour commencer à utiliser BailloGenius
           </p>
+          
+          {/* Test button for debugging */}
+          <div className="mt-4">
+            <Button 
+              variant="outline" 
+              onClick={async () => {
+                console.log('🧪 Testing edge function connectivity...');
+                try {
+                  const { data, error } = await supabase.functions.invoke('test-connection');
+                  console.log('🧪 Test result:', { data, error });
+                  if (data) {
+                    toast.success(`Test réussi ! Stripe: ${data.stripe_key_configured ? '✅' : '❌'}`);
+                  }
+                } catch (err) {
+                  console.error('🧪 Test failed:', err);
+                  toast.error('Test de connexion échoué');
+                }
+              }}
+            >
+              🧪 Test Connexion
+            </Button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
