@@ -7,7 +7,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { user, loading } = useAuth();
+  const { user, subscription, loading } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -24,6 +24,12 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   if (!user) {
     // Redirect to login but save the attempted location
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Check if user has active subscription
+  if (subscription && !subscription.subscribed) {
+    // Redirect to offers page if no active subscription
+    return <Navigate to="/offers" replace />;
   }
 
   return <>{children}</>;

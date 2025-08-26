@@ -27,6 +27,7 @@ import TRISimulator from "./pages/TRISimulator";
 // Auth pages
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import Offers from "./pages/Offers";
 
 // Public/Marketing pages
 import Landing from "./pages/marketing/Landing";
@@ -72,6 +73,7 @@ const App = () => (
             {/* Auth routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/offers" element={<Offers />} />
             
             {/* Protected app routes */}
             <Route path="/app" element={

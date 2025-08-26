@@ -27,7 +27,11 @@ export default function Signup() {
     const firstName = formData.get('firstName') as string;
     const lastName = formData.get('lastName') as string;
     
-    await signUp(email, password, firstName, lastName);
+    const { error } = await signUp(email, password, firstName, lastName);
+    if (!error) {
+      // Redirect to offers page after successful signup
+      window.location.href = '/offers';
+    }
     setIsLoading(false);
   };
 
