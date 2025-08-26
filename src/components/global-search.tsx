@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { Search, Building2, Users, FileText, Calculator } from "lucide-react"
+import { useState, useEffect, useCallback } from "react"
+import { Search, Building2, Users, FileText } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import {
   CommandDialog,
@@ -11,36 +11,90 @@ import {
   CommandSeparator,
 } from "@/components/ui/command"
 import { Button } from "@/components/ui/button"
+import { supabase } from "@/integrations/supabase/client"
 
-const searchData = [
-  {
-    group: "Biens",
-    items: [
-      { id: "1", title: "Appartement 123 Rue de la Paix", type: "property", icon: Building2 },
-      { id: "2", title: "Studio 45 Avenue des Champs", type: "property", icon: Building2 },
-      { id: "3", title: "Maison 78 Boulevard Victor Hugo", type: "property", icon: Building2 },
-    ]
-  },
-  {
-    group: "Locataires",
-    items: [
-      { id: "4", title: "Marie Dupont", type: "tenant", icon: Users },
-      { id: "5", title: "Pierre Martin", type: "tenant", icon: Users },
-      { id: "6", title: "Sophie Dubois", type: "tenant", icon: Users },
-    ]
-  },
-  {
-    group: "Documents",
-    items: [
-      { id: "7", title: "Bail - Appartement 123 Rue de la Paix", type: "document", icon: FileText },
-      { id: "8", title: "Quittance Février 2024", type: "document", icon: Calculator },
-    ]
-  }
-]
+interface SearchItem {
+  id: string
+  title: string
+  type: string
+  icon: typeof Building2 | typeof Users | typeof FileText
+}
+
+interface SearchGroup {
+  group: string
+  items: SearchItem[]
+}
 
 export function GlobalSearch() {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
+  const [searchData, setSearchData] = useState<SearchGroup[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const loadSearchData = useCallback(async () => {
+    try {
+      setLoading(true)
+      
+      // Load properties, tenants, and documents in parallel
+      const [propertiesResult, tenantsResult, documentsResult] = await Promise.all([
+        supabase.from('properties').select('id, name, address'),
+        supabase.from('tenants').select('id, first_name, last_name'),
+        supabase.from('documents').select('id, name, type')
+      ])
+
+      const groups: SearchGroup[] = []
+
+      // Properties
+      if (propertiesResult.data && propertiesResult.data.length > 0) {
+        groups.push({
+          group: "Biens",
+          items: propertiesResult.data.map(property => ({
+            id: property.id,
+            title: `${property.name} - ${property.address}`,
+            type: "property",
+            icon: Building2
+          }))
+        })
+      }
+
+      // Tenants
+      if (tenantsResult.data && tenantsResult.data.length > 0) {
+        groups.push({
+          group: "Locataires",
+          items: tenantsResult.data.map(tenant => ({
+            id: tenant.id,
+            title: `${tenant.first_name} ${tenant.last_name}`,
+            type: "tenant",
+            icon: Users
+          }))
+        })
+      }
+
+      // Documents
+      if (documentsResult.data && documentsResult.data.length > 0) {
+        groups.push({
+          group: "Documents",
+          items: documentsResult.data.map(document => ({
+            id: document.id,
+            title: document.name,
+            type: "document",
+            icon: FileText
+          }))
+        })
+      }
+
+      setSearchData(groups)
+    } catch (error) {
+      console.error('Error loading search data:', error)
+      setSearchData([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadSearchData()
+  }, [loadSearchData])
 
   const filteredData = searchData.map(group => ({
     ...group,
