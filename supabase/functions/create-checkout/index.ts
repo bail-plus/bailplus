@@ -25,18 +25,44 @@ serve(async (req) => {
   try {
     logStep("Function started");
     
-    const { tier } = await req.json();
-    if (!tier) throw new Error("No tier provided");
+    // Check Stripe key first
+    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    if (!stripeKey) {
+      logStep("ERROR: STRIPE_SECRET_KEY is not set");
+      throw new Error("STRIPE_SECRET_KEY is not set");
+    }
+    logStep("Stripe key verified");
+    
+    const requestBody = await req.json();
+    const { tier } = requestBody;
+    if (!tier) {
+      logStep("ERROR: No tier provided", { requestBody });
+      throw new Error("No tier provided");
+    }
     logStep("Tier provided", { tier });
 
-    const authHeader = req.headers.get("Authorization")!;
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      logStep("ERROR: No authorization header");
+      throw new Error("No authorization header provided");
+    }
+    logStep("Authorization header found");
+
     const token = authHeader.replace("Bearer ", "");
-    const { data } = await supabaseClient.auth.getUser(token);
+    const { data, error: authError } = await supabaseClient.auth.getUser(token);
+    if (authError) {
+      logStep("ERROR: Authentication failed", { error: authError });
+      throw new Error(`Authentication error: ${authError.message}`);
+    }
+    
     const user = data.user;
-    if (!user?.email) throw new Error("User not authenticated or email not available");
+    if (!user?.email) {
+      logStep("ERROR: User not authenticated or email not available", { user });
+      throw new Error("User not authenticated or email not available");
+    }
     logStep("User authenticated", { userId: user.id, email: user.email });
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { apiVersion: "2023-10-16" });
+    const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
     
     // Check if customer exists
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
@@ -66,7 +92,8 @@ serve(async (req) => {
         productName = "Enterprise - Lots illimités";
         break;
       default:
-        throw new Error("Invalid tier");
+        logStep("ERROR: Invalid tier", { tier });
+        throw new Error(`Invalid tier: ${tier}`);
     }
 
     logStep("Creating checkout session", { tier, unitAmount, productName });
@@ -94,7 +121,7 @@ serve(async (req) => {
       }
     });
 
-    logStep("Checkout session created", { sessionId: session.id, url: session.url });
+    logStep("Checkout session created successfully", { sessionId: session.id, url: session.url });
 
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -102,7 +129,7 @@ serve(async (req) => {
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logStep("ERROR in create-checkout", { message: errorMessage });
+    logStep("ERROR in create-checkout", { message: errorMessage, stack: error instanceof Error ? error.stack : 'No stack' });
     return new Response(JSON.stringify({ error: errorMessage }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,

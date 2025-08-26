@@ -50,10 +50,13 @@ export default function Offers() {
       return;
     }
 
+    console.log('🔍 Starting offer selection:', { offerId, userId: user.id, sessionExists: !!session });
     setSelectedOffer(offerId);
     setIsLoading(true);
 
     try {
+      console.log('📤 Calling create-checkout function with:', { tier: offerId });
+      
       const { data, error } = await supabase.functions.invoke('create-checkout', {
         body: { tier: offerId },
         headers: {
@@ -61,14 +64,23 @@ export default function Offers() {
         },
       });
 
-      if (error) throw error;
+      console.log('📥 Function response:', { data, error });
+
+      if (error) {
+        console.error('❌ Function error:', error);
+        throw error;
+      }
 
       if (data?.url) {
+        console.log('✅ Redirecting to Stripe:', data.url);
         // Open Stripe checkout in a new tab
         window.open(data.url, '_blank');
+      } else {
+        console.error('❌ No URL in response:', data);
+        throw new Error('Aucune URL de paiement reçue');
       }
     } catch (error) {
-      console.error('Error creating checkout:', error);
+      console.error('❌ Error creating checkout:', error);
       toast.error('Erreur lors de la création de la session de paiement');
     } finally {
       setIsLoading(false);
