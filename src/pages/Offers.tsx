@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -87,7 +88,7 @@ export default function Offers() {
           </CardHeader>
           <CardContent>
             <Button asChild className="w-full">
-              <a href="/login">Se connecter</a>
+              <Link to="/login">Se connecter</Link>
             </Button>
           </CardContent>
         </Card>

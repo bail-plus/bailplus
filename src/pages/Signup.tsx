@@ -12,9 +12,9 @@ export default function Signup() {
   const { user, signUp, loading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated - check subscription status
   if (user) {
-    return <Navigate to="/app" replace />;
+    return <Navigate to="/offers" replace />;
   }
 
   const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {

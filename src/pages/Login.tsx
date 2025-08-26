@@ -13,10 +13,10 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const location = useLocation();
   
-  // Get the intended destination from state, default to /app
-  const from = location.state?.from?.pathname || '/app';
+  // Get the intended destination from state, default to /offers
+  const from = location.state?.from?.pathname || '/offers';
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated - let ProtectedRoute handle subscription check
   if (user) {
     return <Navigate to={from} replace />;
   }
