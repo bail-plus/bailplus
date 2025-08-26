@@ -29,10 +29,8 @@ export default function Signup() {
     
     const { error } = await signUp(email, password, firstName, lastName);
     if (!error) {
-      // Wait a bit for auth state to propagate, then redirect
-      setTimeout(() => {
-        window.location.href = '/offers';
-      }, 1000);
+      // Don't redirect immediately - let the auth state listener handle it
+      console.log('✅ Signup successful, waiting for auth state...');
     }
     setIsLoading(false);
   };

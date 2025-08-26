@@ -107,18 +107,36 @@ export default function Offers() {
           <CardHeader className="text-center">
             <CardTitle>Accès restreint</CardTitle>
             <CardDescription>
-              Vous devez être connecté pour accéder à cette page
+              Vous devez être connecté pour accéder à cette page.
+              <br />
+              <small className="text-xs mt-2 block">
+                Si vous venez de vous inscrire, vérifiez vos emails pour confirmer votre compte.
+              </small>
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <Button asChild className="w-full">
               <Link to="/login">Se connecter</Link>
             </Button>
+            <Button variant="outline" asChild className="w-full">
+              <Link to="/signup">Créer un compte</Link>
+            </Button>
+            <div className="text-center text-sm text-muted-foreground mt-4">
+              <p>Debug: User={user ? 'Connected' : 'Not connected'}, Session={session ? 'Active' : 'None'}</p>
+            </div>
           </CardContent>
         </Card>
       </div>
     );
   }
+
+  // Add debug info to console
+  console.log('🔍 Offers page - User authenticated:', { 
+    userId: user.id, 
+    email: user.email, 
+    emailConfirmed: user.email_confirmed_at,
+    sessionActive: !!session 
+  });
 
   return (
     <div className="min-h-screen bg-gradient-surface py-12">

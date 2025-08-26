@@ -70,19 +70,39 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
+    console.log('🔄 Auth state listener setup...');
+    
     // Set up auth state listener
     const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('🔄 Auth state change:', { event, hasSession: !!session, hasUser: !!session?.user });
+        
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
         
-        // Check subscription after auth state change
-        if (session?.user) {
-          setTimeout(() => {
-            checkSubscription();
-          }, 100);
-        } else {
+        // Handle signin (includes signup with immediate session)
+        if (event === 'SIGNED_IN' && session?.user) {
+          console.log('✅ User signed in/up, checking if redirect needed...');
+          
+          // Check if this is a new signup (you can detect this by checking if user was just created)
+          const isNewUser = new Date(session.user.created_at).getTime() > Date.now() - 60000; // Created within last minute
+          
+          if (isNewUser) {
+            console.log('🎉 New user detected, redirecting to offers...');
+            setTimeout(() => {
+              window.location.href = '/offers';
+            }, 500);
+          } else {
+            console.log('🔑 Existing user signin, checking subscription...');
+            setTimeout(() => {
+              checkSubscription();
+            }, 100);
+          }
+        }
+        
+        // Clear subscription on signout
+        if (event === 'SIGNED_OUT') {
           setSubscription(null);
         }
       }
@@ -90,6 +110,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('🔍 Initial session check:', { hasSession: !!session, hasUser: !!session?.user });
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -106,25 +127,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const signUp = async (email: string, password: string, firstName: string, lastName: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-        data: {
-          first_name: firstName,
-          last_name: lastName,
+    try {
+      console.log('🔐 Starting signup process...', { email });
+      
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/offers`,
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+          }
+        }
+      });
+      
+      console.log('🔐 Signup result:', { data, error, user: data?.user, session: data?.session });
+      
+      if (error) {
+        console.error('❌ Signup error:', error);
+        toast.error(error.message);
+      } else if (data?.user) {
+        if (data.session) {
+          console.log('✅ User signed up with immediate session');
+          toast.success('Compte créé avec succès !');
+        } else {
+          console.log('📧 User signed up, email confirmation required');
+          toast.success('Compte créé ! Vérifiez vos emails pour confirmer votre adresse.');
         }
       }
-    });
-    
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success('Compte créé avec succès ! Vérifiez vos emails.');
+      
+      return { error };
+    } catch (err) {
+      console.error('❌ Signup catch error:', err);
+      toast.error('Erreur lors de la création du compte');
+      return { error: err };
     }
-    
-    return { error };
   };
 
   const signIn = async (email: string, password: string) => {
