@@ -79,7 +79,18 @@ export default function Offers() {
       console.log('📥 Function response:', { data, error });
 
       if (error) {
-        console.error('❌ Function error:', error);
+        console.error('❌ Function error details:', {
+          name: error.name,
+          message: error.message,
+          context: error.context,
+          stack: error.stack
+        });
+        
+        // Try to get more details from the error
+        if (error.context?.body) {
+          console.error('❌ Error response body:', error.context.body);
+        }
+        
         throw error;
       }
 
@@ -149,8 +160,8 @@ export default function Offers() {
             Sélectionnez l'offre qui correspond le mieux à vos besoins pour commencer à utiliser BailloGenius
           </p>
           
-          {/* Test button for debugging */}
-          <div className="mt-4">
+          {/* Test buttons for debugging */}
+          <div className="mt-4 space-y-2">
             <Button 
               variant="outline" 
               onClick={async () => {
@@ -168,6 +179,31 @@ export default function Offers() {
               }}
             >
               🧪 Test Connexion
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              onClick={async () => {
+                console.log('🔍 Testing Stripe API...');
+                try {
+                  const { data, error } = await supabase.functions.invoke('debug-stripe', {
+                    headers: session ? {
+                      Authorization: `Bearer ${session.access_token}`,
+                    } : {},
+                  });
+                  console.log('🔍 Stripe debug result:', { data, error });
+                  if (data) {
+                    toast.success(`Stripe API: ${data.stripe_api_working ? '✅' : '❌'}`);
+                  } else if (error) {
+                    toast.error(`Erreur Stripe: ${error.message || 'Inconnue'}`);
+                  }
+                } catch (err) {
+                  console.error('🔍 Stripe debug failed:', err);
+                  toast.error('Test Stripe échoué');
+                }
+              }}
+            >
+              🔍 Test Stripe API
             </Button>
           </div>
         </div>

@@ -45,3 +45,6 @@ verify_jwt = true
 
 [functions.test-connection]
 verify_jwt = false
+
+[functions.debug-stripe]
+verify_jwt = false
