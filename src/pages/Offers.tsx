@@ -20,12 +20,45 @@ import { supabase } from '@/integrations/supabase/client';
 const offers = [
   {
     id: 'starter',
-    name: siteConfig.pricing.starter.name,
-    price: siteConfig.pricing.starter.price.monthly,
-    description: siteConfig.pricing.starter.description,
-    features: siteConfig.pricing.starter.features,
-    maxProperties: siteConfig.pricing.starter.maxProperties,
+    name: 'Starter',
+    price: '29€',
+    description: 'Parfait pour débuter',
+    features: [
+      'Jusqu\'à 5 propriétés',
+      'Gestion des locataires',
+      'Suivi des paiements',
+      'Support email'
+    ],
+    maxProperties: '5 propriétés',
     popular: true
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
+    price: '59€',
+    description: 'Pour les propriétaires expérimentés',
+    features: [
+      'Jusqu\'à 25 propriétés',
+      'Gestion avancée',
+      'Rapports détaillés',
+      'Support prioritaire'
+    ],
+    maxProperties: '25 propriétés',
+    popular: false
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise',
+    price: '129€',
+    description: 'Pour les professionnels',
+    features: [
+      'Propriétés illimitées',
+      'API complète',
+      'Support dédié',
+      'Intégrations avancées'
+    ],
+    maxProperties: 'Illimité',
+    popular: false
   }
 ];
 
@@ -156,25 +189,25 @@ export default function Offers() {
   }, [searchParams, setSearchParams]);
 
   const handleSelectOffer = async (offerId: string) => {
-    // Only starter tier is available for now
-    if (offerId !== 'starter') {
-      toast.error('Seule l\'offre Starter est disponible pour le moment');
-      return;
-    }
-
-    const tier = 'starter' as const;
+    const tier = offerId as 'starter' | 'pro' | 'enterprise';
 
     // If user is not authenticated, store intent and redirect to signup
     if (!user || !session) {
       console.log('🔄 User not authenticated, storing intent and redirecting to signup');
       
-      const priceId = 'STRIPE_PRICE_STARTER';
-      storeSubscriptionIntent(priceId, tier);
+      // Map tier to actual Stripe price ID
+      const priceIdMap = {
+        starter: 'STRIPE_PRICE_STARTER',
+        pro: 'STRIPE_PRICE_PRO',
+        enterprise: 'STRIPE_PRICE_ENTERPRISE'
+      };
+      
+      storeSubscriptionIntent(priceIdMap[tier], tier);
       
       // Redirect with URL params as backup
       const params = new URLSearchParams({
         intent: 'subscribe',
-        priceId: priceId,
+        priceId: priceIdMap[tier],
         tier: tier,
         next: 'offers'
       });
@@ -193,6 +226,9 @@ export default function Offers() {
       if (success) {
         console.log('✅ Offer selection completed successfully');
       }
+    } catch (error) {
+      console.error('❌ Error in offer selection:', error);
+      toast.error('Erreur lors du traitement de votre demande');
     } finally {
       setIsLoading(false);
       setSelectedOffer(null);
@@ -219,10 +255,10 @@ export default function Offers() {
         <div className="container mx-auto px-6">
           <div className="text-center mb-12">
             <h1 className="text-4xl font-bold text-foreground mb-4">
-              Choisissez votre abonnement
+              Choisissez votre plan
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Sélectionnez l'offre Starter pour commencer à utiliser BailloGenius et simplifier votre gestion locative
+              Sélectionnez l'offre qui correspond le mieux à vos besoins pour commencer à utiliser BailloGenius
             </p>
             
             {/* Debug buttons for testing */}
@@ -252,7 +288,7 @@ export default function Offers() {
             )}
           </div>
 
-          <div className="flex justify-center max-w-lg mx-auto">
+          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {offers.map((offer) => (
               <Card 
                 key={offer.id} 
@@ -270,21 +306,16 @@ export default function Offers() {
                   <CardTitle className="text-2xl">{offer.name}</CardTitle>
                   <CardDescription className="text-base">{offer.description}</CardDescription>
                   <div className="pt-4">
-                    <div className="text-4xl font-bold text-foreground">
-                      {typeof offer.price === 'number' ? `${offer.price}€` : offer.price}
-                    </div>
-                    {typeof offer.price === 'number' && (
-                      <div className="text-muted-foreground">/mois</div>
-                    )}
+                  <div className="text-4xl font-bold text-foreground">
+                    {offer.price}
+                  </div>
+                  <div className="text-muted-foreground">/mois</div>
                   </div>
                 </CardHeader>
 
                 <CardContent className="space-y-6">
                   <div className="text-sm text-muted-foreground">
-                    {typeof offer.maxProperties === 'number' 
-                      ? `Jusqu'à ${offer.maxProperties} lots`
-                      : offer.maxProperties
-                    }
+                    {offer.maxProperties}
                   </div>
 
                   <ul className="space-y-3">

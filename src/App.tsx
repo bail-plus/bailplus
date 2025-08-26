@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Layout } from "@/components/layout";
 import { PublicLayout } from "@/components/PublicLayout";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { ProtectedApp } from '@/components/ProtectedApp';
 import { AuthProvider } from "@/hooks/useAuth";
 
 // App pages (protected)
@@ -32,7 +31,6 @@ import Offers from "./pages/Offers";
 // Public/Marketing pages
 import Landing from "./pages/marketing/Landing";
 import Features from "./pages/marketing/Features";
-// Pricing page replaced by Offers
 import FAQ from "./pages/marketing/FAQ";
 import About from "./pages/marketing/About";
 import Contact from "./pages/marketing/Contact";
@@ -61,12 +59,6 @@ const App = () => (
             {/* Public routes */}
             <Route path="/" element={<PublicLayout><Landing /></PublicLayout>} />
             <Route path="/features" element={<PublicLayout><Features /></PublicLayout>} />
-            {/* Redirects to /offers for all subscription-related routes */}
-            <Route path="/pricing" element={<Navigate to="/offers" replace />} />
-            <Route path="/tarifs" element={<Navigate to="/offers" replace />} />
-            <Route path="/plans" element={<Navigate to="/offers" replace />} />
-            <Route path="/subscription" element={<Navigate to="/offers" replace />} />
-            <Route path="/abonnement" element={<Navigate to="/offers" replace />} />
             <Route path="/faq" element={<PublicLayout><FAQ /></PublicLayout>} />
             <Route path="/about" element={<PublicLayout><About /></PublicLayout>} />
             <Route path="/contact" element={<PublicLayout><Contact /></PublicLayout>} />
@@ -78,108 +70,117 @@ const App = () => (
             {/* Auth routes */}
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            
+            {/* Subscription Management - Public access */}
             <Route path="/offers" element={<Offers />} />
             
-            {/* Protected app routes */}
+            {/* Legacy redirects - All subscription routes go to /offers */}
+            <Route path="/tarifs" element={<Navigate to="/offers" replace />} />
+            <Route path="/pricing" element={<Navigate to="/offers" replace />} />
+            <Route path="/plans" element={<Navigate to="/offers" replace />} />
+            <Route path="/abonnement" element={<Navigate to="/offers" replace />} />
+            <Route path="/subscription" element={<Navigate to="/offers" replace />} />
+            
+            {/* Protected App Routes - Require Active Subscription */}
             <Route path="/app" element={
-              <ProtectedRoute>
+              <ProtectedApp>
                 <Layout>
                   <Index />
                 </Layout>
-              </ProtectedRoute>
+              </ProtectedApp>
             } />
             <Route path="/app/calendar" element={
-              <ProtectedRoute>
+              <ProtectedApp>
                 <Layout>
                   <Calendar />
                 </Layout>
-              </ProtectedRoute>
+              </ProtectedApp>
             } />
             <Route path="/app/properties" element={
-              <ProtectedRoute>
+              <ProtectedApp>
                 <Layout>
                   <Properties />
                 </Layout>
-              </ProtectedRoute>
+              </ProtectedApp>
             } />
             <Route path="/app/leasing" element={
-              <ProtectedRoute>
+              <ProtectedApp>
                 <Layout>
                   <Leasing />
                 </Layout>
-              </ProtectedRoute>
+              </ProtectedApp>
             } />
             <Route path="/app/leases/:id" element={
-              <ProtectedRoute>
+              <ProtectedApp>
                 <Layout>
                   <LeaseDetail />
                 </Layout>
-              </ProtectedRoute>
+              </ProtectedApp>
             } />
             <Route path="/app/people" element={
-              <ProtectedRoute>
+              <ProtectedApp>
                 <Layout>
                   <People />
                 </Layout>
-              </ProtectedRoute>
+              </ProtectedApp>
             } />
             <Route path="/app/maintenance" element={
-              <ProtectedRoute>
+              <ProtectedApp>
                 <Layout>
                   <Maintenance />
                 </Layout>
-              </ProtectedRoute>
+              </ProtectedApp>
             } />
             <Route path="/app/accounting" element={
-              <ProtectedRoute>
+              <ProtectedApp>
                 <Layout>
                   <Accounting />
                 </Layout>
-              </ProtectedRoute>
+              </ProtectedApp>
             } />
             <Route path="/app/documents" element={
-              <ProtectedRoute>
+              <ProtectedApp>
                 <Layout>
                   <Documents />
                 </Layout>
-              </ProtectedRoute>
+              </ProtectedApp>
             } />
             <Route path="/app/communications" element={
-              <ProtectedRoute>
+              <ProtectedApp>
                 <Layout>
                   <Communications />
                 </Layout>
-              </ProtectedRoute>
+              </ProtectedApp>
             } />
             <Route path="/app/reports" element={
-              <ProtectedRoute>
+              <ProtectedApp>
                 <Layout>
                   <Reports />
                 </Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/app/tools/tri" element={
-              <ProtectedRoute>
-                <Layout>
-                  <TRISimulator />
-                </Layout>
-              </ProtectedRoute>
+              </ProtectedApp>
             } />
             <Route path="/app/settings" element={
-              <ProtectedRoute>
+              <ProtectedApp>
                 <Layout>
                   <Settings />
                 </Layout>
-              </ProtectedRoute>
+              </ProtectedApp>
+            } />
+            <Route path="/app/tri-simulator" element={
+              <ProtectedApp>
+                <Layout>
+                  <TRISimulator />
+                </Layout>
+              </ProtectedApp>
             } />
             
             {/* 404 for app routes */}
             <Route path="/app/*" element={
-              <ProtectedRoute>
+              <ProtectedApp>
                 <Layout>
                   <NotFound />
                 </Layout>
-              </ProtectedRoute>
+              </ProtectedApp>
             } />
             
             {/* 404 for public routes */}

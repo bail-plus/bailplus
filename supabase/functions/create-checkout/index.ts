@@ -75,7 +75,7 @@ serve(async (req) => {
       logStep("Creating new customer");
     }
 
-    // For now, only handle starter tier
+    // For now, only handle starter tier (you can remove this check later)
     if (tier !== 'starter') {
       logStep("ERROR: Only starter tier is supported", { tier });
       throw new Error(`Seule l'offre starter est disponible pour le moment`);

@@ -1,43 +1,41 @@
-
 import { useState, useEffect } from 'react';
-import { Navigate, Link, useLocation, useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { Building2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { LoadingGate } from '@/components/LoadingGate';
-import { getSubscriptionIntent, getIntentFromParams } from '@/lib/subscription-intent';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function Login() {
-  const { user, signIn, loading } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
-  const location = useLocation();
+  const { user, loading, signIn } = useAuth();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [isLoading, setIsLoading] = useState(false);
   const [isWaitingForAuth, setIsWaitingForAuth] = useState(false);
-  
-  // Get intent information
-  const urlIntent = getIntentFromParams(searchParams);
-  const storedIntent = getSubscriptionIntent();
-  const hasIntent = !!(urlIntent || storedIntent);
 
-  // Only redirect if user is authenticated AND there's no intent to process
-  if (user && !hasIntent) {
+  // If user is already authenticated, redirect to offers
+  if (user && !loading) {
     return <Navigate to="/offers" replace />;
   }
 
-  // Handle auto-redirect after successful login
+  // Set up auth state listener for immediate redirect after login
   useEffect(() => {
-    if (user && hasIntent) {
-      console.log('👤 User logged in with subscription intent, redirecting to offers...');
-      setIsWaitingForAuth(true);
-      // Redirect to offers page where the intent will be processed
-      setTimeout(() => {
-        window.location.href = '/offers';
-      }, 1000);
-    }
-  }, [user, hasIntent]);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔄 Auth state change:', { event, hasSession: !!session, hasUser: !!session?.user });
+      
+      if (event === 'SIGNED_IN') {
+        console.log('✅ User signed in, redirecting to offers...');
+        // Always redirect to offers after authentication
+        navigate('/offers');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
   const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -49,13 +47,8 @@ export default function Login() {
     
     const { error } = await signIn(email, password);
     if (!error) {
-      console.log('✅ Login successful');
-      if (hasIntent) {
-        console.log('🔄 Will redirect to offers to process subscription intent');
-        setIsWaitingForAuth(true);
-      } else {
-        window.location.href = '/offers';
-      }
+      console.log('✅ Login successful, auth state change will handle redirect');
+      setIsWaitingForAuth(true);
     }
     setIsLoading(false);
   };
@@ -64,87 +57,86 @@ export default function Login() {
     return (
       <LoadingGate 
         isLoading={true} 
-        message={isWaitingForAuth ? "Redirection vers votre abonnement..." : "Chargement..."}
+        message={isWaitingForAuth ? "Connexion en cours..." : "Chargement..."}
       >
         <div />
       </LoadingGate>
     );
   }
 
-  // Determine display text based on intent
-  const getIntentDisplayText = () => {
-    const intent = urlIntent || storedIntent;
-    if (!intent) return null;
-    
-    const tierNames = {
-      starter: 'Starter',
-      pro: 'Pro', 
-      enterprise: 'Enterprise'
-    };
-    
-    return tierNames[intent.tier] || intent.tier;
-  };
-
-  const intentDisplayText = getIntentDisplayText();
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-surface p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="w-12 h-12 bg-gradient-primary rounded-lg flex items-center justify-center mx-auto mb-4">
-            <Building2 className="w-6 h-6 text-white" />
-          </div>
-          <CardTitle>Se connecter</CardTitle>
-          <CardDescription>
-            {intentDisplayText 
-              ? `Connectez-vous pour souscrire à l'offre ${intentDisplayText}`
-              : 'Connectez-vous à votre compte BailloGenius'
-            }
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSignIn} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                required
-                placeholder="votre@email.com"
-              />
+    <div className="min-h-screen flex items-center justify-center bg-gradient-surface py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div className="text-center">
+          <h2 className="text-3xl font-bold text-foreground">
+            Se connecter
+          </h2>
+          <p className="text-sm text-muted-foreground text-center mt-2">
+            Connectez-vous pour accéder aux offres d'abonnement
+          </p>
+        </div>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Connexion</CardTitle>
+            <CardDescription>
+              Entrez vos informations de connexion
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSignIn} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  placeholder="jean.dupont@example.com"
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="password">Mot de passe</Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  required
+                  placeholder="Votre mot de passe"
+                />
+              </div>
+              
+              <Button 
+                type="submit" 
+                className="w-full" 
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Connexion...
+                  </>
+                ) : (
+                  'Se connecter'
+                )}
+              </Button>
+            </form>
+            
+            <div className="mt-6 text-center">
+              <p className="text-sm text-muted-foreground">
+                Vous n'avez pas de compte ?{' '}
+                <Link 
+                  to={`/signup${window.location.search}`}
+                  className="text-primary hover:underline"
+                >
+                  Créez-en un
+                </Link>
+              </p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Mot de passe</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                required
-                placeholder="••••••••"
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Connexion...' : 'Se connecter'}
-            </Button>
-          </form>
-          
-          <div className="mt-6 text-center">
-            <p className="text-sm text-muted-foreground">
-              Pas encore de compte ?{" "}
-              <Link to={`/signup${urlIntent ? `?${new URLSearchParams({ intent: 'subscribe', priceId: urlIntent.priceId, tier: urlIntent.tier }).toString()}` : ''}`} className="text-primary hover:underline">
-                S'inscrire
-              </Link>
-            </p>
-          </div>
-          
-          <div className="mt-4 text-center">
-            <Link to="/offers" className="text-sm text-muted-foreground hover:text-foreground">
-              ← Voir les offres
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

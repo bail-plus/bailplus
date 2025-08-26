@@ -6,7 +6,7 @@ import { setCheckoutPending, clearCheckoutPending, isCheckoutPending } from './s
 
 interface CheckoutOptions {
   priceId: string;
-  tier: 'starter';
+  tier: 'starter' | 'pro' | 'enterprise';
   session: any; // Supabase session
 }
 
@@ -64,7 +64,7 @@ export function redirectToCheckout(url: string) {
 
 // Main function to handle offer selection
 export async function handleOfferSelection(
-  offerId: 'starter', 
+  offerId: 'starter' | 'pro' | 'enterprise', 
   user: any, 
   session: any
 ): Promise<boolean> {
@@ -72,13 +72,18 @@ export async function handleOfferSelection(
     return false; // Caller should handle auth redirect
   }
 
-  // Only starter tier is available for now
-  if (offerId !== 'starter') {
-    toast.error('Seule l\'offre Starter est disponible pour le moment');
+  // Map tier to price ID (this should match your Supabase secrets)
+  const priceIdMap = {
+    starter: 'STRIPE_PRICE_STARTER',
+    pro: 'STRIPE_PRICE_PRO', 
+    enterprise: 'STRIPE_PRICE_ENTERPRISE'
+  };
+
+  const priceId = priceIdMap[offerId];
+  if (!priceId) {
+    toast.error('Offre non reconnue');
     return false;
   }
-
-  const priceId = 'STRIPE_PRICE_STARTER'; // This will be resolved in the edge function
 
   const checkoutUrl = await createCheckoutSession({ 
     priceId, 
