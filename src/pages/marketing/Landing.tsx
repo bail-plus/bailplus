@@ -142,15 +142,15 @@ export default function Landing() {
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button size="lg" className="px-8" asChild>
-                <a href={siteConfig.appUrl}>
+                <Link to="/app">
                   Accéder à l'application
                   <ArrowRight className="ml-2 h-4 w-4" />
-                </a>
+                </Link>
               </Button>
               <Button size="lg" variant="outline" className="px-8" asChild>
-                <a href={`${siteConfig.appUrl}/sign-up`}>
+                <Link to="/signup">
                   S'inscrire gratuitement
-                </a>
+                </Link>
               </Button>
             </div>
 
@@ -378,14 +378,14 @@ export default function Landing() {
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" variant="secondary" className="px-8" asChild>
-              <a href={siteConfig.appUrl}>
+              <Link to="/app">
                 Accéder à l'application
-              </a>
+              </Link>
             </Button>
             <Button size="lg" variant="outline" className="px-8 border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary" asChild>
-              <a href={`${siteConfig.appUrl}/sign-up`}>
+              <Link to="/signup">
                 S'inscrire gratuitement
-              </a>
+              </Link>
             </Button>
           </div>
         </div>
