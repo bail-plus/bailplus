@@ -15,6 +15,7 @@ import {
 } from '@/lib/subscription-intent';
 import { handleOfferSelection } from '@/lib/stripe-checkout';
 import { LoadingGate } from '@/components/LoadingGate';
+import { supabase } from '@/integrations/supabase/client';
 
 const offers = [
   {
@@ -75,6 +76,31 @@ export default function Offers() {
   const debugReplayIntent = async () => {
     console.log('🔧 Debug: Replaying subscription intent...');
     await processSubscriptionIntent();
+  };
+
+  // Debug function to test Stripe connection
+  const debugStripeConnection = async () => {
+    try {
+      console.log('🔧 Testing Stripe connection...');
+      const { data, error } = await supabase.functions.invoke('debug-stripe', {
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+      });
+      
+      console.log('🔧 Debug response:', { data, error });
+      
+      if (error) {
+        toast.error(`Debug error: ${error.message}`);
+      } else if (data?.success) {
+        toast.success('✅ Stripe configuration is valid!');
+      } else {
+        toast.error(`Debug failed: ${data?.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('❌ Debug connection error:', error);
+      toast.error('Erreur lors du test de connexion Stripe');
+    }
   };
 
   // Check for subscription intent when user auth state changes
@@ -191,18 +217,29 @@ export default function Offers() {
               Sélectionnez l'offre Starter pour commencer à utiliser BailloGenius et simplifier votre gestion locative
             </p>
             
-            {/* Debug button for testing intent replay */}
-            {process.env.NODE_ENV === 'development' && getSubscriptionIntent() && (
-              <div className="mt-4">
+            {/* Debug buttons for testing */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="mt-4 space-y-2">
                 <Button 
                   variant="outline" 
                   size="sm"
-                  onClick={debugReplayIntent}
+                  onClick={debugStripeConnection}
                   className="text-xs"
                 >
                   <RefreshCw className="mr-2 h-3 w-3" />
-                  🔧 Rejouer l'intention d'abonnement
+                  🔧 Tester la connexion Stripe
                 </Button>
+                {getSubscriptionIntent() && (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={debugReplayIntent}
+                    className="text-xs"
+                  >
+                    <RefreshCw className="mr-2 h-3 w-3" />
+                    🔧 Rejouer l'intention d'abonnement
+                  </Button>
+                )}
               </div>
             )}
           </div>

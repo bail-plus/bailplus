@@ -7,90 +7,107 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const logStep = (step: string, details?: any) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[DEBUG-STRIPE] ${step}${detailsStr}`);
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log("[DEBUG-STRIPE] Starting debug...");
+    logStep("=== DEBUG STRIPE FUNCTION STARTED ===");
     
-    // Test Stripe key
+    // Check all environment variables
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    console.log("[DEBUG-STRIPE] Stripe key exists:", !!stripeKey);
-    console.log("[DEBUG-STRIPE] Stripe key prefix:", stripeKey?.substring(0, 12));
+    const priceId = Deno.env.get("STRIPE_PRICE_STARTER");
+    
+    logStep("Environment check", {
+      hasStripeKey: !!stripeKey,
+      stripeKeyLength: stripeKey?.length || 0,
+      stripeKeyPrefix: stripeKey?.substring(0, 10) || "NONE",
+      hasPriceId: !!priceId,
+      priceId: priceId || "NONE"
+    });
     
     if (!stripeKey) {
-      throw new Error("STRIPE_SECRET_KEY not found");
+      throw new Error("STRIPE_SECRET_KEY is missing");
+    }
+    
+    if (!priceId) {
+      throw new Error("STRIPE_PRICE_STARTER is missing");
     }
     
     // Test Stripe initialization
+    logStep("Testing Stripe initialization");
     const stripe = new Stripe(stripeKey, { apiVersion: "2023-10-16" });
-    console.log("[DEBUG-STRIPE] Stripe instance created");
     
-    // Test a simple Stripe API call
+    // Test Stripe API connection by fetching the price
+    logStep("Testing Stripe API connection - fetching price", { priceId });
     try {
-      const balance = await stripe.balance.retrieve();
-      console.log("[DEBUG-STRIPE] Stripe API test successful:", { 
-        available: balance.available,
-        pending: balance.pending 
+      const price = await stripe.prices.retrieve(priceId);
+      logStep("Price retrieved successfully", { 
+        id: price.id, 
+        amount: price.unit_amount, 
+        currency: price.currency,
+        active: price.active
       });
-    } catch (stripeError) {
-      console.error("[DEBUG-STRIPE] Stripe API test failed:", stripeError.message);
-      return new Response(JSON.stringify({ 
-        error: "Stripe API test failed", 
-        details: stripeError.message,
-        stripe_configured: true
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
+    } catch (priceError) {
+      logStep("ERROR fetching price", { 
+        priceId,
+        error: priceError instanceof Error ? priceError.message : String(priceError)
       });
+      throw new Error(`Invalid price ID: ${priceId} - ${priceError instanceof Error ? priceError.message : String(priceError)}`);
     }
     
-    // Test Supabase auth
+    // Test auth
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? ""
     );
-    
+
     const authHeader = req.headers.get("Authorization");
-    if (authHeader) {
-      const token = authHeader.replace("Bearer ", "");
-      const { data, error: authError } = await supabaseClient.auth.getUser(token);
-      
-      if (authError) {
-        console.error("[DEBUG-STRIPE] Auth test failed:", authError.message);
-        return new Response(JSON.stringify({ 
-          error: "Auth test failed", 
-          details: authError.message 
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 401,
-        });
-      }
-      
-      console.log("[DEBUG-STRIPE] Auth test successful:", { 
-        userId: data.user?.id, 
-        email: data.user?.email 
-      });
+    if (!authHeader) {
+      logStep("ERROR: No authorization header");
+      throw new Error("No authorization header provided");
+    }
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data, error: authError } = await supabaseClient.auth.getUser(token);
+    if (authError) {
+      logStep("ERROR: Authentication failed", { error: authError });
+      throw new Error(`Authentication error: ${authError.message}`);
     }
     
-    return new Response(JSON.stringify({
-      status: "success",
-      message: "All tests passed",
-      stripe_configured: true,
-      stripe_api_working: true,
-      auth_working: !!authHeader
+    const user = data.user;
+    if (!user?.email) {
+      logStep("ERROR: User not authenticated or email not available", { user });
+      throw new Error("User not authenticated or email not available");
+    }
+    logStep("User authenticated successfully", { userId: user.id, email: user.email });
+    
+    logStep("=== ALL TESTS PASSED ===");
+    
+    return new Response(JSON.stringify({ 
+      success: true, 
+      message: "All Stripe and auth tests passed",
+      stripeKeyValid: true,
+      priceIdValid: true,
+      userAuthenticated: true
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
     
   } catch (error) {
-    console.error("[DEBUG-STRIPE] Error:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logStep("=== ERROR IN DEBUG ===", { message: errorMessage, stack: error instanceof Error ? error.stack : 'No stack' });
     return new Response(JSON.stringify({ 
-      error: error.message,
-      stack: error.stack 
+      success: false,
+      error: errorMessage,
+      timestamp: new Date().toISOString()
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,
