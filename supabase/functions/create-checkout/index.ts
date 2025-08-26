@@ -31,7 +31,7 @@ serve(async (req) => {
       logStep("ERROR: STRIPE_SECRET_KEY is not set");
       throw new Error("STRIPE_SECRET_KEY is not set");
     }
-    logStep("Stripe key verified");
+    logStep("Stripe key verified", { keyLength: stripeKey.length, keyPrefix: stripeKey.substring(0, 7) });
     
     const requestBody = await req.json();
     const { priceId, tier } = requestBody;
@@ -114,7 +114,9 @@ serve(async (req) => {
 
     logStep("Creating checkout session", { tier, priceId: actualPriceId });
 
-    const session = await stripe.checkout.sessions.create({
+    let session;
+    try {
+      session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
       line_items: [
@@ -132,6 +134,14 @@ serve(async (req) => {
         priceId: actualPriceId
       }
     });
+    } catch (stripeError) {
+      logStep("ERROR: Failed to create Stripe checkout session", { 
+        error: stripeError instanceof Error ? stripeError.message : String(stripeError),
+        actualPriceId,
+        tier
+      });
+      throw stripeError;
+    }
 
     logStep("Checkout session created successfully", { sessionId: session.id, url: session.url });
 
