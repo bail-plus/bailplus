@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react"
 import { Building2, MapPin, Users, Plus, Eye, Edit, MoreHorizontal } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -9,57 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useToast } from "@/hooks/use-toast"
-
-const properties = [
-  {
-    id: "1",
-    title: "Appartement 123 Rue de la Paix",
-    address: "123 Rue de la Paix, 75001 Paris",
-    type: "Appartement",
-    surface: "65 m²",
-    units: 1,
-    occupied: 1,
-    rent: "1,200€",
-    status: "occupied",
-    image: "/api/placeholder/300/200"
-  },
-  {
-    id: "2",
-    title: "Studio 45 Avenue des Champs",
-    address: "45 Avenue des Champs, 75008 Paris", 
-    type: "Studio",
-    surface: "25 m²",
-    units: 1,
-    occupied: 0,
-    rent: "850€",
-    status: "vacant",
-    image: "/api/placeholder/300/200"
-  },
-  {
-    id: "3",
-    title: "Maison 78 Boulevard Victor Hugo",
-    address: "78 Boulevard Victor Hugo, 75015 Paris",
-    type: "Maison",
-    surface: "120 m²",
-    units: 1,
-    occupied: 1,
-    rent: "2,500€",
-    status: "occupied",
-    image: "/api/placeholder/300/200"
-  },
-  {
-    id: "4",
-    title: "Parking souterrain",
-    address: "15 Rue des Lilas, 75011 Paris",
-    type: "Parking",
-    surface: "15 m²",
-    units: 1,
-    occupied: 0,
-    rent: "120€",
-    status: "vacant",
-    image: "/api/placeholder/300/200"
-  }
-]
+import { supabase } from "@/integrations/supabase/client"
 
 const statusConfig = {
   occupied: { label: "Occupé", variant: "default" as const },
@@ -69,6 +20,45 @@ const statusConfig = {
 
 const Properties = () => {
   const { toast } = useToast()
+  const [properties, setProperties] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadProperties()
+  }, [])
+
+  const loadProperties = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('properties')
+        .select('*')
+      
+      if (error) throw error
+      setProperties(data || [])
+    } catch (error) {
+      console.error('Error loading properties:', error)
+      toast({
+        title: "Erreur",
+        description: "Impossible de charger les biens",
+        variant: "destructive"
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Chargement des biens...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
   
   return (
     <div className="space-y-6 animate-fade-in">
@@ -99,7 +89,7 @@ const Properties = () => {
             <Building2 className="w-5 h-5 text-primary" />
             <span className="text-sm font-medium text-muted-foreground">Total biens</span>
           </div>
-          <div className="text-2xl font-bold mt-2">4</div>
+          <div className="text-2xl font-bold mt-2">{properties.length}</div>
         </div>
         
         <div className="rounded-lg border bg-card p-4">
@@ -107,7 +97,7 @@ const Properties = () => {
             <Users className="w-5 h-5 text-success" />
             <span className="text-sm font-medium text-muted-foreground">Occupés</span>
           </div>
-          <div className="text-2xl font-bold mt-2">2</div>
+          <div className="text-2xl font-bold mt-2">0</div>
         </div>
         
         <div className="rounded-lg border bg-card p-4">
@@ -115,7 +105,7 @@ const Properties = () => {
             <Building2 className="w-5 h-5 text-warning" />
             <span className="text-sm font-medium text-muted-foreground">Vacants</span>
           </div>
-          <div className="text-2xl font-bold mt-2">2</div>
+          <div className="text-2xl font-bold mt-2">0</div>
         </div>
         
         <div className="rounded-lg border bg-card p-4">
@@ -123,13 +113,31 @@ const Properties = () => {
             <MapPin className="w-5 h-5 text-primary" />
             <span className="text-sm font-medium text-muted-foreground">Surface totale</span>
           </div>
-          <div className="text-2xl font-bold mt-2">225 m²</div>
+          <div className="text-2xl font-bold mt-2">0 m²</div>
         </div>
       </div>
 
       {/* Properties Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {properties.map((property) => (
+        {properties.length === 0 ? (
+          <div className="col-span-full text-center py-12">
+            <Building2 className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Aucun bien trouvé</h3>
+            <p className="text-muted-foreground mb-4">
+              Vous n'avez pas encore ajouté de biens immobiliers.
+            </p>
+            <Button 
+              className="bg-gradient-primary"
+              onClick={() => toast({
+                title: "Fonctionnalité en développement",
+                description: "Cette fonctionnalité sera bientôt disponible"
+              })}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Ajouter votre premier bien
+            </Button>
+          </div>
+        ) : properties.map((property) => (
           <Card key={property.id} className="overflow-hidden hover:shadow-lg transition-shadow">
             <div className="aspect-video bg-muted relative">
               <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
@@ -145,7 +153,7 @@ const Properties = () => {
             <CardContent className="p-4">
               <div className="space-y-3">
                 <div>
-                  <h3 className="font-semibold text-lg leading-tight">{property.title}</h3>
+                  <h3 className="font-semibold text-lg leading-tight">{property.name}</h3>
                   <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
                     <MapPin className="w-3 h-3" />
                     {property.address}
@@ -153,23 +161,13 @@ const Properties = () => {
                 </div>
                 
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Type</span>
-                  <span className="font-medium">{property.type}</span>
+                  <span className="text-muted-foreground">Identifiant</span>
+                  <span className="font-medium">{property.id.slice(0, 8)}...</span>
                 </div>
                 
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Surface</span>
-                  <span className="font-medium">{property.surface}</span>
-                </div>
-                
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Occupation</span>
-                  <span className="font-medium">{property.occupied}/{property.units} lots</span>
-                </div>
-                
-                <div className="flex items-center justify-between text-sm border-t pt-3">
-                  <span className="text-muted-foreground">Loyer</span>
-                  <span className="font-bold text-lg">{property.rent}</span>
+                  <span className="text-muted-foreground">Créé le</span>
+                  <span className="font-medium">{new Date(property.created_at).toLocaleDateString()}</span>
                 </div>
                 
                 <div className="flex items-center gap-2 pt-2">
@@ -179,7 +177,7 @@ const Properties = () => {
                     className="flex-1"
                     onClick={() => toast({
                       title: "Voir le bien",
-                      description: property.title
+                      description: property.name
                     })}
                   >
                     <Eye className="w-4 h-4 mr-2" />
@@ -191,7 +189,7 @@ const Properties = () => {
                     className="flex-1"
                     onClick={() => toast({
                       title: "Modifier le bien",
-                      description: property.title
+                      description: property.name
                     })}
                   >
                     <Edit className="w-4 h-4 mr-2" />

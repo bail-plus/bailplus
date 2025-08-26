@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -8,73 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { AlertTriangle, Clock, CheckCircle, Wrench, Plus, Search, Calendar, User, MapPin, Image } from "lucide-react"
-
-const MOCK_TICKETS = [
-  {
-    id: "1",
-    title: "Fuite d'eau dans la salle de bain",
-    description: "L'eau coule sous la baignoire depuis hier matin",
-    priority: "HIGH",
-    status: "NEW",
-    property: "25 rue de la Paix",
-    unit: "T3 - Appartement",
-    reporter: "Marie Dubois",
-    reporterType: "TENANT",
-    createdAt: "2024-01-15T09:00:00Z",
-    photos: 2,
-    workOrders: []
-  },
-  {
-    id: "2",
-    title: "Problème électrique - prises défaillantes",
-    description: "Plusieurs prises ne fonctionnent plus dans le salon",
-    priority: "MEDIUM",
-    status: "IN_PROGRESS", 
-    property: "10 avenue Mozart",
-    unit: "Studio",
-    reporter: "Pierre Martin",
-    reporterType: "TENANT",
-    createdAt: "2024-01-10T14:30:00Z",
-    assignedTo: "Électricien Dupont",
-    estimatedCost: 150,
-    scheduledAt: "2024-01-20T10:00:00Z",
-    photos: 1,
-    workOrders: [
-      {
-        id: "wo1",
-        vendor: "Électricien Dupont",
-        estimatedAmount: 150,
-        approved: true,
-        scheduledAt: "2024-01-20T10:00:00Z"
-      }
-    ]
-  },
-  {
-    id: "3",
-    title: "Serrure défectueuse",
-    description: "La serrure de la porte d'entrée est difficile à ouvrir",
-    priority: "LOW",
-    status: "DONE",
-    property: "25 rue de la Paix",
-    unit: "T2 avec balcon",
-    reporter: "Admin",
-    reporterType: "ADMIN",
-    createdAt: "2024-01-05T11:00:00Z",
-    closedAt: "2024-01-12T16:00:00Z",
-    finalCost: 80,
-    photos: 0,
-    workOrders: [
-      {
-        id: "wo2", 
-        vendor: "Serrurier Martin",
-        estimatedAmount: 100,
-        approved: true,
-        finalAmount: 80,
-        closedAt: "2024-01-12T16:00:00Z"
-      }
-    ]
-  }
-]
+import { useToast } from "@/hooks/use-toast"
+import { supabase } from "@/integrations/supabase/client"
 
 const KANBAN_COLUMNS = [
   { id: "NEW", title: "Nouveau", color: "bg-red-50", icon: AlertTriangle },
@@ -88,17 +23,56 @@ export default function Maintenance() {
   const [searchTerm, setSearchTerm] = useState("")
   const [priorityFilter, setPriorityFilter] = useState("all")
   const [selectedTicket, setSelectedTicket] = useState<any>(null)
+  const [tickets, setTickets] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const { toast } = useToast()
 
-  const filteredTickets = MOCK_TICKETS.filter(ticket => {
+  useEffect(() => {
+    loadTickets()
+  }, [])
+
+  const loadTickets = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('maintenance_tickets')
+        .select('*')
+      
+      if (error) throw error
+      setTickets(data || [])
+    } catch (error) {
+      console.error('Error loading tickets:', error)
+      toast({
+        title: "Erreur",
+        description: "Impossible de charger les tickets",
+        variant: "destructive"
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredTickets = tickets.filter(ticket => {
     const matchesSearch = 
-      ticket.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ticket.property.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ticket.reporter.toLowerCase().includes(searchTerm.toLowerCase())
+      ticket.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ticket.description?.toLowerCase().includes(searchTerm.toLowerCase())
     
     const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter
     
     return matchesSearch && matchesPriority
   })
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Chargement des tickets...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const getPriorityBadge = (priority: string) => {
     const priorities = {
@@ -207,7 +181,7 @@ export default function Maintenance() {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {KANBAN_COLUMNS.map(column => {
-          const count = MOCK_TICKETS.filter(t => t.status === column.id).length
+          const count = tickets.filter(t => t.status === column.id).length
           return (
             <Card key={column.id}>
               <CardContent className="p-6">
@@ -243,7 +217,11 @@ export default function Maintenance() {
 
                 {/* Column Cards */}
                 <div className="space-y-3">
-                  {columnTickets.map(ticket => (
+                  {columnTickets.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground text-sm">
+                      Aucun ticket {column.title.toLowerCase()}
+                    </div>
+                  ) : columnTickets.map(ticket => (
                     <Card 
                       key={ticket.id} 
                       className={`cursor-pointer transition-shadow hover:shadow-md ${column.color}`}
@@ -257,54 +235,15 @@ export default function Maintenance() {
                             <Badge {...getPriorityBadge(ticket.priority)} className="text-xs" />
                           </div>
 
-                          {/* Location */}
+                          {/* Created Date */}
                           <div className="text-xs text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <MapPin className="w-3 h-3" />
-                              {ticket.property}
-                            </div>
-                            <div className="mt-1">{ticket.unit}</div>
+                            Créé le: {formatDate(ticket.created_at)}
                           </div>
 
-                          {/* Reporter */}
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <User className="w-3 h-3" />
-                            {ticket.reporter}
-                          </div>
-
-                          {/* Assignee & Schedule (if applicable) */}
-                          {ticket.assignedTo && (
-                            <div className="text-xs text-muted-foreground">
-                              <div className="flex items-center gap-1">
-                                <Wrench className="w-3 h-3" />
-                                {ticket.assignedTo}
-                              </div>
-                              {ticket.scheduledAt && (
-                                <div className="flex items-center gap-1 mt-1">
-                                  <Calendar className="w-3 h-3" />
-                                  {formatDate(ticket.scheduledAt)}
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Photos */}
-                          {ticket.photos > 0 && (
-                            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <Image className="w-3 h-3" />
-                              {ticket.photos} photo(s)
-                            </div>
-                          )}
-
-                          {/* Cost */}
-                          {ticket.estimatedCost && (
-                            <div className="text-xs font-medium text-green-600">
-                              Devis: {ticket.estimatedCost}€
-                            </div>
-                          )}
-                          {ticket.finalCost && (
-                            <div className="text-xs font-medium text-green-600">
-                              Coût final: {ticket.finalCost}€
+                          {/* Description */}
+                          {ticket.description && (
+                            <div className="text-xs text-muted-foreground line-clamp-2">
+                              {ticket.description}
                             </div>
                           )}
                         </div>

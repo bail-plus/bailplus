@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -9,73 +9,61 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Users, Plus, Search, Phone, Mail, MapPin, FileText, User, Wrench } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-
-const MOCK_PEOPLE = [
-  {
-    id: "1",
-    type: "TENANT",
-    firstName: "Marie",
-    lastName: "Dubois",
-    email: "marie.dubois@email.com",
-    phone: "06 12 34 56 78",
-    address: "25 rue de la Paix, Paris 2e",
-    activeLease: "T3 - 25 rue de la Paix",
-    status: "active",
-    documents: 5
-  },
-  {
-    id: "2",
-    type: "TENANT", 
-    firstName: "Pierre",
-    lastName: "Martin",
-    email: "pierre.martin@email.com",
-    phone: "06 87 65 43 21",
-    address: "10 avenue Mozart, Paris 16e",
-    activeLease: "Studio - 10 avenue Mozart",
-    status: "active",
-    documents: 3
-  },
-  {
-    id: "3",
-    type: "GUARANTOR",
-    firstName: "Sophie",
-    lastName: "Dubois",
-    email: "sophie.dubois@email.com", 
-    phone: "01 23 45 67 89",
-    address: "12 rue de Rivoli, Paris 1er",
-    guaranteeFor: "Marie Dubois",
-    status: "active",
-    documents: 2
-  },
-  {
-    id: "4",
-    type: "VENDOR",
-    firstName: "Jean",
-    lastName: "Plombier",
-    email: "jean.plombier@artisan.com",
-    phone: "06 11 22 33 44",
-    specialty: "Plomberie",
-    status: "active",
-    documents: 1
-  }
-]
+import { supabase } from "@/integrations/supabase/client"
 
 export default function People() {
   const [searchTerm, setSearchTerm] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
   const [selectedPerson, setSelectedPerson] = useState<any>(null)
+  const [tenants, setTenants] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
   const { toast } = useToast()
 
-  const filteredPeople = MOCK_PEOPLE.filter(person => {
+  useEffect(() => {
+    loadTenants()
+  }, [])
+
+  const loadTenants = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tenants')
+        .select('*')
+      
+      if (error) throw error
+      setTenants(data || [])
+    } catch (error) {
+      console.error('Error loading tenants:', error)
+      toast({
+        title: "Erreur",
+        description: "Impossible de charger les personnes",
+        variant: "destructive"
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredPeople = tenants.filter(person => {
     const matchesSearch = 
-      person.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      person.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      person.email.toLowerCase().includes(searchTerm.toLowerCase())
+      person.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      person.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      person.email?.toLowerCase().includes(searchTerm.toLowerCase())
     
-    const matchesType = typeFilter === "all" || person.type === typeFilter
-    
-    return matchesSearch && matchesType
+    return matchesSearch
   })
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Chargement des personnes...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const getPersonTypeLabel = (type: string) => {
     const types = {
@@ -158,7 +146,7 @@ export default function People() {
               <Users className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm font-medium">Total</span>
             </div>
-            <div className="text-2xl font-bold">{MOCK_PEOPLE.length}</div>
+            <div className="text-2xl font-bold">{tenants.length}</div>
           </CardContent>
         </Card>
         
@@ -168,9 +156,7 @@ export default function People() {
               <User className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm font-medium">Locataires</span>
             </div>
-            <div className="text-2xl font-bold">
-              {MOCK_PEOPLE.filter(p => p.type === "TENANT").length}
-            </div>
+            <div className="text-2xl font-bold">{tenants.length}</div>
           </CardContent>
         </Card>
         
@@ -180,9 +166,7 @@ export default function People() {
               <User className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm font-medium">Garants</span>
             </div>
-            <div className="text-2xl font-bold">
-              {MOCK_PEOPLE.filter(p => p.type === "GUARANTOR").length}
-            </div>
+            <div className="text-2xl font-bold">0</div>
           </CardContent>
         </Card>
         
@@ -192,9 +176,7 @@ export default function People() {
               <Wrench className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm font-medium">Prestataires</span>
             </div>
-            <div className="text-2xl font-bold">
-              {MOCK_PEOPLE.filter(p => p.type === "VENDOR").length}
-            </div>
+            <div className="text-2xl font-bold">0</div>
           </CardContent>
         </Card>
       </div>
@@ -218,9 +200,19 @@ export default function People() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredPeople.map((person) => {
-                const typeConfig = getPersonTypeLabel(person.type)
-                const statusConfig = getStatusBadge(person.status)
+              {filteredPeople.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8">
+                    <div className="text-center">
+                      <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">Aucune personne trouvée</h3>
+                      <p className="text-muted-foreground">
+                        Vous n'avez pas encore ajouté de locataires ou autres personnes.
+                      </p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : filteredPeople.map((person) => {
                 
                 return (
                   <TableRow 
@@ -231,7 +223,7 @@ export default function People() {
                     <TableCell>
                       <div>
                         <div className="font-medium">
-                          {person.firstName} {person.lastName}
+                          {person.first_name} {person.last_name}
                         </div>
                         <div className="text-sm text-muted-foreground flex items-center gap-1">
                           <Mail className="w-3 h-3" />
@@ -241,9 +233,9 @@ export default function People() {
                     </TableCell>
                     
                     <TableCell>
-                      <Badge variant={typeConfig.variant} className="gap-1">
-                        <typeConfig.icon className="w-3 h-3" />
-                        {typeConfig.label}
+                      <Badge variant="default" className="gap-1">
+                        <User className="w-3 h-3" />
+                        Locataire
                       </Badge>
                     </TableCell>
                     
@@ -263,35 +255,21 @@ export default function People() {
                     </TableCell>
                     
                     <TableCell>
-                      <Badge variant={statusConfig.variant}>
-                        {statusConfig.label}
+                      <Badge variant="default">
+                        Actif
                       </Badge>
                     </TableCell>
                     
                     <TableCell>
-                      <div className="text-sm">
-                        {person.activeLease && (
-                          <span className="text-muted-foreground">
-                            Bail: {person.activeLease}
-                          </span>
-                        )}
-                        {person.guaranteeFor && (
-                          <span className="text-muted-foreground">
-                            Garant de: {person.guaranteeFor}
-                          </span>
-                        )}
-                        {person.specialty && (
-                          <span className="text-muted-foreground">
-                            {person.specialty}
-                          </span>
-                        )}
+                      <div className="text-sm text-muted-foreground">
+                        -
                       </div>
                     </TableCell>
                     
                     <TableCell>
                       <div className="flex items-center gap-1">
                         <FileText className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">{person.documents}</span>
+                        <span className="text-sm">0</span>
                       </div>
                     </TableCell>
                     
@@ -303,7 +281,7 @@ export default function People() {
                           e.stopPropagation()
                           toast({
                             title: "Voir la personne",
-                            description: `${person.firstName} ${person.lastName}`
+                            description: `${person.first_name} ${person.last_name}`
                           })
                         }}
                       >

@@ -1,21 +1,56 @@
+import { useState, useEffect } from "react"
 import { Building2, Users, Calculator, AlertTriangle, TrendingUp, Clock } from "lucide-react"
 import { StatCard } from "@/components/dashboard/stat-card"
 import { MiniChart } from "@/components/dashboard/mini-chart"
 import { QuickActions } from "@/components/dashboard/quick-actions"
 import { RecentActivity } from "@/components/dashboard/recent-activity"
-
-// Mock data for charts
-const revenueData = [
-  { value: 8500 }, { value: 9200 }, { value: 8800 }, { value: 9600 },
-  { value: 10200 }, { value: 9800 }, { value: 10500 }
-]
-
-const occupancyData = [
-  { value: 85 }, { value: 88 }, { value: 92 }, { value: 89 },
-  { value: 95 }, { value: 94 }, { value: 96 }
-]
+import { supabase } from "@/integrations/supabase/client"
 
 const Index = () => {
+  const [stats, setStats] = useState({
+    properties: 0,
+    tenants: 0,
+    tickets: 0,
+    loading: true
+  })
+
+  useEffect(() => {
+    loadStats()
+  }, [])
+
+  const loadStats = async () => {
+    try {
+      const [propertiesRes, tenantsRes, ticketsRes] = await Promise.all([
+        supabase.from('properties').select('id', { count: 'exact' }),
+        supabase.from('tenants').select('id', { count: 'exact' }),
+        supabase.from('maintenance_tickets').select('id', { count: 'exact' })
+      ])
+
+      setStats({
+        properties: propertiesRes.count || 0,
+        tenants: tenantsRes.count || 0,
+        tickets: ticketsRes.count || 0,
+        loading: false
+      })
+    } catch (error) {
+      console.error('Error loading stats:', error)
+      setStats(prev => ({ ...prev, loading: false }))
+    }
+  }
+
+  if (stats.loading) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Chargement du tableau de bord...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Page Header */}
@@ -30,36 +65,33 @@ const Index = () => {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Biens gérés"
-          value="12"
-          change="+2 ce mois"
-          changeType="positive"
+          value={stats.properties.toString()}
+          change={stats.properties === 0 ? "Aucun bien" : `${stats.properties} bien${stats.properties > 1 ? 's' : ''}`}
+          changeType={stats.properties > 0 ? "positive" : "neutral"}
           icon={<Building2 className="w-5 h-5 text-primary" />}
-          trend={<MiniChart data={[{value: 8}, {value: 9}, {value: 10}, {value: 11}, {value: 12}]} />}
+        />
+        
+        <StatCard
+          title="Locataires"
+          value={stats.tenants.toString()}
+          change={stats.tenants === 0 ? "Aucun locataire" : `${stats.tenants} locataire${stats.tenants > 1 ? 's' : ''}`}
+          changeType={stats.tenants > 0 ? "positive" : "neutral"}
+          icon={<Users className="w-5 h-5 text-primary" />}
         />
         
         <StatCard
           title="Revenus du mois"
-          value="10 500€"
-          change="+8.2% vs mois dernier"
-          changeType="positive"
+          value="0€"
+          change="Aucune donnée"
+          changeType="neutral"
           icon={<Calculator className="w-5 h-5 text-primary" />}
-          trend={<MiniChart data={revenueData} />}
         />
         
         <StatCard
-          title="Taux d'occupation"
-          value="96%"
-          change="+2% vs mois dernier"
-          changeType="positive"
-          icon={<TrendingUp className="w-5 h-5 text-primary" />}
-          trend={<MiniChart data={occupancyData} />}
-        />
-        
-        <StatCard
-          title="Impayés"
-          value="1 200€"
-          change="1 locataire en retard"
-          changeType="negative"
+          title="Tickets maintenance"
+          value={stats.tickets.toString()}
+          change={stats.tickets === 0 ? "Aucun ticket" : `${stats.tickets} ticket${stats.tickets > 1 ? 's' : ''}`}
+          changeType={stats.tickets > 0 ? "negative" : "positive"}
           icon={<AlertTriangle className="w-5 h-5 text-destructive" />}
         />
       </div>
@@ -86,36 +118,10 @@ const Index = () => {
               <Clock className="w-5 h-5 text-primary" />
               <h3 className="text-lg font-semibold">Tâches du jour</h3>
             </div>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                <div>
-                  <p className="font-medium">Relance loyer en retard</p>
-                  <p className="text-sm text-muted-foreground">Marie Dupont - Studio 45</p>
-                </div>
-                <span className="text-xs bg-destructive/10 text-destructive px-2 py-1 rounded-full">
-                  Urgent
-                </span>
-              </div>
-              
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                <div>
-                  <p className="font-medium">Visite programmée</p>
-                  <p className="text-sm text-muted-foreground">Appartement 78 Boulevard - 14h30</p>
-                </div>
-                <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
-                  Aujourd'hui
-                </span>
-              </div>
-              
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                <div>
-                  <p className="font-medium">Envoyer quittances</p>
-                  <p className="text-sm text-muted-foreground">3 quittances à générer</p>
-                </div>
-                <span className="text-xs bg-warning/10 text-warning px-2 py-1 rounded-full">
-                  En cours
-                </span>
-              </div>
+            <div className="text-center py-8 text-muted-foreground">
+              <Clock className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p className="text-sm">Aucune tâche pour aujourd'hui</p>
+              <p className="text-xs mt-2">Les tâches apparaîtront ici une fois que vous aurez ajouté des biens et locataires</p>
             </div>
           </div>
         </div>
@@ -127,37 +133,28 @@ const Index = () => {
               <Building2 className="w-5 h-5 text-primary" />
               <h3 className="text-lg font-semibold">Aperçu du parc</h3>
             </div>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Appartements</span>
-                <div className="flex items-center gap-2">
-                  <div className="w-20 bg-muted rounded-full h-2">
-                    <div className="bg-primary h-2 rounded-full w-4/5"></div>
-                  </div>
-                  <span className="text-sm font-medium">8/10</span>
+            {stats.properties === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Building2 className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p className="text-sm">Aucun bien dans votre parc</p>
+                <p className="text-xs mt-2">Ajoutez vos premiers biens pour voir les statistiques</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Biens total</span>
+                  <span className="text-sm font-medium">{stats.properties}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Locataires</span>
+                  <span className="text-sm font-medium">{stats.tenants}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Tickets ouverts</span>
+                  <span className="text-sm font-medium">{stats.tickets}</span>
                 </div>
               </div>
-              
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Studios</span>
-                <div className="flex items-center gap-2">
-                  <div className="w-20 bg-muted rounded-full h-2">
-                    <div className="bg-primary h-2 rounded-full w-full"></div>
-                  </div>
-                  <span className="text-sm font-medium">2/2</span>
-                </div>
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Parkings</span>
-                <div className="flex items-center gap-2">
-                  <div className="w-20 bg-muted rounded-full h-2">
-                    <div className="bg-primary h-2 rounded-full w-1/2"></div>
-                  </div>
-                  <span className="text-sm font-medium">1/2</span>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>
