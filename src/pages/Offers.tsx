@@ -122,35 +122,25 @@ export default function Offers() {
   }, [searchParams, setSearchParams]);
 
   const handleSelectOffer = async (offerId: string) => {
-    const tierMap = {
-      'starter': 'starter' as const,
-      'pro': 'pro' as const, 
-      'enterprise': 'enterprise' as const
-    };
-
-    const tier = tierMap[offerId as keyof typeof tierMap];
-    if (!tier) {
-      toast.error('Offre non reconnue');
+    // Only starter tier is available for now
+    if (offerId !== 'starter') {
+      toast.error('Seule l\'offre Starter est disponible pour le moment');
       return;
     }
+
+    const tier = 'starter' as const;
 
     // If user is not authenticated, store intent and redirect to signup
     if (!user || !session) {
       console.log('🔄 User not authenticated, storing intent and redirecting to signup');
       
-      // Map tier to actual Stripe price ID (placeholder for now, will be resolved in edge function)
-      const priceIdMap = {
-        starter: 'STRIPE_PRICE_STARTER',
-        pro: 'STRIPE_PRICE_PRO',
-        enterprise: 'STRIPE_PRICE_ENTERPRISE'
-      };
-      
-      storeSubscriptionIntent(priceIdMap[tier], tier);
+      const priceId = 'STRIPE_PRICE_STARTER';
+      storeSubscriptionIntent(priceId, tier);
       
       // Redirect with URL params as backup
       const params = new URLSearchParams({
         intent: 'subscribe',
-        priceId: priceIdMap[tier],
+        priceId: priceId,
         tier: tier,
         next: 'offers'
       });

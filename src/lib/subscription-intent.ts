@@ -3,7 +3,7 @@
 export interface SubscriptionIntent {
   action: 'subscribe';
   priceId: string;
-  tier: 'starter' | 'pro' | 'enterprise';
+  tier: 'starter';
   timestamp: number;
 }
 
@@ -11,7 +11,7 @@ const INTENT_STORAGE_KEY = 'subscriptionIntent';
 const CHECKOUT_PENDING_KEY = 'checkoutPending';
 const INTENT_TIMEOUT = 10 * 60 * 1000; // 10 minutes
 
-export function storeSubscriptionIntent(priceId: string, tier: 'starter' | 'pro' | 'enterprise') {
+export function storeSubscriptionIntent(priceId: string, tier: 'starter') {
   const intent: SubscriptionIntent = {
     action: 'subscribe',
     priceId,
@@ -67,7 +67,7 @@ export function clearCheckoutPending() {
 export function getIntentFromParams(searchParams: URLSearchParams): SubscriptionIntent | null {
   const intent = searchParams.get('intent');
   const priceId = searchParams.get('priceId');
-  const tier = searchParams.get('tier') as 'starter' | 'pro' | 'enterprise';
+  const tier = searchParams.get('tier') as 'starter';
   
   if (intent === 'subscribe' && priceId && tier) {
     return {
