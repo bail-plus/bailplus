@@ -3,11 +3,18 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Check, ArrowRight, Loader2 } from 'lucide-react';
+import { Check, ArrowRight, Loader2, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { siteConfig } from '@/config/site';
+import { 
+  storeSubscriptionIntent, 
+  getSubscriptionIntent, 
+  clearSubscriptionIntent,
+  getIntentFromParams 
+} from '@/lib/subscription-intent';
+import { handleOfferSelection } from '@/lib/stripe-checkout';
+import { LoadingGate } from '@/components/LoadingGate';
 
 const offers = [
   {
@@ -26,61 +33,63 @@ export default function Offers() {
   const [selectedOffer, setSelectedOffer] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
-  
-  const processStoredOffer = async (offerId: string) => {
-    console.log('🔍 Processing stored offer:', { offerId, userId: user?.id, sessionExists: !!session });
-    setSelectedOffer(offerId);
-    setIsLoading(true);
+  const [isProcessingIntent, setIsProcessingIntent] = useState(false);
+
+  // Process stored subscription intent when user becomes authenticated
+  const processSubscriptionIntent = async () => {
+    if (!user || !session) return;
+    
+    // Try URL params first, then localStorage
+    const urlIntent = getIntentFromParams(searchParams);
+    const storedIntent = urlIntent || getSubscriptionIntent();
+    
+    if (!storedIntent) return;
+
+    console.log('🔄 Processing subscription intent:', storedIntent);
+    setIsProcessingIntent(true);
 
     try {
-      console.log('📤 Calling create-checkout function with:', { tier: offerId });
-      
-      const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { tier: offerId },
-        headers: {
-          Authorization: `Bearer ${session!.access_token}`,
-        },
-      });
-
-      console.log('📥 Function response:', { data, error });
-
-      if (error) {
-        console.error('❌ Function error details:', {
-          name: error.name,
-          message: error.message,
-          context: error.context,
-          stack: error.stack
-        });
-        throw error;
-      }
-
-      if (data?.url) {
-        console.log('✅ Redirecting to Stripe:', data.url);
-        // Open Stripe checkout in a new tab
-        window.open(data.url, '_blank');
-      } else {
-        console.error('❌ No URL in response:', data);
-        throw new Error('Aucune URL de paiement reçue');
+      const success = await handleOfferSelection(storedIntent.tier, user, session);
+      if (success) {
+        console.log('✅ Subscription intent processed successfully');
+        clearSubscriptionIntent();
+        
+        // Clean URL params if they were used
+        if (urlIntent) {
+          const newParams = new URLSearchParams(searchParams);
+          newParams.delete('intent');
+          newParams.delete('priceId');
+          newParams.delete('tier');
+          setSearchParams(newParams, { replace: true });
+        }
       }
     } catch (error) {
-      console.error('❌ Error creating checkout:', error);
-      toast.error('Erreur lors de la création de la session de paiement');
+      console.error('❌ Error processing subscription intent:', error);
+      toast.error('Erreur lors du traitement de votre demande d\'abonnement');
     } finally {
-      setIsLoading(false);
-      setSelectedOffer(null);
+      setIsProcessingIntent(false);
     }
   };
 
-  // Check if user just came back from auth and has a stored offer
+  // Debug function to replay stored intent
+  const debugReplayIntent = async () => {
+    console.log('🔧 Debug: Replaying subscription intent...');
+    await processSubscriptionIntent();
+  };
+
+  // Check for subscription intent when user auth state changes
   useEffect(() => {
-    const storedOffer = sessionStorage.getItem('selectedOffer');
-    if (user && session && storedOffer) {
-      console.log('🔄 User returned from auth, processing stored offer:', storedOffer);
-      sessionStorage.removeItem('selectedOffer');
-      // Auto-trigger the offer selection after a short delay
-      setTimeout(() => {
-        processStoredOffer(storedOffer);
-      }, 1000);
+    if (user && session && !isProcessingIntent) {
+      const urlIntent = getIntentFromParams(searchParams);
+      const storedIntent = getSubscriptionIntent();
+      
+      if (urlIntent || storedIntent) {
+        console.log('👤 User authenticated with pending subscription intent');
+        // Small delay to ensure auth is fully settled
+        setTimeout(() => {
+          processSubscriptionIntent();
+        }, 500);
+      }
     }
   }, [user, session]);
 
@@ -89,6 +98,8 @@ export default function Offers() {
     const checkoutStatus = searchParams.get('checkout');
     if (checkoutStatus === 'success') {
       toast.success('Paiement réussi ! Votre abonnement est maintenant actif.');
+      // Clear any pending intents
+      clearSubscriptionIntent();
       // Remove the checkout parameter from URL
       const newParams = new URLSearchParams(searchParams);
       newParams.delete('checkout');
@@ -101,6 +112,8 @@ export default function Offers() {
       }, 2000);
     } else if (checkoutStatus === 'cancel') {
       toast.error('Paiement annulé. Vous pouvez reprendre le processus à tout moment.');
+      // Clear any pending intents
+      clearSubscriptionIntent();
       // Remove the checkout parameter from URL
       const newParams = new URLSearchParams(searchParams);
       newParams.delete('checkout');
@@ -108,71 +121,54 @@ export default function Offers() {
     }
   }, [searchParams, setSearchParams]);
 
-  // Show loading state while auth is being determined
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-surface">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Chargement...</p>
-        </div>
-      </div>
-    );
-  }
-
   const handleSelectOffer = async (offerId: string) => {
-    // If user is not authenticated, redirect to signup with offer info
-    if (!user || !session) {
-      console.log('🔄 User not authenticated, redirecting to signup with offer:', offerId);
-      // Store the selected offer in sessionStorage for after auth
-      sessionStorage.setItem('selectedOffer', offerId);
-      window.location.href = `/signup?offer=${offerId}`;
+    const tierMap = {
+      'starter': 'starter' as const,
+      'pro': 'pro' as const, 
+      'enterprise': 'enterprise' as const
+    };
+
+    const tier = tierMap[offerId as keyof typeof tierMap];
+    if (!tier) {
+      toast.error('Offre non reconnue');
       return;
     }
 
-    console.log('🔍 Starting offer selection:', { offerId, userId: user.id, sessionExists: !!session });
+    // If user is not authenticated, store intent and redirect to signup
+    if (!user || !session) {
+      console.log('🔄 User not authenticated, storing intent and redirecting to signup');
+      
+      // Map tier to actual Stripe price ID (placeholder for now, will be resolved in edge function)
+      const priceIdMap = {
+        starter: 'STRIPE_PRICE_STARTER',
+        pro: 'STRIPE_PRICE_PRO',
+        enterprise: 'STRIPE_PRICE_ENTERPRISE'
+      };
+      
+      storeSubscriptionIntent(priceIdMap[tier], tier);
+      
+      // Redirect with URL params as backup
+      const params = new URLSearchParams({
+        intent: 'subscribe',
+        priceId: priceIdMap[tier],
+        tier: tier,
+        next: 'offers'
+      });
+      
+      window.location.href = `/signup?${params.toString()}`;
+      return;
+    }
+
+    // User is authenticated, proceed with checkout
+    console.log('🔍 Starting offer selection for authenticated user:', { offerId, tier });
     setSelectedOffer(offerId);
     setIsLoading(true);
 
     try {
-      console.log('📤 Calling create-checkout function with:', { tier: offerId });
-      
-      const { data, error } = await supabase.functions.invoke('create-checkout', {
-        body: { tier: offerId },
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      console.log('📥 Function response:', { data, error });
-
-      if (error) {
-        console.error('❌ Function error details:', {
-          name: error.name,
-          message: error.message,
-          context: error.context,
-          stack: error.stack
-        });
-        
-        // Try to get more details from the error
-        if (error.context?.body) {
-          console.error('❌ Error response body:', error.context.body);
-        }
-        
-        throw error;
+      const success = await handleOfferSelection(tier, user, session);
+      if (success) {
+        console.log('✅ Offer selection completed successfully');
       }
-
-      if (data?.url) {
-        console.log('✅ Redirecting to Stripe:', data.url);
-        // Open Stripe checkout in a new tab
-        window.open(data.url, '_blank');
-      } else {
-        console.error('❌ No URL in response:', data);
-        throw new Error('Aucune URL de paiement reçue');
-      }
-    } catch (error) {
-      console.error('❌ Error creating checkout:', error);
-      toast.error('Erreur lors de la création de la session de paiement');
     } finally {
       setIsLoading(false);
       setSelectedOffer(null);
@@ -185,103 +181,127 @@ export default function Offers() {
       userId: user.id, 
       email: user.email, 
       emailConfirmed: user.email_confirmed_at,
-      sessionActive: !!session 
+      sessionActive: !!session,
+      hasStoredIntent: !!getSubscriptionIntent()
     });
   }
 
   return (
-    <div className="min-h-screen bg-gradient-surface py-12">
-      <div className="container mx-auto px-6">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-foreground mb-4">
-            Choisissez votre abonnement
-          </h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Sélectionnez l'offre Starter pour commencer à utiliser BailloGenius et simplifier votre gestion locative
-          </p>
-          
-          {/* Remove debug buttons from production */}
-        </div>
-
-        <div className="flex justify-center max-w-lg mx-auto">
-          {offers.map((offer) => (
-            <Card 
-              key={offer.id} 
-              className={`relative p-6 transition-all duration-200 hover:shadow-lg ${
-                offer.popular ? 'ring-2 ring-primary shadow-lg' : ''
-              }`}
-            >
-              {offer.popular && (
-                <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary">
-                  Le plus populaire
-                </Badge>
-              )}
-              
-              <CardHeader className="pb-6">
-                <CardTitle className="text-2xl">{offer.name}</CardTitle>
-                <CardDescription className="text-base">{offer.description}</CardDescription>
-                <div className="pt-4">
-                  <div className="text-4xl font-bold text-foreground">
-                    {typeof offer.price === 'number' ? `${offer.price}€` : offer.price}
-                  </div>
-                  {typeof offer.price === 'number' && (
-                    <div className="text-muted-foreground">/mois</div>
-                  )}
-                </div>
-              </CardHeader>
-
-              <CardContent className="space-y-6">
-                <div className="text-sm text-muted-foreground">
-                  {typeof offer.maxProperties === 'number' 
-                    ? `Jusqu'à ${offer.maxProperties} lots`
-                    : offer.maxProperties
-                  }
-                </div>
-
-                <ul className="space-y-3">
-                  {offer.features.map((feature, index) => (
-                    <li key={index} className="flex items-start gap-3">
-                      <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                      <span className="text-sm">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-
+    <LoadingGate 
+      isLoading={loading || isProcessingIntent} 
+      message={isProcessingIntent ? "Traitement de votre demande d'abonnement..." : "Chargement..."}
+    >
+      <div className="min-h-screen bg-gradient-surface py-12">
+        <div className="container mx-auto px-6">
+          <div className="text-center mb-12">
+            <h1 className="text-4xl font-bold text-foreground mb-4">
+              Choisissez votre abonnement
+            </h1>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              Sélectionnez l'offre Starter pour commencer à utiliser BailloGenius et simplifier votre gestion locative
+            </p>
+            
+            {/* Debug button for testing intent replay */}
+            {process.env.NODE_ENV === 'development' && getSubscriptionIntent() && (
+              <div className="mt-4">
                 <Button 
-                  className="w-full" 
-                  onClick={() => handleSelectOffer(offer.id)}
-                  disabled={isLoading}
-                  variant={offer.popular ? "default" : "outline"}
+                  variant="outline" 
+                  size="sm"
+                  onClick={debugReplayIntent}
+                  className="text-xs"
                 >
-                  {isLoading && selectedOffer === offer.id ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {user ? 'Redirection...' : 'Redirection vers inscription...'}
-                    </>
-                  ) : (
-                    <>
-                      {user ? 'Choisir cette offre' : 'S\'abonner'}
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </>
-                  )}
+                  <RefreshCw className="mr-2 h-3 w-3" />
+                  🔧 Rejouer l'intention d'abonnement
                 </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+              </div>
+            )}
+          </div>
 
-        <div className="text-center mt-12">
-          <p className="text-sm text-muted-foreground mb-4">
-            Paiement sécurisé par Stripe • Annulation possible à tout moment
-          </p>
-          <p className="text-sm text-muted-foreground">
-            Questions ? Contactez-nous à{' '}
-            <a href="mailto:contact@bailogenius.fr" className="text-primary hover:underline">
-              contact@bailogenius.fr
-            </a>
-          </p>
+          <div className="flex justify-center max-w-lg mx-auto">
+            {offers.map((offer) => (
+              <Card 
+                key={offer.id} 
+                className={`relative p-6 transition-all duration-200 hover:shadow-lg ${
+                  offer.popular ? 'ring-2 ring-primary shadow-lg' : ''
+                }`}
+              >
+                {offer.popular && (
+                  <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary">
+                    Le plus populaire
+                  </Badge>
+                )}
+                
+                <CardHeader className="pb-6">
+                  <CardTitle className="text-2xl">{offer.name}</CardTitle>
+                  <CardDescription className="text-base">{offer.description}</CardDescription>
+                  <div className="pt-4">
+                    <div className="text-4xl font-bold text-foreground">
+                      {typeof offer.price === 'number' ? `${offer.price}€` : offer.price}
+                    </div>
+                    {typeof offer.price === 'number' && (
+                      <div className="text-muted-foreground">/mois</div>
+                    )}
+                  </div>
+                </CardHeader>
+
+                <CardContent className="space-y-6">
+                  <div className="text-sm text-muted-foreground">
+                    {typeof offer.maxProperties === 'number' 
+                      ? `Jusqu'à ${offer.maxProperties} lots`
+                      : offer.maxProperties
+                    }
+                  </div>
+
+                  <ul className="space-y-3">
+                    {offer.features.map((feature, index) => (
+                      <li key={index} className="flex items-start gap-3">
+                        <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                        <span className="text-sm">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <Button 
+                    className="w-full" 
+                    onClick={() => handleSelectOffer(offer.id)}
+                    disabled={isLoading || isProcessingIntent}
+                    variant={offer.popular ? "default" : "outline"}
+                  >
+                    {isLoading && selectedOffer === offer.id ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Redirection vers Stripe...
+                      </>
+                    ) : isProcessingIntent ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Traitement...
+                      </>
+                    ) : (
+                      <>
+                        {user ? 'Choisir cette offre' : 'S\'abonner'}
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div className="text-center mt-12">
+            <p className="text-sm text-muted-foreground mb-4">
+              Paiement sécurisé par Stripe • Annulation possible à tout moment
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Questions ? Contactez-nous à{' '}
+              <a href="mailto:contact@bailogenius.fr" className="text-primary hover:underline">
+                contact@bailogenius.fr
+              </a>
+            </p>
+          </div>
         </div>
       </div>
-    </div>
+    </LoadingGate>
   );
 }

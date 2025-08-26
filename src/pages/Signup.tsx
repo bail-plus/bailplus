@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Navigate, Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,17 +7,36 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/hooks/useAuth';
 import { Building2 } from 'lucide-react';
+import { LoadingGate } from '@/components/LoadingGate';
+import { getSubscriptionIntent, getIntentFromParams } from '@/lib/subscription-intent';
 
 export default function Signup() {
   const { user, signUp, loading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [searchParams] = useSearchParams();
-  const offerParam = searchParams.get('offer');
+  const [isWaitingForAuth, setIsWaitingForAuth] = useState(false);
+  
+  // Get intent information
+  const urlIntent = getIntentFromParams(searchParams);
+  const storedIntent = getSubscriptionIntent();
+  const hasIntent = !!(urlIntent || storedIntent);
 
-  // Only redirect if user is authenticated AND there's no offer to process
-  if (user && !offerParam) {
+  // Only redirect if user is authenticated AND there's no intent to process
+  if (user && !hasIntent) {
     return <Navigate to="/offers" replace />;
   }
+
+  // Handle auto-redirect after successful signup
+  useEffect(() => {
+    if (user && hasIntent) {
+      console.log('👤 User signed up with subscription intent, redirecting to offers...');
+      setIsWaitingForAuth(true);
+      // Redirect to offers page where the intent will be processed
+      setTimeout(() => {
+        window.location.href = '/offers';
+      }, 1000);
+    }
+  }, [user, hasIntent]);
 
   const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -31,20 +50,43 @@ export default function Signup() {
     
     const { error } = await signUp(email, password, firstName, lastName);
     if (!error) {
-      // Redirect to offers page after successful signup
-      console.log('✅ Signup successful, redirecting to offers...');
-      window.location.href = '/offers';
+      console.log('✅ Signup successful');
+      if (hasIntent) {
+        console.log('🔄 Will redirect to offers to process subscription intent');
+        setIsWaitingForAuth(true);
+      } else {
+        window.location.href = '/offers';
+      }
     }
     setIsLoading(false);
   };
 
-  if (loading) {
+  if (loading || isWaitingForAuth) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">Chargement...</div>
-      </div>
+      <LoadingGate 
+        isLoading={true} 
+        message={isWaitingForAuth ? "Redirection vers votre abonnement..." : "Chargement..."}
+      >
+        <div />
+      </LoadingGate>
     );
   }
+
+  // Determine display text based on intent
+  const getIntentDisplayText = () => {
+    const intent = urlIntent || storedIntent;
+    if (!intent) return null;
+    
+    const tierNames = {
+      starter: 'Starter',
+      pro: 'Pro', 
+      enterprise: 'Enterprise'
+    };
+    
+    return tierNames[intent.tier] || intent.tier;
+  };
+
+  const intentDisplayText = getIntentDisplayText();
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-surface p-4">
@@ -55,8 +97,8 @@ export default function Signup() {
           </div>
           <CardTitle>Créer un compte</CardTitle>
           <CardDescription>
-            {offerParam 
-              ? `Créez votre compte pour souscrire à l'offre ${offerParam.charAt(0).toUpperCase() + offerParam.slice(1)}`
+            {intentDisplayText 
+              ? `Créez votre compte pour souscrire à l'offre ${intentDisplayText}`
               : 'Rejoignez BailloGenius et simplifiez votre gestion locative'
             }
           </CardDescription>
@@ -112,7 +154,7 @@ export default function Signup() {
           <div className="mt-6 text-center">
             <p className="text-sm text-muted-foreground">
               Déjà un compte ?{" "}
-              <Link to={`/login${offerParam ? `?offer=${offerParam}` : ''}`} className="text-primary hover:underline">
+              <Link to={`/login${urlIntent ? `?${new URLSearchParams({ intent: 'subscribe', priceId: urlIntent.priceId, tier: urlIntent.tier }).toString()}` : ''}`} className="text-primary hover:underline">
                 Se connecter
               </Link>
             </p>

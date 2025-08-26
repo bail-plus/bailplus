@@ -34,12 +34,13 @@ serve(async (req) => {
     logStep("Stripe key verified");
     
     const requestBody = await req.json();
-    const { tier } = requestBody;
-    if (!tier) {
-      logStep("ERROR: No tier provided", { requestBody });
-      throw new Error("No tier provided");
+    const { priceId, tier } = requestBody;
+    
+    if (!priceId || !tier) {
+      logStep("ERROR: Missing priceId or tier", { requestBody });
+      throw new Error("priceId and tier are required");
     }
-    logStep("Tier provided", { tier });
+    logStep("Request parameters", { priceId, tier });
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
@@ -80,23 +81,45 @@ serve(async (req) => {
       throw new Error(`Seule l'offre starter est disponible pour le moment`);
     }
 
-    // Get price from environment variable
-    const starterPriceId = Deno.env.get("STRIPE_PRICE_STARTER");
-    if (!starterPriceId) {
-      logStep("ERROR: STRIPE_PRICE_STARTER is not set");
-      throw new Error("STRIPE_PRICE_STARTER is not set");
+    // Resolve Stripe price ID from environment variables
+    let actualPriceId;
+    switch (priceId) {
+      case 'STRIPE_PRICE_STARTER':
+        actualPriceId = Deno.env.get("STRIPE_PRICE_STARTER");
+        if (!actualPriceId) {
+          logStep("ERROR: STRIPE_PRICE_STARTER is not set");
+          throw new Error("STRIPE_PRICE_STARTER is not configured");
+        }
+        break;
+      case 'STRIPE_PRICE_PRO':
+        actualPriceId = Deno.env.get("STRIPE_PRICE_PRO");
+        if (!actualPriceId) {
+          logStep("ERROR: STRIPE_PRICE_PRO is not set");
+          throw new Error("STRIPE_PRICE_PRO is not configured");
+        }
+        break;
+      case 'STRIPE_PRICE_ENTERPRISE':
+        actualPriceId = Deno.env.get("STRIPE_PRICE_ENTERPRISE");
+        if (!actualPriceId) {
+          logStep("ERROR: STRIPE_PRICE_ENTERPRISE is not set");
+          throw new Error("STRIPE_PRICE_ENTERPRISE is not configured");
+        }
+        break;
+      default:
+        logStep("ERROR: Invalid priceId", { priceId });
+        throw new Error(`Invalid priceId: ${priceId}`);
     }
     
-    logStep("Using Stripe price ID", { starterPriceId });
+    logStep("Using Stripe price ID", { priceId, actualPriceId });
 
-    logStep("Creating checkout session", { tier, priceId: starterPriceId });
+    logStep("Creating checkout session", { tier, priceId: actualPriceId });
 
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
       line_items: [
         {
-          price: starterPriceId,
+          price: actualPriceId,
           quantity: 1,
         },
       ],
@@ -105,7 +128,8 @@ serve(async (req) => {
       cancel_url: `${req.headers.get("origin")}/offers?checkout=cancel`,
       metadata: {
         user_id: user.id,
-        tier: tier
+        tier: tier,
+        priceId: actualPriceId
       }
     });
 
