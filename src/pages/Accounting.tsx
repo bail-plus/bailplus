@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -53,11 +53,7 @@ export default function Accounting() {
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
 
-  useEffect(() => {
-    loadAccountingData()
-  }, [])
-
-  const loadAccountingData = async () => {
+  const loadAccountingData = useCallback(async () => {
     try {
       const [rentResult, expensesResult, depositsResult] = await Promise.all([
         supabase.from('rent_invoices').select('*'),
@@ -73,7 +69,11 @@ export default function Accounting() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadAccountingData()
+  }, [loadAccountingData])
 
   const getStatusBadge = (status: string) => {
     const statuses = {

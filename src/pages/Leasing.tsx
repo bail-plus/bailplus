@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -33,11 +33,7 @@ export default function Leasing() {
   const [units, setUnits] = useState<LeasingUnit[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadUnits()
-  }, [])
-
-  const loadUnits = async () => {
+  const loadUnits = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('units')
@@ -64,7 +60,11 @@ export default function Leasing() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadUnits()
+  }, [loadUnits])
 
   const filteredUnits = units.filter(unit =>
     unit.property_name.toLowerCase().includes(searchTerm.toLowerCase()) ||

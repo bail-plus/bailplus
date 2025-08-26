@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -42,11 +42,7 @@ export default function Communications() {
   const [templates, setTemplates] = useState<CommunicationTemplate[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadCommunicationData()
-  }, [])
-
-  const loadCommunicationData = async () => {
+  const loadCommunicationData = useCallback(async () => {
     try {
       const [messagesResult, templatesResult] = await Promise.all([
         supabase.from('communication_logs').select('*').order('sent_at', { ascending: false }),
@@ -60,7 +56,11 @@ export default function Communications() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadCommunicationData()
+  }, [loadCommunicationData])
 
   const filteredMessages = messages.filter(message => {
     const matchesSearch = 
@@ -242,7 +242,7 @@ export default function Communications() {
             </div>
             <div className="text-2xl font-bold text-green-600">{deliveredMessages}</div>
             <p className="text-xs text-muted-foreground mt-1">
-              {((deliveredMessages / totalMessages) * 100).toFixed(0)}% de succès
+              {totalMessages > 0 ? ((deliveredMessages / totalMessages) * 100).toFixed(0) : 0}% de succès
             </p>
           </CardContent>
         </Card>

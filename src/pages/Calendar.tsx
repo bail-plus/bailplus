@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Calendar as CalendarIcon, Clock, MapPin, Users } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -25,11 +25,7 @@ const Calendar = () => {
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadEvents()
-  }, [])
-
-  const loadEvents = async () => {
+  const loadEvents = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('events')
@@ -45,7 +41,11 @@ const Calendar = () => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadEvents()
+  }, [loadEvents])
 
   if (loading) {
     return (

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -26,11 +26,7 @@ export default function Reports() {
   })
   const { toast } = useToast()
 
-  useEffect(() => {
-    loadReportData()
-  }, [])
-
-  const loadReportData = async () => {
+  const loadReportData = useCallback(async () => {
     try {
       const [rentResult, expensesResult, propertiesResult] = await Promise.all([
         supabase.from('rent_invoices').select('total_amount, status'),
@@ -65,7 +61,11 @@ export default function Reports() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    loadReportData()
+  }, [loadReportData])
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('fr-FR', {
