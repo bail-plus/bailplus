@@ -25,6 +25,10 @@ serve(async (req) => {
   try {
     logStep("Function started");
     
+    // Debug environment variables
+    const availableEnvVars = Object.keys(Deno.env.toObject());
+    logStep("Available environment variables", { count: availableEnvVars.length, vars: availableEnvVars.filter(v => v.includes('STRIPE')).sort() });
+    
     // Check Stripe key first
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
     if (!stripeKey) {
