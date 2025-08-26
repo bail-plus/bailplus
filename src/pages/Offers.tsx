@@ -82,15 +82,23 @@ export default function Offers() {
   const debugStripeConnection = async () => {
     try {
       console.log('🔧 Testing Stripe connection...');
+      
+      // Test with test-connection function first (simpler)
+      const { data: testData, error: testError } = await supabase.functions.invoke('test-connection');
+      console.log('🔧 Test connection response:', { testData, testError });
+      
+      // Then test with debug-stripe function
       const { data, error } = await supabase.functions.invoke('debug-stripe', {
         headers: {
           Authorization: `Bearer ${session?.access_token}`,
         },
       });
       
-      console.log('🔧 Debug response:', { data, error });
+      console.log('🔧 Debug Stripe response:', { data, error });
       
-      if (error) {
+      if (testError) {
+        toast.error(`Test connection error: ${testError.message}`);
+      } else if (error) {
         toast.error(`Debug error: ${error.message}`);
       } else if (data?.success) {
         toast.success('✅ Stripe configuration is valid!');
