@@ -18,7 +18,13 @@ export default function Login() {
 
   console.log('[AUTH] Login page - user:', !!user, 'loading:', loading);
 
-  // No automatic redirections - let user manually navigate
+  // Auto-redirect if already logged in
+  useEffect(() => {
+    if (user && !loading) {
+      console.log('[AUTH] Already logged in on login page - redirecting to Stripe');
+      window.location.href = 'https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00';
+    }
+  }, [user, loading]);
   
   const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -38,7 +44,7 @@ export default function Login() {
       if (!error) {
         console.log('[AUTH] Login successful - redirecting to Stripe checkout');
         // Redirect directly to Stripe checkout for starter plan
-        window.location.href = 'https://buy.stripe.com/test_00g8yzaCQ0PAdS024d';
+        window.location.href = 'https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00';
       } else {
         console.error('[AUTH] Login error:', error);
       }
