@@ -19,8 +19,6 @@ export default function Signup() {
 
   console.log('[AUTH] Signup page - user:', !!user, 'loading:', loading);
 
-  // No automatic redirections - let user manually navigate
-
   const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     console.log('[AUTH] Signup form submitted');
@@ -40,18 +38,28 @@ export default function Signup() {
       
       if (!error) {
         console.log('[AUTH] Signup successful');
+        console.log('[STRIPE] Redirect start -> https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
         
-        // Check if user should be redirected to Stripe checkout
-        const redirectParam = searchParams.get('redirect');
-        if (redirectParam === 'stripe') {
-          console.log('[STRIPE] checkout redirect start');
-          const stripeCheckoutUrl = "https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00";
-          console.log('[STRIPE] Redirecting to:', stripeCheckoutUrl);
-          window.location.href = stripeCheckoutUrl;
-        } else {
-          console.log('[AUTH] Redirecting to /app');
-          navigate('/app');
+        // Direct redirect to Stripe checkout - no intermediate pages
+        try {
+          window.location.assign('https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
+        } catch (redirectError) {
+          console.error('[STRIPE] Redirect error:', redirectError);
+          toast.error('Redirection vers le paiement...', {
+            action: {
+              label: 'Ouvrir Stripe',
+              onClick: () => window.location.assign('https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00')
+            }
+          });
         }
+        
+        // Fallback timeout in case redirect doesn't work
+        setTimeout(() => {
+          if (!document.hidden) {
+            console.log('[STRIPE] Timeout fallback - forcing redirect');
+            window.location.assign('https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
+          }
+        }, 4000);
       } else {
         console.error('[AUTH] Signup error:', error);
       }
@@ -148,7 +156,7 @@ export default function Signup() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Création du compte...
+                    Redirection vers le paiement...
                   </>
                 ) : (
                   'Créer mon compte'

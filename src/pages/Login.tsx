@@ -21,8 +21,9 @@ export default function Login() {
   // Auto-redirect if already logged in
   useEffect(() => {
     if (user && !loading) {
-      console.log('[AUTH] Already logged in on login page - redirecting to Stripe');
-      window.location.href = 'https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00';
+      console.log('[AUTH] Already logged in on login page');
+      console.log('[STRIPE] Redirect start -> https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
+      window.location.assign('https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
     }
   }, [user, loading]);
   
@@ -42,9 +43,29 @@ export default function Login() {
       const { error } = await signIn(email, password);
       
       if (!error) {
-        console.log('[AUTH] Login successful - redirecting to Stripe checkout');
-        // Redirect directly to Stripe checkout for starter plan
-        window.location.href = 'https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00';
+        console.log('[AUTH] Login successful');
+        console.log('[STRIPE] Redirect start -> https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
+        
+        // Direct redirect to Stripe checkout - no subscription check needed
+        try {
+          window.location.assign('https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
+        } catch (redirectError) {
+          console.error('[STRIPE] Redirect error:', redirectError);
+          toast.error('Redirection vers le paiement...', {
+            action: {
+              label: 'Ouvrir Stripe',
+              onClick: () => window.location.assign('https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00')
+            }
+          });
+        }
+        
+        // Fallback timeout in case redirect doesn't work
+        setTimeout(() => {
+          if (!document.hidden) {
+            console.log('[STRIPE] Timeout fallback - forcing redirect');
+            window.location.assign('https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
+          }
+        }, 4000);
       } else {
         console.error('[AUTH] Login error:', error);
       }
@@ -118,7 +139,7 @@ export default function Login() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Connexion...
+                    Redirection vers le paiement...
                   </>
                 ) : (
                   'Se connecter'
