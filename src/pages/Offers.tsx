@@ -30,12 +30,7 @@ export default function Offers() {
 
     try {
       // URL de checkout Stripe directe
-      const stripeCheckoutUrl = "VOTRE_URL_STRIPE_CHECKOUT_ICI";
-      
-      if (stripeCheckoutUrl === "VOTRE_URL_STRIPE_CHECKOUT_ICI") {
-        toast.error('Veuillez configurer votre URL de checkout Stripe');
-        return;
-      }
+      const stripeCheckoutUrl = "https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00";
 
       // Redirection vers Stripe Checkout
       window.open(stripeCheckoutUrl, '_blank');
