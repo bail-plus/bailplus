@@ -17,20 +17,73 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [isWaitingForAuth, setIsWaitingForAuth] = useState(false);
 
-  // If user is already authenticated, redirect to offers
-  if (user && !loading) {
-    return <Navigate to="/offers" replace />;
-  }
+  // If user is already authenticated, check subscription and redirect accordingly
+  useEffect(() => {
+    const checkUserSubscription = async () => {
+      if (user && !loading) {
+        try {
+          // Check if user has an active subscription
+          const { data: subscriptionData, error } = await supabase
+            .from('subscriptions')
+            .select('subscribed, subscription_status')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          if (error) {
+            console.error('❌ Error checking subscription:', error);
+            navigate('/offers', { replace: true });
+            return;
+          }
+
+          if (subscriptionData?.subscribed && subscriptionData?.subscription_status === 'active') {
+            navigate('/', { replace: true });
+          } else {
+            navigate('/offers', { replace: true });
+          }
+        } catch (error) {
+          console.error('❌ Error during subscription check:', error);
+          navigate('/offers', { replace: true });
+        }
+      }
+    };
+
+    checkUserSubscription();
+  }, [user, loading, navigate]);
 
   // Set up auth state listener for immediate redirect after login
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('🔄 Auth state change:', { event, hasSession: !!session, hasUser: !!session?.user });
       
-      if (event === 'SIGNED_IN') {
-        console.log('✅ User signed in, redirecting to offers...');
-        // Always redirect to offers after authentication
-        navigate('/offers');
+      if (event === 'SIGNED_IN' && session?.user) {
+        console.log('✅ User signed in, checking subscription status...');
+        
+        try {
+          // Check if user has an active subscription
+          const { data: subscriptionData, error } = await supabase
+            .from('subscriptions')
+            .select('subscribed, subscription_status')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+
+          if (error) {
+            console.error('❌ Error checking subscription:', error);
+            // If error checking subscription, redirect to offers
+            navigate('/offers');
+            return;
+          }
+
+          if (subscriptionData?.subscribed && subscriptionData?.subscription_status === 'active') {
+            console.log('✅ User has active subscription, redirecting to dashboard...');
+            navigate('/');
+          } else {
+            console.log('❌ User has no active subscription, redirecting to offers...');
+            navigate('/offers');
+          }
+        } catch (error) {
+          console.error('❌ Error during subscription check:', error);
+          navigate('/offers');
+        }
       }
     });
 

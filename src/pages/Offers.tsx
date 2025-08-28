@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Check, ArrowRight, Loader2 } from 'lucide-react';
+import { Check, ArrowRight, Loader2, UserPlus, LogIn } from 'lucide-react';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 
 const starterOffer = {
   id: 'starter',
@@ -23,23 +25,35 @@ const starterOffer = {
 };
 
 export default function Offers() {
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSignupLoading, setIsSignupLoading] = useState(false);
+  const [isLoginLoading, setIsLoginLoading] = useState(false);
+  const navigate = useNavigate();
 
-  const handleSelectOffer = async () => {
-    setIsLoading(true);
+  const handleSignup = async () => {
+    setIsSignupLoading(true);
 
     try {
-      // URL de checkout Stripe directe
-      const stripeCheckoutUrl = "https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00";
-
-      // Redirection vers Stripe Checkout
-      window.open(stripeCheckoutUrl, '_blank');
-      
+      // Rediriger vers la page d'inscription
+      navigate('/signup?redirect=stripe');
     } catch (error) {
       console.error('❌ Erreur:', error);
-      toast.error('Erreur lors du processus de paiement');
+      toast.error('Erreur lors de la redirection');
     } finally {
-      setIsLoading(false);
+      setIsSignupLoading(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    setIsLoginLoading(true);
+
+    try {
+      // Rediriger vers la page de connexion
+      navigate('/login');
+    } catch (error) {
+      console.error('❌ Erreur:', error);
+      toast.error('Erreur lors de la redirection');
+    } finally {
+      setIsLoginLoading(false);
     }
   };
 
@@ -86,24 +100,56 @@ export default function Offers() {
                   ))}
                 </ul>
 
-                <Button 
-                  className="w-full text-lg py-6" 
-                  onClick={handleSelectOffer}
-                  disabled={isLoading}
-                  size="lg"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                      Redirection vers Stripe...
-                    </>
-                  ) : (
-                    <>
-                      S'abonner maintenant
-                      <ArrowRight className="ml-2 h-5 w-5" />
-                    </>
-                  )}
-                </Button>
+                <div className="space-y-3">
+                  <Button 
+                    className="w-full text-lg py-6" 
+                    onClick={handleSignup}
+                    disabled={isSignupLoading}
+                    size="lg"
+                  >
+                    {isSignupLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Redirection...
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="mr-2 h-5 w-5" />
+                        S'inscrire et s'abonner
+                        <ArrowRight className="ml-2 h-5 w-5" />
+                      </>
+                    )}
+                  </Button>
+
+                  <Button 
+                    variant="outline"
+                    className="w-full text-lg py-6" 
+                    onClick={handleLogin}
+                    disabled={isLoginLoading}
+                    size="lg"
+                  >
+                    {isLoginLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Redirection...
+                      </>
+                    ) : (
+                      <>
+                        <LogIn className="mr-2 h-5 w-5" />
+                        Se connecter
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                <div className="text-center text-xs text-muted-foreground">
+                  <p className="mb-2">
+                    <strong>Nouveaux utilisateurs :</strong> Créez votre compte et souscrivez à l'abonnement
+                  </p>
+                  <p>
+                    <strong>Déjà abonné :</strong> Connectez-vous directement à votre compte
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </div>

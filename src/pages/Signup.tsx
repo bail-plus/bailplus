@@ -28,14 +28,24 @@ export default function Signup() {
       console.log('🔄 Auth state change:', { event, hasSession: !!session, hasUser: !!session?.user });
       
       if (event === 'SIGNED_IN') {
-        console.log('✅ User signed up, redirecting to offers...');
-        // Always redirect to offers after authentication
-        navigate('/offers');
+        console.log('✅ User signed up, checking redirect parameter...');
+        
+        // Check if user should be redirected to Stripe checkout
+        const redirectParam = searchParams.get('redirect');
+        if (redirectParam === 'stripe') {
+          console.log('🔄 Redirecting to Stripe checkout...');
+          // Redirect to Stripe checkout URL
+          const stripeCheckoutUrl = "https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00";
+          window.location.href = stripeCheckoutUrl;
+        } else {
+          // Default redirect to offers
+          navigate('/offers');
+        }
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, searchParams]);
 
   const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
