@@ -17,50 +17,22 @@ import { handleOfferSelection } from '@/lib/stripe-checkout';
 import { LoadingGate } from '@/components/LoadingGate';
 import { supabase } from '@/integrations/supabase/client';
 
-const offers = [
-  {
-    id: 'starter',
-    name: 'Starter',
-    price: '29€',
-    description: 'Parfait pour débuter',
-    features: [
-      'Jusqu\'à 5 propriétés',
-      'Gestion des locataires',
-      'Suivi des paiements',
-      'Support email'
-    ],
-    maxProperties: '5 propriétés',
-    popular: true
-  },
-  {
-    id: 'pro',
-    name: 'Pro',
-    price: '59€',
-    description: 'Pour les propriétaires expérimentés',
-    features: [
-      'Jusqu\'à 25 propriétés',
-      'Gestion avancée',
-      'Rapports détaillés',
-      'Support prioritaire'
-    ],
-    maxProperties: '25 propriétés',
-    popular: false
-  },
-  {
-    id: 'enterprise',
-    name: 'Enterprise',
-    price: '129€',
-    description: 'Pour les professionnels',
-    features: [
-      'Propriétés illimitées',
-      'API complète',
-      'Support dédié',
-      'Intégrations avancées'
-    ],
-    maxProperties: 'Illimité',
-    popular: false
-  }
-];
+const starterOffer = {
+  id: 'starter',
+  name: 'Starter',
+  price: '29€',
+  description: 'Parfait pour débuter avec BailloGenius',
+  features: [
+    'Jusqu\'à 5 propriétés',
+    'Gestion des locataires',
+    'Suivi des paiements',
+    'Support email',
+    'Tableaux de bord',
+    'Rapports de base'
+  ],
+  maxProperties: '5 propriétés',
+  popular: true
+};
 
 export default function Offers() {
   const { user, session, loading } = useAuth();
@@ -188,50 +160,41 @@ export default function Offers() {
     }
   }, [searchParams, setSearchParams]);
 
-  const handleSelectOffer = async (offerId: string) => {
-    const tier = offerId as 'starter' | 'pro' | 'enterprise';
-
-    // If user is not authenticated, store intent and redirect to signup
-    if (!user || !session) {
-      console.log('🔄 User not authenticated, storing intent and redirecting to signup');
-      
-      // Map tier to actual Stripe price ID
-      const priceIdMap = {
-        starter: 'STRIPE_PRICE_STARTER',
-        pro: 'STRIPE_PRICE_PRO',
-        enterprise: 'STRIPE_PRICE_ENTERPRISE'
-      };
-      
-      storeSubscriptionIntent(priceIdMap[tier], tier);
-      
-      // Redirect with URL params as backup
-      const params = new URLSearchParams({
-        intent: 'subscribe',
-        priceId: priceIdMap[tier],
-        tier: tier,
-        next: 'offers'
-      });
-      
-      window.location.href = `/signup?${params.toString()}`;
-      return;
-    }
-
-    // User is authenticated, proceed with checkout
-    console.log('🔍 Starting offer selection for authenticated user:', { offerId, tier });
-    setSelectedOffer(offerId);
+  const handleSelectOffer = async () => {
+    console.log('🔍 Starting Starter plan checkout...');
     setIsLoading(true);
 
     try {
-      const success = await handleOfferSelection(tier, user, session);
-      if (success) {
-        console.log('✅ Offer selection completed successfully');
+      // Create checkout session directly with create-checkout function
+      const { data, error } = await supabase.functions.invoke('create-checkout', {
+        body: {
+          priceId: 'STRIPE_PRICE_STARTER',
+          tier: 'starter'
+        },
+        headers: user && session ? {
+          Authorization: `Bearer ${session.access_token}`,
+        } : undefined,
+      });
+
+      if (error) {
+        console.error('❌ Error creating checkout session:', error);
+        toast.error('Erreur lors de la création de la session de paiement');
+        return;
+      }
+
+      if (data?.url) {
+        console.log('✅ Checkout session created, redirecting to Stripe...');
+        // Open Stripe checkout in a new tab
+        window.open(data.url, '_blank');
+      } else {
+        console.error('❌ No checkout URL received');
+        toast.error('Erreur: Aucune URL de paiement reçue');
       }
     } catch (error) {
-      console.error('❌ Error in offer selection:', error);
-      toast.error('Erreur lors du traitement de votre demande');
+      console.error('❌ Error in checkout process:', error);
+      toast.error('Erreur lors du processus de paiement');
     } finally {
       setIsLoading(false);
-      setSelectedOffer(null);
     }
   };
 
@@ -288,71 +251,57 @@ export default function Offers() {
             )}
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {offers.map((offer) => (
-              <Card 
-                key={offer.id} 
-                className={`relative p-6 transition-all duration-200 hover:shadow-lg ${
-                  offer.popular ? 'ring-2 ring-primary shadow-lg' : ''
-                }`}
-              >
-                {offer.popular && (
-                  <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary">
-                    Le plus populaire
-                  </Badge>
-                )}
-                
-                <CardHeader className="pb-6">
-                  <CardTitle className="text-2xl">{offer.name}</CardTitle>
-                  <CardDescription className="text-base">{offer.description}</CardDescription>
-                  <div className="pt-4">
-                  <div className="text-4xl font-bold text-foreground">
-                    {offer.price}
+          <div className="flex justify-center max-w-md mx-auto">
+            <Card className="relative p-6 transition-all duration-200 hover:shadow-lg ring-2 ring-primary shadow-lg">
+              <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-primary">
+                Offre recommandée
+              </Badge>
+              
+              <CardHeader className="pb-6 text-center">
+                <CardTitle className="text-3xl">{starterOffer.name}</CardTitle>
+                <CardDescription className="text-base">{starterOffer.description}</CardDescription>
+                <div className="pt-4">
+                  <div className="text-5xl font-bold text-foreground">
+                    {starterOffer.price}
                   </div>
-                  <div className="text-muted-foreground">/mois</div>
-                  </div>
-                </CardHeader>
+                  <div className="text-muted-foreground text-lg">/mois</div>
+                </div>
+              </CardHeader>
 
-                <CardContent className="space-y-6">
-                  <div className="text-sm text-muted-foreground">
-                    {offer.maxProperties}
-                  </div>
+              <CardContent className="space-y-6">
+                <div className="text-center text-sm text-muted-foreground">
+                  {starterOffer.maxProperties}
+                </div>
 
-                  <ul className="space-y-3">
-                    {offer.features.map((feature, index) => (
-                      <li key={index} className="flex items-start gap-3">
-                        <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                        <span className="text-sm">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
+                <ul className="space-y-3">
+                  {starterOffer.features.map((feature, index) => (
+                    <li key={index} className="flex items-start gap-3">
+                      <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                      <span className="text-sm">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
 
-                  <Button 
-                    className="w-full" 
-                    onClick={() => handleSelectOffer(offer.id)}
-                    disabled={isLoading || isProcessingIntent}
-                    variant={offer.popular ? "default" : "outline"}
-                  >
-                    {isLoading && selectedOffer === offer.id ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Redirection vers Stripe...
-                      </>
-                    ) : isProcessingIntent ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Traitement...
-                      </>
-                    ) : (
-                      <>
-                        {user ? 'Choisir cette offre' : 'S\'abonner'}
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </>
-                    )}
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
+                <Button 
+                  className="w-full text-lg py-6" 
+                  onClick={handleSelectOffer}
+                  disabled={isLoading}
+                  size="lg"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Redirection vers Stripe...
+                    </>
+                  ) : (
+                    <>
+                      S'abonner maintenant
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </>
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
           </div>
 
           <div className="text-center mt-12">
