@@ -29,37 +29,33 @@ export default function Offers() {
   const [isLoginLoading, setIsLoginLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSignup = async () => {
-    console.log('🔄 Signup button clicked');
+  // Simple handlers without async/await to test
+  const handleSignup = () => {
+    console.log('🔴 SIGNUP BUTTON CLICKED - START');
     setIsSignupLoading(true);
-
-    try {
-      // Rediriger vers la page d'inscription
-      console.log('🔄 Navigating to signup with stripe redirect');
+    console.log('🔴 SIGNUP - Setting loading to true');
+    
+    setTimeout(() => {
+      console.log('🔴 SIGNUP - Navigating to signup');
       navigate('/signup?redirect=stripe');
-    } catch (error) {
-      console.error('❌ Erreur:', error);
-      toast.error('Erreur lors de la redirection');
-    } finally {
       setIsSignupLoading(false);
-    }
+    }, 100);
   };
 
-  const handleLogin = async () => {
-    console.log('🔄 Login button clicked');
+  const handleLogin = () => {
+    console.log('🔵 LOGIN BUTTON CLICKED - START');
     setIsLoginLoading(true);
-
-    try {
-      // Rediriger vers la page de connexion
-      console.log('🔄 Navigating to login');
+    console.log('🔵 LOGIN - Setting loading to true');
+    
+    setTimeout(() => {
+      console.log('🔵 LOGIN - Navigating to login');
       navigate('/login');
-    } catch (error) {
-      console.error('❌ Erreur:', error);
-      toast.error('Erreur lors de la redirection');
-    } finally {
       setIsLoginLoading(false);
-    }
+    }, 100);
   };
+
+  // Test if component is even rendering
+  console.log('🟡 Offers component rendering');
 
   return (
     <div className="min-h-screen bg-gradient-surface py-12">
