@@ -15,16 +15,19 @@ export function ProtectedApp({ children }: ProtectedAppProps) {
     hasActiveSubscription: boolean;
   }>({ loading: true, hasActiveSubscription: false });
 
+  console.log('[GUARD] ProtectedApp check - user:', !!user, 'session:', !!session, 'loading:', loading);
+
   // Check subscription status when user/session changes
   useEffect(() => {
     const checkSubscription = async () => {
       if (!user || !session) {
+        console.log('[GUARD] No user/session - denying access');
         setSubscriptionStatus({ loading: false, hasActiveSubscription: false });
         return;
       }
 
       try {
-        console.log('🔍 Checking subscription status for app access...');
+        console.log('[GUARD] protected route check start');
         const { data, error } = await supabase.functions.invoke('check-subscription', {
           headers: {
             Authorization: `Bearer ${session.access_token}`,
@@ -32,20 +35,20 @@ export function ProtectedApp({ children }: ProtectedAppProps) {
         });
 
         if (error) {
-          console.error('❌ Error checking subscription:', error);
+          console.error('[GUARD] protected route check fail:', error);
           setSubscriptionStatus({ loading: false, hasActiveSubscription: false });
           return;
         }
 
         const hasActiveSubscription = data?.subscribed === true;
-        console.log('✅ Subscription check result:', { hasActiveSubscription });
+        console.log('[GUARD] protected route check ok:', { hasActiveSubscription });
         
         setSubscriptionStatus({ 
           loading: false, 
           hasActiveSubscription 
         });
       } catch (error) {
-        console.error('❌ Unexpected error checking subscription:', error);
+        console.error('[GUARD] protected route check fail (catch):', error);
         setSubscriptionStatus({ loading: false, hasActiveSubscription: false });
       }
     };
@@ -67,7 +70,7 @@ export function ProtectedApp({ children }: ProtectedAppProps) {
 
   // Redirect to offers if not authenticated or no active subscription
   if (!user || !session || !subscriptionStatus.hasActiveSubscription) {
-    console.log('🔒 Access denied - redirecting to offers', {
+    console.log('[GUARD] Access denied - redirecting to offers', {
       hasUser: !!user,
       hasSession: !!session,
       hasActiveSubscription: subscriptionStatus.hasActiveSubscription
@@ -76,5 +79,6 @@ export function ProtectedApp({ children }: ProtectedAppProps) {
   }
 
   // User has active subscription - allow access to app
+  console.log('[GUARD] Access granted - user has active subscription');
   return <>{children}</>;
 }

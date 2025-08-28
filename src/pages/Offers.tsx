@@ -29,45 +29,55 @@ export default function Offers() {
   const [isLoginLoading, setIsLoginLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Simplified handlers using React Router navigate
+  // Clean button handlers with clear logs
   const handleSignup = () => {
-    console.log('🔴 SIGNUP BUTTON CLICKED');
-    if (isSignupLoading) return; // Prevent double clicks
+    console.log('[AUTH] signup click - starting navigation to /signup');
+    if (isSignupLoading) {
+      console.log('[AUTH] signup click ignored - already loading');
+      return;
+    }
     
     setIsSignupLoading(true);
     
     try {
-      console.log('🔴 Navigating to signup');
+      console.log('[AUTH] navigating to /signup?redirect=stripe');
       navigate('/signup?redirect=stripe');
     } catch (error) {
-      console.error('❌ Navigation error:', error);
-      setIsSignupLoading(false);
+      console.error('[AUTH] signup navigation error:', error);
+      toast.error('Erreur lors de la redirection');
     }
     
-    // Reset loading state after a brief delay
-    setTimeout(() => setIsSignupLoading(false), 1000);
+    // Reset loading state after brief delay
+    setTimeout(() => {
+      setIsSignupLoading(false);
+    }, 1000);
   };
 
   const handleLogin = () => {
-    console.log('🔵 LOGIN BUTTON CLICKED');
-    if (isLoginLoading) return; // Prevent double clicks
+    console.log('[AUTH] login click - starting navigation to /login');
+    if (isLoginLoading) {
+      console.log('[AUTH] login click ignored - already loading');
+      return;
+    }
     
     setIsLoginLoading(true);
     
     try {
-      console.log('🔵 Navigating to login');
+      console.log('[AUTH] navigating to /login');
       navigate('/login');
     } catch (error) {
-      console.error('❌ Navigation error:', error);
-      setIsLoginLoading(false);
+      console.error('[AUTH] login navigation error:', error);
+      toast.error('Erreur lors de la redirection');
     }
     
-    // Reset loading state after a brief delay
-    setTimeout(() => setIsLoginLoading(false), 1000);
+    // Reset loading state after brief delay
+    setTimeout(() => {
+      setIsLoginLoading(false);
+    }, 1000);
   };
 
-  // Test if component is even rendering
-  console.log('🟡 Offers component rendering');
+  // Debug log to confirm component renders
+  console.log('[AUTH] Offers component rendering');
 
   return (
     <div className="min-h-screen bg-gradient-surface py-12">

@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'react-router-dom';
 import { LoadingGate } from '@/components/LoadingGate';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export default function Signup() {
   const { user, loading, signUp } = useAuth();
@@ -16,38 +17,50 @@ export default function Signup() {
   const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
 
-  // If user is already authenticated, redirect to app
-  if (user && !loading) {
-    return <Navigate to="/app" replace />;
-  }
+  console.log('[AUTH] Signup page - user:', !!user, 'loading:', loading);
+
+  // No automatic redirections - let user manually navigate
 
   const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    console.log('[AUTH] Signup form submitted');
+    
+    if (isLoading) return;
     setIsLoading(true);
     
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get('email') as string;
-    const password = formData.get('password') as string;
-    const firstName = formData.get('firstName') as string;
-    const lastName = formData.get('lastName') as string;
-    
-    const { error } = await signUp(email, password, firstName, lastName);
-    if (!error) {
-      console.log('✅ Signup successful');
+    try {
+      const formData = new FormData(e.currentTarget);
+      const email = formData.get('email') as string;
+      const password = formData.get('password') as string;
+      const firstName = formData.get('firstName') as string;
+      const lastName = formData.get('lastName') as string;
       
-      // Check if user should be redirected to Stripe checkout
-      const redirectParam = searchParams.get('redirect');
-      if (redirectParam === 'stripe') {
-        console.log('🔄 Redirecting to Stripe checkout...');
-        // Redirect to Stripe checkout URL
-        const stripeCheckoutUrl = "https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00";
-        window.location.href = stripeCheckoutUrl;
+      console.log('[AUTH] Attempting signup for:', email);
+      const { error } = await signUp(email, password, firstName, lastName);
+      
+      if (!error) {
+        console.log('[AUTH] Signup successful');
+        
+        // Check if user should be redirected to Stripe checkout
+        const redirectParam = searchParams.get('redirect');
+        if (redirectParam === 'stripe') {
+          console.log('[STRIPE] checkout redirect start');
+          const stripeCheckoutUrl = "https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00";
+          console.log('[STRIPE] Redirecting to:', stripeCheckoutUrl);
+          window.location.href = stripeCheckoutUrl;
+        } else {
+          console.log('[AUTH] Redirecting to /app');
+          navigate('/app');
+        }
       } else {
-        // Default redirect to app
-        navigate('/app');
+        console.error('[AUTH] Signup error:', error);
       }
+    } catch (error) {
+      console.error('[AUTH] Signup catch error:', error);
+      toast.error('Erreur lors de la création du compte');
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   if (loading) {

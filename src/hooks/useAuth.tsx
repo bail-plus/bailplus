@@ -70,30 +70,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
-    console.log('🔄 Auth state listener setup...');
+    console.log('[AUTH] useAuth initialization started...');
     
-    // Set up auth state listener
+    // Set up auth state listener - NO AUTOMATIC REDIRECTIONS
     const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('🔄 Auth state change:', { event, hasSession: !!session, hasUser: !!session?.user });
+        console.log('[AUTH] Auth state change:', { event, hasSession: !!session, hasUser: !!session?.user });
         
+        // Only update state, never redirect automatically
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
         
-        // Only handle specific events to avoid infinite loops
         if (event === 'SIGNED_OUT') {
           setSubscription(null);
-          console.log('🚪 User signed out');
+          console.log('[AUTH] User signed out - cleared subscription');
         }
         
-        // Don't auto-redirect on auth state changes - let components handle their own routing
+        // No automatic redirections - let components handle their own routing
       }
     );
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('🔍 Initial session check:', { hasSession: !!session, hasUser: !!session?.user });
+      console.log('[AUTH] Initial session check:', { hasSession: !!session, hasUser: !!session?.user });
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);

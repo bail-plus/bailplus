@@ -9,32 +9,44 @@ import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'react-router-dom';
 import { LoadingGate } from '@/components/LoadingGate';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export default function Login() {
   const { user, loading, signIn } = useAuth();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
 
-  // Simple redirect if user is already authenticated
-  if (user && !loading) {
-    return <Navigate to="/app" replace />;
-  }
+  console.log('[AUTH] Login page - user:', !!user, 'loading:', loading);
 
+  // No automatic redirections - let user manually navigate
+  
   const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    console.log('[AUTH] Login form submitted');
+    
+    if (isLoading) return;
     setIsLoading(true);
     
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get('email') as string;
-    const password = formData.get('password') as string;
-    
-    const { error } = await signIn(email, password);
-    if (!error) {
-      console.log('✅ Login successful, redirecting to app...');
-      // Simple redirect to app after successful login
-      navigate('/app');
+    try {
+      const formData = new FormData(e.currentTarget);
+      const email = formData.get('email') as string;
+      const password = formData.get('password') as string;
+      
+      console.log('[AUTH] Attempting login for:', email);
+      const { error } = await signIn(email, password);
+      
+      if (!error) {
+        console.log('[AUTH] Login successful - redirecting to /app');
+        navigate('/app');
+      } else {
+        console.error('[AUTH] Login error:', error);
+      }
+    } catch (error) {
+      console.error('[AUTH] Login catch error:', error);
+      toast.error('Erreur lors de la connexion');
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
   if (loading) {
