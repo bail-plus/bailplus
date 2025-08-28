@@ -26,23 +26,22 @@ export default function Offers() {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSelectOffer = async () => {
-    console.log('🔍 Starting Starter plan checkout...');
     setIsLoading(true);
 
     try {
-      // Redirection directe vers l'URL Stripe (à configurer)
+      // URL de checkout Stripe directe
       const stripeCheckoutUrl = "VOTRE_URL_STRIPE_CHECKOUT_ICI";
       
       if (stripeCheckoutUrl === "VOTRE_URL_STRIPE_CHECKOUT_ICI") {
-        toast.error('URL Stripe non configurée. Veuillez configurer l\'URL de checkout.');
+        toast.error('Veuillez configurer votre URL de checkout Stripe');
         return;
       }
 
-      // Ouvrir directement l'URL Stripe
+      // Redirection vers Stripe Checkout
       window.open(stripeCheckoutUrl, '_blank');
       
     } catch (error) {
-      console.error('❌ Error in checkout process:', error);
+      console.error('❌ Erreur:', error);
       toast.error('Erreur lors du processus de paiement');
     } finally {
       setIsLoading(false);
