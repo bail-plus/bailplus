@@ -22,7 +22,7 @@ export default function Login() {
   useEffect(() => {
     if (user && !loading) {
       console.log('[AUTH] Already logged in on login page');
-      console.log('[STRIPE] Redirect start -> https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
+      console.log('[STRIPE] Redirecting to: https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
       window.location.assign('https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
     }
   }, [user, loading]);
@@ -44,34 +44,28 @@ export default function Login() {
       
       if (!error) {
         console.log('[AUTH] Login successful');
-        console.log('[STRIPE] Redirect start -> https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
+        console.log('[STRIPE] Redirecting to: https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
         
-        // Direct redirect to Stripe checkout - no subscription check needed
-        try {
-          window.location.assign('https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
-        } catch (redirectError) {
-          console.error('[STRIPE] Redirect error:', redirectError);
-          toast.error('Redirection vers le paiement...', {
-            action: {
-              label: 'Ouvrir Stripe',
-              onClick: () => window.location.assign('https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00')
-            }
-          });
-        }
-        
-        // Fallback timeout in case redirect doesn't work
-        setTimeout(() => {
-          if (!document.hidden) {
-            console.log('[STRIPE] Timeout fallback - forcing redirect');
-            window.location.assign('https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
-          }
-        }, 4000);
+        // Immediate redirect - bypass any loading states
+        window.location.assign('https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
+        return; // Stop any further processing
       } else {
         console.error('[AUTH] Login error:', error);
+        toast.error('Erreur lors de la connexion. Merci de réessayer', {
+          action: {
+            label: 'Aller au paiement Stripe',
+            onClick: () => window.location.assign('https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00')
+          }
+        });
       }
     } catch (error) {
       console.error('[AUTH] Login catch error:', error);
-      toast.error('Erreur lors de la connexion');
+      toast.error('Erreur lors de la connexion. Merci de réessayer', {
+        action: {
+          label: 'Aller au paiement Stripe',
+          onClick: () => window.location.assign('https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00')
+        }
+      });
     } finally {
       setIsLoading(false);
     }
@@ -139,7 +133,7 @@ export default function Login() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Redirection vers le paiement...
+                    Redirection vers le paiement Stripe...
                   </>
                 ) : (
                   'Se connecter'

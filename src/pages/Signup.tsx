@@ -38,39 +38,34 @@ export default function Signup() {
       
       if (!error) {
         console.log('[AUTH] Signup successful');
-        console.log('[STRIPE] Redirect start -> https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
+        console.log('[STRIPE] Redirecting to: https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
         
-        // Direct redirect to Stripe checkout - no intermediate pages
-        try {
-          window.location.assign('https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
-        } catch (redirectError) {
-          console.error('[STRIPE] Redirect error:', redirectError);
-          toast.error('Redirection vers le paiement...', {
-            action: {
-              label: 'Ouvrir Stripe',
-              onClick: () => window.location.assign('https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00')
-            }
-          });
-        }
-        
-        // Fallback timeout in case redirect doesn't work
-        setTimeout(() => {
-          if (!document.hidden) {
-            console.log('[STRIPE] Timeout fallback - forcing redirect');
-            window.location.assign('https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
-          }
-        }, 4000);
+        // Immediate redirect - bypass any loading states
+        window.location.assign('https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
+        return; // Stop any further processing
       } else {
         console.error('[AUTH] Signup error:', error);
+        toast.error('Erreur lors de l\'inscription. Merci de réessayer', {
+          action: {
+            label: 'Aller au paiement Stripe',
+            onClick: () => window.location.assign('https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00')
+          }
+        });
       }
     } catch (error) {
       console.error('[AUTH] Signup catch error:', error);
-      toast.error('Erreur lors de la création du compte');
+      toast.error('Erreur lors de l\'inscription. Merci de réessayer', {
+        action: {
+          label: 'Aller au paiement Stripe',
+          onClick: () => window.location.assign('https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00')
+        }
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Don't show loading screen that could interfere with redirect
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -156,7 +151,7 @@ export default function Signup() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Redirection vers le paiement...
+                    Redirection vers le paiement Stripe...
                   </>
                 ) : (
                   'Créer mon compte'
