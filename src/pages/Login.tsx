@@ -36,8 +36,9 @@ export default function Login() {
       const { error } = await signIn(email, password);
       
       if (!error) {
-        console.log('[AUTH] Login successful - redirecting to /app');
-        navigate('/app');
+        console.log('[AUTH] Login successful - redirecting to Stripe checkout');
+        // Redirect directly to Stripe checkout for starter plan
+        window.location.href = 'https://buy.stripe.com/test_00g8yzaCQ0PAdS024d';
       } else {
         console.error('[AUTH] Login error:', error);
       }
