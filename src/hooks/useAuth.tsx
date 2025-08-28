@@ -107,12 +107,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           }
         }
         
-        // Prevent excessive re-renders from INITIAL_SESSION events
-        if (event === 'INITIAL_SESSION') {
-          console.log('🔄 Initial session event - minimal processing');
-          return; // Don't process INITIAL_SESSION events repeatedly
-        }
-        
         // Clear subscription on signout
         if (event === 'SIGNED_OUT') {
           setSubscription(null);

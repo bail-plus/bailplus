@@ -29,27 +29,41 @@ export default function Offers() {
   const [isLoginLoading, setIsLoginLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Simple handlers with direct redirections to avoid navigation interference
+  // Simplified handlers using React Router navigate
   const handleSignup = () => {
-    console.log('🔴 SIGNUP BUTTON CLICKED - DIRECT REDIRECT');
+    console.log('🔴 SIGNUP BUTTON CLICKED');
+    if (isSignupLoading) return; // Prevent double clicks
+    
     setIsSignupLoading(true);
     
-    // Use direct redirect instead of navigate to avoid interference
-    setTimeout(() => {
-      console.log('🔴 DIRECT REDIRECT to signup');
-      window.location.href = '/signup?redirect=stripe';
-    }, 100);
+    try {
+      console.log('🔴 Navigating to signup');
+      navigate('/signup?redirect=stripe');
+    } catch (error) {
+      console.error('❌ Navigation error:', error);
+      setIsSignupLoading(false);
+    }
+    
+    // Reset loading state after a brief delay
+    setTimeout(() => setIsSignupLoading(false), 1000);
   };
 
   const handleLogin = () => {
-    console.log('🔵 LOGIN BUTTON CLICKED - DIRECT REDIRECT');
+    console.log('🔵 LOGIN BUTTON CLICKED');
+    if (isLoginLoading) return; // Prevent double clicks
+    
     setIsLoginLoading(true);
     
-    // Use direct redirect instead of navigate to avoid interference  
-    setTimeout(() => {
-      console.log('🔵 DIRECT REDIRECT to login');
-      window.location.href = '/login';
-    }, 100);
+    try {
+      console.log('🔵 Navigating to login');
+      navigate('/login');
+    } catch (error) {
+      console.error('❌ Navigation error:', error);
+      setIsLoginLoading(false);
+    }
+    
+    // Reset loading state after a brief delay
+    setTimeout(() => setIsLoginLoading(false), 1000);
   };
 
   // Test if component is even rendering
