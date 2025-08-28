@@ -15,37 +15,11 @@ export default function Signup() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
-  const [isWaitingForAuth, setIsWaitingForAuth] = useState(false);
 
-  // If user is already authenticated, redirect to offers
+  // If user is already authenticated, redirect to app
   if (user && !loading) {
-    return <Navigate to="/offers" replace />;
+    return <Navigate to="/app" replace />;
   }
-
-  // Set up auth state listener for immediate redirect after signup
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('🔄 Auth state change:', { event, hasSession: !!session, hasUser: !!session?.user });
-      
-      if (event === 'SIGNED_IN') {
-        console.log('✅ User signed up, checking redirect parameter...');
-        
-        // Check if user should be redirected to Stripe checkout
-        const redirectParam = searchParams.get('redirect');
-        if (redirectParam === 'stripe') {
-          console.log('🔄 Redirecting to Stripe checkout...');
-          // Redirect to Stripe checkout URL
-          const stripeCheckoutUrl = "https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00";
-          window.location.href = stripeCheckoutUrl;
-        } else {
-          // Default redirect to offers
-          navigate('/offers');
-        }
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate, searchParams]);
 
   const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -59,20 +33,31 @@ export default function Signup() {
     
     const { error } = await signUp(email, password, firstName, lastName);
     if (!error) {
-      console.log('✅ Signup successful, auth state change will handle redirect');
-      setIsWaitingForAuth(true);
+      console.log('✅ Signup successful');
+      
+      // Check if user should be redirected to Stripe checkout
+      const redirectParam = searchParams.get('redirect');
+      if (redirectParam === 'stripe') {
+        console.log('🔄 Redirecting to Stripe checkout...');
+        // Redirect to Stripe checkout URL
+        const stripeCheckoutUrl = "https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00";
+        window.location.href = stripeCheckoutUrl;
+      } else {
+        // Default redirect to app
+        navigate('/app');
+      }
     }
     setIsLoading(false);
   };
 
-  if (loading || isWaitingForAuth) {
+  if (loading) {
     return (
-      <LoadingGate 
-        isLoading={true} 
-        message={isWaitingForAuth ? "Création de votre compte..." : "Chargement..."}
-      >
-        <div />
-      </LoadingGate>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Chargement...</p>
+        </div>
+      </div>
     );
   }
 

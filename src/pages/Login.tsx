@@ -13,33 +13,12 @@ import { supabase } from '@/integrations/supabase/client';
 export default function Login() {
   const { user, loading, signIn } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
-  const [isWaitingForAuth, setIsWaitingForAuth] = useState(false);
 
   // Simple redirect if user is already authenticated
   if (user && !loading) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/app" replace />;
   }
-
-  // Simplified auth state listener  
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔄 Auth state change:', { event, hasSession: !!session, hasUser: !!session?.user });
-      
-      if (event === 'SIGNED_IN' && session?.user) {
-        console.log('✅ User signed in, redirecting...');
-        setIsWaitingForAuth(true);
-        
-        // Simple redirect to main app after login
-        setTimeout(() => {
-          navigate('/');
-        }, 500);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
 
   const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -51,20 +30,21 @@ export default function Login() {
     
     const { error } = await signIn(email, password);
     if (!error) {
-      console.log('✅ Login successful, auth state change will handle redirect');
-      setIsWaitingForAuth(true);
+      console.log('✅ Login successful, redirecting to app...');
+      // Simple redirect to app after successful login
+      navigate('/app');
     }
     setIsLoading(false);
   };
 
-  if (loading || isWaitingForAuth) {
+  if (loading) {
     return (
-      <LoadingGate 
-        isLoading={true} 
-        message={isWaitingForAuth ? "Connexion en cours..." : "Chargement..."}
-      >
-        <div />
-      </LoadingGate>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Chargement...</p>
+        </div>
+      </div>
     );
   }
 

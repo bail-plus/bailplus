@@ -81,36 +81,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(session?.user ?? null);
         setLoading(false);
         
-        // Handle signin (includes signup with immediate session)
-        if (event === 'SIGNED_IN' && session?.user) {
-          console.log('✅ User signed in/up, checking if redirect needed...');
-          
-          // Only redirect if we're not already on the offers page
-          const currentPath = window.location.pathname;
-          console.log('🔍 Current path:', currentPath);
-          
-          // Check if this is a new signup (you can detect this by checking if user was just created)
-          const isNewUser = new Date(session.user.created_at).getTime() > Date.now() - 60000; // Created within last minute
-          
-          if (isNewUser && currentPath !== '/offers') {
-            console.log('🎉 New user detected, redirecting to offers...');
-            setTimeout(() => {
-              window.location.href = '/offers';
-            }, 500);
-          } else if (!isNewUser) {
-            console.log('🔑 Existing user signin, checking subscription...');
-            setTimeout(() => {
-              checkSubscription();
-            }, 100);
-          } else {
-            console.log('⏭️ Already on offers page, skipping redirect');
-          }
-        }
-        
-        // Clear subscription on signout
+        // Only handle specific events to avoid infinite loops
         if (event === 'SIGNED_OUT') {
           setSubscription(null);
+          console.log('🚪 User signed out');
         }
+        
+        // Don't auto-redirect on auth state changes - let components handle their own routing
       }
     );
 
@@ -120,13 +97,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
-      
-      // Check subscription for existing session
-      if (session?.user) {
-        setTimeout(() => {
-          checkSubscription();
-        }, 100);
-      }
     });
 
     return () => authSubscription.unsubscribe();
