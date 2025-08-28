@@ -30,10 +30,12 @@ export default function Offers() {
   const navigate = useNavigate();
 
   const handleSignup = async () => {
+    console.log('🔄 Signup button clicked');
     setIsSignupLoading(true);
 
     try {
       // Rediriger vers la page d'inscription
+      console.log('🔄 Navigating to signup with stripe redirect');
       navigate('/signup?redirect=stripe');
     } catch (error) {
       console.error('❌ Erreur:', error);
@@ -44,10 +46,12 @@ export default function Offers() {
   };
 
   const handleLogin = async () => {
+    console.log('🔄 Login button clicked');
     setIsLoginLoading(true);
 
     try {
       // Rediriger vers la page de connexion
+      console.log('🔄 Navigating to login');
       navigate('/login');
     } catch (error) {
       console.error('❌ Erreur:', error);
