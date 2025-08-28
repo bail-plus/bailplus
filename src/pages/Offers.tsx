@@ -29,28 +29,26 @@ export default function Offers() {
   const [isLoginLoading, setIsLoginLoading] = useState(false);
   const navigate = useNavigate();
 
-  // Simple handlers without async/await to test
+  // Simple handlers with direct redirections to avoid navigation interference
   const handleSignup = () => {
-    console.log('🔴 SIGNUP BUTTON CLICKED - START');
+    console.log('🔴 SIGNUP BUTTON CLICKED - DIRECT REDIRECT');
     setIsSignupLoading(true);
-    console.log('🔴 SIGNUP - Setting loading to true');
     
+    // Use direct redirect instead of navigate to avoid interference
     setTimeout(() => {
-      console.log('🔴 SIGNUP - Navigating to signup');
-      navigate('/signup?redirect=stripe');
-      setIsSignupLoading(false);
+      console.log('🔴 DIRECT REDIRECT to signup');
+      window.location.href = '/signup?redirect=stripe';
     }, 100);
   };
 
   const handleLogin = () => {
-    console.log('🔵 LOGIN BUTTON CLICKED - START');
+    console.log('🔵 LOGIN BUTTON CLICKED - DIRECT REDIRECT');
     setIsLoginLoading(true);
-    console.log('🔵 LOGIN - Setting loading to true');
     
+    // Use direct redirect instead of navigate to avoid interference  
     setTimeout(() => {
-      console.log('🔵 LOGIN - Navigating to login');
-      navigate('/login');
-      setIsLoginLoading(false);
+      console.log('🔵 DIRECT REDIRECT to login');
+      window.location.href = '/login';
     }, 100);
   };
 
