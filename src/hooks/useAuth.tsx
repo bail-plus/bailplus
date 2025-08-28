@@ -70,33 +70,57 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
-    console.log('[AUTH] useAuth initialization started...');
+    console.log('🔄 Auth state listener setup...');
     
-    // Set up auth state listener - NO AUTOMATIC REDIRECTIONS
+    // Set up auth state listener
     const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('[AUTH] Auth state change:', { event, hasSession: !!session, hasUser: !!session?.user });
+        console.log('🔄 Auth state change:', { event, hasSession: !!session, hasUser: !!session?.user });
         
-        // Only update state, never redirect automatically
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
         
-        if (event === 'SIGNED_OUT') {
-          setSubscription(null);
-          console.log('[AUTH] User signed out - cleared subscription');
+        // Handle signin (includes signup with immediate session)
+        if (event === 'SIGNED_IN' && session?.user) {
+          console.log('✅ User signed in/up, checking if redirect needed...');
+          
+          // Check if this is a new signup (you can detect this by checking if user was just created)
+          const isNewUser = new Date(session.user.created_at).getTime() > Date.now() - 60000; // Created within last minute
+          
+          if (isNewUser) {
+            console.log('🎉 New user detected, redirecting to offers...');
+            setTimeout(() => {
+              window.location.href = '/offers';
+            }, 500);
+          } else {
+            console.log('🔑 Existing user signin, checking subscription...');
+            setTimeout(() => {
+              checkSubscription();
+            }, 100);
+          }
         }
         
-        // No automatic redirections - let components handle their own routing
+        // Clear subscription on signout
+        if (event === 'SIGNED_OUT') {
+          setSubscription(null);
+        }
       }
     );
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('[AUTH] Initial session check:', { hasSession: !!session, hasUser: !!session?.user });
+      console.log('🔍 Initial session check:', { hasSession: !!session, hasUser: !!session?.user });
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      
+      // Check subscription for existing session
+      if (session?.user) {
+        setTimeout(() => {
+          checkSubscription();
+        }, 100);
+      }
     });
 
     return () => authSubscription.unsubscribe();

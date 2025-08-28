@@ -9,76 +9,58 @@ import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'react-router-dom';
 import { LoadingGate } from '@/components/LoadingGate';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 
 export default function Login() {
   const { user, loading, signIn } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
+  const [isWaitingForAuth, setIsWaitingForAuth] = useState(false);
 
-  console.log('[AUTH] Login page - user:', !!user, 'loading:', loading);
+  // If user is already authenticated, redirect to offers
+  if (user && !loading) {
+    return <Navigate to="/offers" replace />;
+  }
 
-  // Auto-redirect if already logged in
+  // Set up auth state listener for immediate redirect after login
   useEffect(() => {
-    if (user && !loading) {
-      console.log('[AUTH] Already logged in on login page');
-      console.log('[STRIPE] Redirecting to: https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
-      window.location.assign('https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
-    }
-  }, [user, loading]);
-  
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔄 Auth state change:', { event, hasSession: !!session, hasUser: !!session?.user });
+      
+      if (event === 'SIGNED_IN') {
+        console.log('✅ User signed in, redirecting to offers...');
+        // Always redirect to offers after authentication
+        navigate('/offers');
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
   const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log('[AUTH] Login form submitted');
-    
-    if (isLoading) return;
     setIsLoading(true);
     
-    try {
-      const formData = new FormData(e.currentTarget);
-      const email = formData.get('email') as string;
-      const password = formData.get('password') as string;
-      
-      console.log('[AUTH] Attempting login for:', email);
-      const { error } = await signIn(email, password);
-      
-      if (!error) {
-        console.log('[AUTH] Login successful');
-        console.log('[STRIPE] Redirecting to: https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
-        
-        // Immediate redirect - bypass any loading states
-        window.location.assign('https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00');
-        return; // Stop any further processing
-      } else {
-        console.error('[AUTH] Login error:', error);
-        toast.error('Erreur lors de la connexion. Merci de réessayer', {
-          action: {
-            label: 'Aller au paiement Stripe',
-            onClick: () => window.location.assign('https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00')
-          }
-        });
-      }
-    } catch (error) {
-      console.error('[AUTH] Login catch error:', error);
-      toast.error('Erreur lors de la connexion. Merci de réessayer', {
-        action: {
-          label: 'Aller au paiement Stripe',
-          onClick: () => window.location.assign('https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00')
-        }
-      });
-    } finally {
-      setIsLoading(false);
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get('email') as string;
+    const password = formData.get('password') as string;
+    
+    const { error } = await signIn(email, password);
+    if (!error) {
+      console.log('✅ Login successful, auth state change will handle redirect');
+      setIsWaitingForAuth(true);
     }
+    setIsLoading(false);
   };
 
-  if (loading) {
+  if (loading || isWaitingForAuth) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Chargement...</p>
-        </div>
-      </div>
+      <LoadingGate 
+        isLoading={true} 
+        message={isWaitingForAuth ? "Connexion en cours..." : "Chargement..."}
+      >
+        <div />
+      </LoadingGate>
     );
   }
 
@@ -133,7 +115,7 @@ export default function Login() {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Redirection vers le paiement Stripe...
+                    Connexion...
                   </>
                 ) : (
                   'Se connecter'

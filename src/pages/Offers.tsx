@@ -2,10 +2,8 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Check, ArrowRight, Loader2, UserPlus, LogIn } from 'lucide-react';
+import { Check, ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
 
 const starterOffer = {
   id: 'starter',
@@ -25,59 +23,25 @@ const starterOffer = {
 };
 
 export default function Offers() {
-  const [isSignupLoading, setIsSignupLoading] = useState(false);
-  const [isLoginLoading, setIsLoginLoading] = useState(false);
-  const navigate = useNavigate();
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Clean button handlers with clear logs
-  const handleSignup = () => {
-    console.log('[AUTH] signup click - starting navigation to /signup');
-    if (isSignupLoading) {
-      console.log('[AUTH] signup click ignored - already loading');
-      return;
-    }
-    
-    setIsSignupLoading(true);
-    
+  const handleSelectOffer = async () => {
+    setIsLoading(true);
+
     try {
-      console.log('[AUTH] navigating to /signup?redirect=stripe');
-      navigate('/signup?redirect=stripe');
-    } catch (error) {
-      console.error('[AUTH] signup navigation error:', error);
-      toast.error('Erreur lors de la redirection');
-    }
-    
-    // Reset loading state after brief delay
-    setTimeout(() => {
-      setIsSignupLoading(false);
-    }, 1000);
-  };
+      // URL de checkout Stripe directe
+      const stripeCheckoutUrl = "https://buy.stripe.com/3cIbJ105K5iW6Yp4PV1Jm00";
 
-  const handleLogin = () => {
-    console.log('[AUTH] login click - starting navigation to /login');
-    if (isLoginLoading) {
-      console.log('[AUTH] login click ignored - already loading');
-      return;
-    }
-    
-    setIsLoginLoading(true);
-    
-    try {
-      console.log('[AUTH] navigating to /login');
-      navigate('/login');
+      // Redirection vers Stripe Checkout
+      window.open(stripeCheckoutUrl, '_blank');
+      
     } catch (error) {
-      console.error('[AUTH] login navigation error:', error);
-      toast.error('Erreur lors de la redirection');
+      console.error('❌ Erreur:', error);
+      toast.error('Erreur lors du processus de paiement');
+    } finally {
+      setIsLoading(false);
     }
-    
-    // Reset loading state after brief delay
-    setTimeout(() => {
-      setIsLoginLoading(false);
-    }, 1000);
   };
-
-  // Debug log to confirm component renders
-  console.log('[AUTH] Offers component rendering');
 
   return (
     <div className="min-h-screen bg-gradient-surface py-12">
@@ -122,56 +86,24 @@ export default function Offers() {
                   ))}
                 </ul>
 
-                <div className="space-y-3">
-                  <Button 
-                    className="w-full text-lg py-6" 
-                    onClick={handleSignup}
-                    disabled={isSignupLoading}
-                    size="lg"
-                  >
-                    {isSignupLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Redirection...
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus className="mr-2 h-5 w-5" />
-                        S'inscrire et s'abonner
-                        <ArrowRight className="ml-2 h-5 w-5" />
-                      </>
-                    )}
-                  </Button>
-
-                  <Button 
-                    variant="outline"
-                    className="w-full text-lg py-6" 
-                    onClick={handleLogin}
-                    disabled={isLoginLoading}
-                    size="lg"
-                  >
-                    {isLoginLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                        Redirection...
-                      </>
-                    ) : (
-                      <>
-                        <LogIn className="mr-2 h-5 w-5" />
-                        Se connecter
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                <div className="text-center text-xs text-muted-foreground">
-                  <p className="mb-2">
-                    <strong>Nouveaux utilisateurs :</strong> Créez votre compte et souscrivez à l'abonnement
-                  </p>
-                  <p>
-                    <strong>Déjà abonné :</strong> Connectez-vous directement à votre compte
-                  </p>
-                </div>
+                <Button 
+                  className="w-full text-lg py-6" 
+                  onClick={handleSelectOffer}
+                  disabled={isLoading}
+                  size="lg"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Redirection vers Stripe...
+                    </>
+                  ) : (
+                    <>
+                      S'abonner maintenant
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </>
+                  )}
+                </Button>
               </CardContent>
             </Card>
           </div>
