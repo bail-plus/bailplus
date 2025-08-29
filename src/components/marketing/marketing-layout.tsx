@@ -1,8 +1,8 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { 
-  Menu, 
-  X, 
+import {
+  Menu,
+  X,
   Home,
   Star,
   Calculator,
@@ -60,8 +60,8 @@ export function MarketingLayout({ children }: MarketingLayoutProps) {
                   to={item.href}
                   className={cn(
                     "text-sm font-medium transition-colors hover:text-primary",
-                    isActive(item.href) 
-                      ? "text-primary font-semibold" 
+                    isActive(item.href)
+                      ? "text-primary font-semibold"
                       : "text-muted-foreground"
                   )}
                 >
@@ -72,15 +72,13 @@ export function MarketingLayout({ children }: MarketingLayoutProps) {
 
             {/* Desktop CTAs */}
             <div className="hidden md:flex items-center space-x-3">
-              <Button variant="ghost" asChild>
+              {/* <Button variant="ghost" asChild>
                 <a href={`${siteConfig.appUrl}/sign-in`}>
                   Se connecter
                 </a>
-              </Button>
-              <Button asChild>
-                <a href={siteConfig.appUrl}>
-                  Accéder à l'application
-                </a>
+              </Button> */}
+              <Button className="w-full justify-start" asChild>
+                <Link to="/app">Accéder à l'application</Link>
               </Button>
             </div>
 

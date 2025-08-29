@@ -1,7 +1,26 @@
-import { useState, useEffect, createContext, useContext } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useEffect, createContext, useContext, useMemo } from 'react';
+import type { User, Session } from '@supabase/supabase-js';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+
+type Profile = {
+  id: string;
+  user_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  entity_id: string | null;
+  role: string | null;
+  trial_end_date: string | null; // stocké en DATE => "YYYY-MM-DD"
+  gender?: string | null;
+  birthdate?: string | null;
+  phone_number?: string | null;
+  adress?: string | null;
+  city?: string | null;
+  postal_code?: number | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
 
 interface SubscriptionInfo {
   subscribed: boolean;
@@ -13,8 +32,15 @@ interface SubscriptionInfo {
 interface AuthContextType {
   user: User | null;
   session: Session | null;
-  subscription: SubscriptionInfo | null;
-  signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<{ error: any }>;
+
+  profile: Profile | null;
+  refreshProfile: () => Promise<void>;
+  signUp: (
+    email: string,
+    password: string,
+    firstName: string,
+    lastName: string
+  ) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   checkSubscription: () => Promise<void>;
@@ -24,177 +50,147 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
-  subscription: null,
+
+  profile: null,
+  refreshProfile: async () => { },
   signUp: async () => ({ error: null }),
   signIn: async () => ({ error: null }),
-  signOut: async () => {},
-  checkSubscription: async () => {},
+  signOut: async () => { },
+  checkSubscription: async () => { },
   loading: true,
 });
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
 };
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const checkSubscription = async () => {
-    if (!session) return;
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('check-subscription', {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
+  /** Charge le profil pour un user donné */
+  const fetchProfile = async (uid: string) => {
+    const { data, error } = await supabase
+      .from('profiles')               // ← adapte si ta table s’appelle autrement
+      .select('*')
+      .eq('user_id', uid)
+      .single();
 
-      if (error) throw error;
-      setSubscription(data);
-    } catch (error) {
-      console.error('Error checking subscription:', error);
-      setSubscription({
-        subscribed: false,
-        subscription_tier: null,
-        subscription_status: 'inactive',
-        subscription_end: null
-      });
+    if (error) {
+      // 406/No Rows: la ligne n’existe pas encore
+      if (error.code !== 'PGRST116' && error.code !== '406') {
+        console.error('fetchProfile error', error);
+      }
+      setProfile(null);
+      return;
     }
+    setProfile(data as Profile);
   };
 
+  const refreshProfile = async () => {
+    if (user?.id) await fetchProfile(user.id);
+  };
+
+  // 1) État initial (session existante)
   useEffect(() => {
-    console.log('🔄 Auth state listener setup...');
-    
-    // Set up auth state listener
-    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('🔄 Auth state change:', { event, hasSession: !!session, hasUser: !!session?.user });
-        
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-        
-        // Handle signin (includes signup with immediate session)
-        if (event === 'SIGNED_IN' && session?.user) {
-          console.log('✅ User signed in/up, checking if redirect needed...');
-          
-          // Check if this is a new signup (you can detect this by checking if user was just created)
-          const isNewUser = new Date(session.user.created_at).getTime() > Date.now() - 60000; // Created within last minute
-          
-          if (isNewUser) {
-            console.log('🎉 New user detected, redirecting to offers...');
-            setTimeout(() => {
-              window.location.href = '/offers';
-            }, 500);
-          } else {
-            console.log('🔑 Existing user signin, checking subscription...');
-            setTimeout(() => {
-              checkSubscription();
-            }, 100);
-          }
-        }
-        
-        // Clear subscription on signout
-        if (event === 'SIGNED_OUT') {
-          setSubscription(null);
+    let cancelled = false;
+
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (cancelled) return;
+
+      setSession(session ?? null);
+      setUser(session?.user ?? null);
+
+      if (session?.user?.id) {
+        await fetchProfile(session.user.id);
+      } else {
+        setProfile(null);
+      }
+
+      setLoading(false);
+    })();
+
+    return () => { cancelled = true; };
+  }, []);
+
+  // 2) Écoute des changements d’auth
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        setSession(session ?? null);
+        const newUser = session?.user ?? null;
+        setUser(newUser);
+
+        if (newUser?.id) {
+          await fetchProfile(newUser.id);
+        } else {
+          setProfile(null);
+
         }
       }
     );
-
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('🔍 Initial session check:', { hasSession: !!session, hasUser: !!session?.user });
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-      
-      // Check subscription for existing session
-      if (session?.user) {
-        setTimeout(() => {
-          checkSubscription();
-        }, 100);
-      }
-    });
-
-    return () => authSubscription.unsubscribe();
+    return () => subscription.unsubscribe();
   }, []);
 
   const signUp = async (email: string, password: string, firstName: string, lastName: string) => {
-    try {
-      console.log('🔐 Starting signup process...', { email });
-      
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/offers`,
-          data: {
-            first_name: firstName,
-            last_name: lastName,
-          }
-        }
-      });
-      
-      console.log('🔐 Signup result:', { data, error, user: data?.user, session: data?.session });
-      
-      if (error) {
-        console.error('❌ Signup error:', error);
-        toast.error(error.message);
-      } else if (data?.user) {
-        if (data.session) {
-          console.log('✅ User signed up with immediate session');
-          toast.success('Compte créé avec succès !');
-        } else {
-          console.log('📧 User signed up, email confirmation required');
-          toast.success('Compte créé ! Vérifiez vos emails pour confirmer votre adresse.');
-        }
-      }
-      
-      return { error };
-    } catch (err) {
-      console.error('❌ Signup catch error:', err);
-      toast.error('Erreur lors de la création du compte');
-      return { error: err };
-    }
-  };
-
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signUp({
       email,
-      password
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/`,
+        data: { first_name: firstName, last_name: lastName }, // user_metadata (optionnel)
+      }
     });
-    
+
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success('Connexion réussie !');
+      toast.success('Compte créé avec succès ! Vérifiez vos emails.');
     }
-    
+
+    // ⚠️ Si tu exiges la vérification d’email, il n’y aura pas de session tout de suite.
+    // La ligne "profile" peut être créée via trigger côté DB, ou après la première connexion.
     return { error };
+  };
+
+  const signIn = async (email: string, password: string) => {
+    const { error, data } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      toast.error(error.message);
+      return { error };
+    }
+    toast.success('Connexion réussie !');
+
+    // Session/Utilisateur mis à jour par le listener; on peut aussi forcer un fetch
+    if (data.session?.user?.id) await fetchProfile(data.session.user.id);
+    return { error: null };
   };
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    setProfile(null);
     toast.success('Déconnexion réussie');
   };
 
-  const value = {
-    user,
-    session,
-    subscription,
-    signUp,
-    signIn,
-    signOut,
-    checkSubscription,
-    loading,
-  };
+
+  const value = useMemo(
+    () => ({
+      user,
+      session,
+      profile,
+      refreshProfile,
+      signUp,
+      signIn,
+      signOut,
+      loading,
+    }),
+    [user, session, profile, loading]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

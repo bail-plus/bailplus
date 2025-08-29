@@ -9,13 +9,36 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { supabase } from "@/integrations/supabase/client"
 
-interface Entity {
-  id: string
-  name: string
-  type: "PERSONAL" | "SCI"
-  icon: typeof User | typeof Building
-  description: string
-}
+const entities = [
+  {
+    id: "personal",
+    name: "Personnel",
+    type: "PERSONAL" as const,
+    icon: User,
+    description: "Biens personnels"
+  },
+  {
+    id: "sci-demo",
+    name: "SCI Investissement",
+    type: "SCI" as const,
+    icon: Building,
+    description: "3 biens • 2 locataires"
+  },
+  {
+    id: "sci-paris",
+    name: "SCI Paris Center",
+    type: "SCI" as const,
+    icon: Building,
+    description: "1 bien • 1 locataire"
+  },
+  {
+    id: "sci-paris",
+    name: "SCI Paris Center",
+    type: "SCI" as const,
+    icon: Building,
+    description: "1 bien • 1 locataire"
+  }
+]
 
 export function EntitySelector() {
   const [entities, setEntities] = useState<Entity[]>([])

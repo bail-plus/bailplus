@@ -1,20 +1,19 @@
 import { useState } from "react"
-import { 
-  BarChart3, 
-  Calendar, 
-  Building2, 
-  UserCheck, 
-  Users, 
-  Wrench, 
-  Calculator, 
-  FileText, 
-  MessageCircle, 
-  TrendingUp, 
+import {
+  BarChart3,
+  Calendar,
+  Building2,
+  UserCheck,
+  Users,
+  Wrench,
+  Calculator,
+  FileText,
+  MessageCircle,
+  TrendingUp,
   Settings,
-  Target 
+  Target
 } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
-
 import {
   Sidebar,
   SidebarContent,
@@ -27,6 +26,9 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { useAuth } from "@/hooks/useAuth"
+import { LogOut } from "lucide-react"
+import { useNavigate } from "react-router-dom"
 
 const items = [
   { title: "Accueil", url: "/app", icon: BarChart3 },
@@ -46,9 +48,10 @@ const items = [
 export function AppSidebar() {
   const { state } = useSidebar()
   const location = useLocation()
+  const { user, loading, signOut } = useAuth();
   const currentPath = location.pathname
   const collapsed = state === "collapsed"
-
+  const navigate = useNavigate()
   const isActive = (path: string) => {
     if (path === "/app") {
       return currentPath === "/app"
@@ -57,11 +60,18 @@ export function AppSidebar() {
   }
 
   const getNavClassName = (path: string) => {
-    return isActive(path) 
-      ? "bg-sidebar-accent text-sidebar-primary font-medium shadow-sm border-r-2 border-sidebar-primary" 
+    return isActive(path)
+      ? "bg-sidebar-accent text-sidebar-primary font-medium shadow-sm border-r-2 border-sidebar-primary"
       : "hover:bg-sidebar-accent/50 text-sidebar-foreground"
   }
 
+  const handleSignOut = async () => {
+    await signOut()
+    // Si tu as un <RequireAuth />, pas besoin du navigate;
+    // sinon décommente la redirection choisie :
+    // navigate("/login", { replace: true })
+    // navigate("/", { replace: true })
+  }
   return (
     <Sidebar
       className={`
@@ -95,8 +105,8 @@ export function AppSidebar() {
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
-                    <NavLink 
-                      to={item.url} 
+                    <NavLink
+                      to={item.url}
                       end={item.url === "/app"}
                       className={`
                         ${getNavClassName(item.url)}
@@ -126,16 +136,37 @@ export function AppSidebar() {
         <div className="p-4 border-t border-sidebar-border">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-sidebar-accent rounded-full flex items-center justify-center">
-              <span className="text-xs font-medium text-sidebar-foreground">JD</span>
+              <span className="text-xs font-medium text-sidebar-foreground">
+                {(user?.user_metadata?.first_name?.charAt(0) ?? "").toUpperCase()}
+                {(user?.user_metadata?.last_name?.charAt(0) ?? "").toUpperCase()}
+              </span>
             </div>
+
             {!collapsed && (
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-sidebar-foreground truncate">Jean Dupont</p>
+                <p className="text-sm font-medium text-sidebar-foreground truncate">
+                  {user?.user_metadata?.first_name} {user?.user_metadata?.last_name}
+                </p>
                 <p className="text-xs text-sidebar-foreground/60 truncate">SCI Investissement</p>
               </div>
             )}
+
+            {/* Bouton déconnexion */}
+            <button
+              onClick={handleSignOut}
+              className={`
+        inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm
+        hover:bg-sidebar-accent/60 text-sidebar-foreground transition
+        ${collapsed ? "px-2 py-2" : ""}
+      `}
+              title="Se déconnecter"
+            >
+              <LogOut className="w-4 h-4" />
+              {!collapsed }
+            </button>
           </div>
         </div>
+
       </SidebarContent>
     </Sidebar>
   )

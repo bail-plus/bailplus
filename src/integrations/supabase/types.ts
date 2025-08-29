@@ -522,35 +522,56 @@ export type Database = {
       }
       profiles: {
         Row: {
+          adress: string | null
+          birthdate: string | null
+          city: string | null
           created_at: string
           email: string | null
           entity_id: string | null
           first_name: string | null
+          gender: Database["public"]["Enums"]["gender"] | null
           id: string
           last_name: string | null
-          role: string | null
+          phone_number: string | null
+          postal_code: number | null
+          role: Database["public"]["Enums"]["user_role"] | null
+          trial_end_date: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          adress?: string | null
+          birthdate?: string | null
+          city?: string | null
           created_at?: string
           email?: string | null
           entity_id?: string | null
           first_name?: string | null
+          gender?: Database["public"]["Enums"]["gender"] | null
           id?: string
           last_name?: string | null
-          role?: string | null
+          phone_number?: string | null
+          postal_code?: number | null
+          role?: Database["public"]["Enums"]["user_role"] | null
+          trial_end_date?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          adress?: string | null
+          birthdate?: string | null
+          city?: string | null
           created_at?: string
           email?: string | null
           entity_id?: string | null
           first_name?: string | null
+          gender?: Database["public"]["Enums"]["gender"] | null
           id?: string
           last_name?: string | null
-          role?: string | null
+          phone_number?: string | null
+          postal_code?: number | null
+          role?: Database["public"]["Enums"]["user_role"] | null
+          trial_end_date?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -827,7 +848,8 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      gender: "male" | "female" | "other"
+      user_role: "admin" | "user" | "trial"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -954,6 +976,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      gender: ["male", "female", "other"],
+      user_role: ["admin", "user", "trial"],
+    },
   },
 } as const

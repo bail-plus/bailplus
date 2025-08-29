@@ -57,17 +57,17 @@ const values = [
 
 const team = [
   {
-    name: "Marie Dupont",
+    name: "MEYER Arthus",
     role: "CEO & Co-fondatrice",
     description: "Ex-directrice produit chez PropTech leader, investisseuse immobilière",
   },
   {
-    name: "Thomas Martin",
+    name: "GAIGNEROT Edouard",
     role: "CTO & Co-fondateur", 
     description: "15 ans d'expérience en développement, expert en solutions SaaS",
   },
   {
-    name: "Sophie Bernard",
+    name: "DION Julien",
     role: "Head of Customer Success",
     description: "Spécialiste de l'accompagnement client, experte gestion locative",
   }
