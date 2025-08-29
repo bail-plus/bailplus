@@ -1,4 +1,6 @@
+// src/components/EntitySelector.tsx
 import { useState, useEffect, useCallback } from "react"
+import type { LucideIcon } from "lucide-react"
 import { Check, ChevronDown, Building, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -9,88 +11,103 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { supabase } from "@/integrations/supabase/client"
 
-const entities = [
+// ---- Types ----
+type EntityType = "PERSONAL" | "SCI"
+
+interface Entity {
+  id: string
+  name: string
+  type: EntityType
+  icon: LucideIcon
+  description: string
+}
+
+// Optionnel: typer (grossièrement) la ligne venant de la table Supabase "entities"
+type DbEntityRow = {
+  id: string
+  name: string
+  type?: string | null
+  description?: string | null
+}
+
+// (facultatif) exemples locaux si besoin de seed
+const STATIC_ENTITIES: Entity[] = [
   {
     id: "personal",
     name: "Personnel",
-    type: "PERSONAL" as const,
+    type: "PERSONAL",
     icon: User,
-    description: "Biens personnels"
+    description: "Biens personnels",
   },
   {
     id: "sci-demo",
     name: "SCI Investissement",
-    type: "SCI" as const,
+    type: "SCI",
     icon: Building,
-    description: "3 biens • 2 locataires"
+    description: "3 biens • 2 locataires",
   },
   {
     id: "sci-paris",
     name: "SCI Paris Center",
-    type: "SCI" as const,
+    type: "SCI",
     icon: Building,
-    description: "1 bien • 1 locataire"
+    description: "1 bien • 1 locataire",
   },
-  {
-    id: "sci-paris",
-    name: "SCI Paris Center",
-    type: "SCI" as const,
-    icon: Building,
-    description: "1 bien • 1 locataire"
-  }
 ]
 
 export function EntitySelector() {
-  const [entities, setEntities] = useState<Entity[]>([])
+  const [entityOptions, setEntityOptions] = useState<Entity[]>([])
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null)
   const [loading, setLoading] = useState(true)
 
   const loadEntities = useCallback(async () => {
     try {
       setLoading(true)
-      const { data: entitiesData, error } = await supabase
-        .from('entities')
-        .select('*')
+
+      const { data, error } = await supabase
+        .from("entities")
+        .select("*")
 
       if (error) throw error
 
-      // Create a default personal entity
-      const defaultEntities: Entity[] = [
-        {
-          id: "personal",
-          name: "Personnel",
-          type: "PERSONAL",
-          icon: User,
-          description: "Biens personnels"
-        }
-      ]
-
-      // Add real entities from database
-      if (entitiesData) {
-        const realEntities = entitiesData.map(entity => ({
-          id: entity.id,
-          name: entity.name,
-          type: "SCI" as const,
-          icon: Building,
-          description: "Entité" // Could be enhanced with property count later
-        }))
-        defaultEntities.push(...realEntities)
+      const personal: Entity = {
+        id: "personal",
+        name: "Personnel",
+        type: "PERSONAL",
+        icon: User,
+        description: "Biens personnels",
       }
 
-      setEntities(defaultEntities)
-      setSelectedEntity(defaultEntities[0])
-    } catch (error) {
-      console.error('Error loading entities:', error)
-      // Fallback to default entity
-      const fallbackEntity = {
+      // map des entités réelles
+      const realEntities: Entity[] = (data as DbEntityRow[] | null)?.map((row) => ({
+        id: row.id,
+        name: row.name,
+        // si tu as une colonne "type" en DB, on la normalise, sinon "SCI" par défaut
+        type: (row.type?.toUpperCase() as EntityType) ?? "SCI",
+        icon: Building,
+        description: row.description ?? "Entité",
+      })) ?? []
+
+      // dédoublonnage éventuel par id
+      const byId = new Map<string, Entity>([[personal.id, personal]])
+      for (const e of realEntities) byId.set(e.id, e)
+
+      const options = Array.from(byId.values())
+
+      setEntityOptions(options)
+      setSelectedEntity(options[0] ?? personal)
+    } catch (err) {
+      console.error("Error loading entities:", err)
+      // fallback
+      const fallback = {
         id: "personal",
         name: "Personnel",
         type: "PERSONAL" as const,
         icon: User,
-        description: "Biens personnels"
+        description: "Biens personnels",
       }
-      setEntities([fallbackEntity])
-      setSelectedEntity(fallbackEntity)
+      setEntityOptions([fallback])
+      setSelectedEntity(fallback)
     } finally {
       setLoading(false)
     }
@@ -112,8 +129,8 @@ export function EntitySelector() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           size="sm"
           className="min-w-48 justify-between"
         >
@@ -127,8 +144,9 @@ export function EntitySelector() {
           <ChevronDown className="w-4 h-4 opacity-50" />
         </Button>
       </DropdownMenuTrigger>
+
       <DropdownMenuContent className="w-56">
-        {entities.map((entity) => (
+        {entityOptions.map((entity) => (
           <DropdownMenuItem
             key={entity.id}
             onClick={() => setSelectedEntity(entity)}

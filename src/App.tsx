@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -6,8 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/layout";
-import { PublicLayout } from "@/components/PublicLayout";
-import { ProtectedApp } from '@/components/ProtectedApp';
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 
 // App pages (protected)
@@ -44,12 +41,11 @@ import Privacy from "./pages/marketing/legal/Privacy";
 import Imprint from "./pages/marketing/legal/Imprint";
 
 // 404 pages
-import NotFoundPublic from "./pages/NotFoundPublic";
 import NotFound from "./pages/NotFound";
 import { MarketingLayout } from "./components/marketing/marketing-layout";
 
-
 const queryClient = new QueryClient();
+
 /** Helpers dates (locale) */
 const startOfDay = (d: Date) => {
   const x = new Date(d);
@@ -77,8 +73,10 @@ const AuthenticatedApp = () => {
   const trialEndRaw = profile?.trial_end_date ?? null; // "YYYY-MM-DD"
   const trialEndMs = parseDateLocalMs(trialEndRaw);
   const todayMs = startOfDay(new Date());
-  const shouldGoPaywall = trialEndMs !== null && trialEndMs >= todayMs;
 
+  // ⚠️ Tu as dit de ne pas toucher au paywall : je ne change PAS la ligne suivante
+  const shouldGoPaywall = trialEndMs !== null && trialEndMs >= todayMs;
+  console.log({ loading, user: !!user, profileLoaded: !!profile });
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -94,11 +92,9 @@ const AuthenticatedApp = () => {
   }
 
 
-  // Sinon, routes de l'app
   return (
     <Layout>
       <Routes>
-        {/* <Route path="/paywall" element={<div style={{ padding: 24 }}>PAYWALL OK ✅</div>} /> */}
         <Route path="/" element={<Index />} />
         <Route path="/calendar" element={<Calendar />} />
         <Route path="/properties" element={<Properties />} />
@@ -114,48 +110,37 @@ const AuthenticatedApp = () => {
         <Route path="/settings" element={<Settings />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/paywall" element={<TrialPaywall />} />
-
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Layout>
   );
 };
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
+    <AuthProvider>{/* ← ICI: un seul provider autour de toute l’app */}
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            {/* Marketing routes (public) */}
+            <Route path="/" element={<MarketingLayout><Landing /></MarketingLayout>} />
+            <Route path="/features" element={<MarketingLayout><Features /></MarketingLayout>} />
+            <Route path="/faq" element={<MarketingLayout><FAQ /></MarketingLayout>} />
+            <Route path="/about" element={<MarketingLayout><About /></MarketingLayout>} />
+            <Route path="/contact" element={<MarketingLayout><Contact /></MarketingLayout>} />
+            <Route path="/resources" element={<MarketingLayout><Resources /></MarketingLayout>} />
+            <Route path="/legal/terms" element={<MarketingLayout><Terms /></MarketingLayout>} />
+            <Route path="/legal/privacy" element={<MarketingLayout><Privacy /></MarketingLayout>} />
+            <Route path="/legal/imprint" element={<MarketingLayout><Imprint /></MarketingLayout>} />
 
-      <BrowserRouter>
-        <Routes>
-          {/* Marketing routes (public) */}
-          <Route path="/" element={<MarketingLayout><Landing /></MarketingLayout>} />
-          <Route path="/features" element={<MarketingLayout><Features /></MarketingLayout>} />
-          {/* <Route path="/pricing" element={<MarketingLayout><Pricing /></MarketingLayout>} /> */}
-          <Route path="/faq" element={<MarketingLayout><FAQ /></MarketingLayout>} />
-          <Route path="/about" element={<MarketingLayout><About /></MarketingLayout>} />
-          <Route path="/contact" element={<MarketingLayout><Contact /></MarketingLayout>} />
-          <Route path="/resources" element={<MarketingLayout><Resources /></MarketingLayout>} />
-          <Route path="/legal/terms" element={<MarketingLayout><Terms /></MarketingLayout>} />
-          <Route path="/legal/privacy" element={<MarketingLayout><Privacy /></MarketingLayout>} />
-          <Route path="/legal/imprint" element={<MarketingLayout><Imprint /></MarketingLayout>} />
-
-          {/* App routes (authenticated) */}
-          <Route
-            path="/app/*"
-            element={
-              <AuthProvider>
-                <AuthenticatedApp />
-              </AuthProvider>
-            }
-          />
-
-          {/* 404 */}
-          {/* <Route path="*" element={<MarketingLayout><MarketingNotFound /></MarketingLayout>} /> */}
-        </Routes>
-      </BrowserRouter>
-
-    </TooltipProvider>
+            {/* App routes (authenticated) */}
+            <Route path="/app/*" element={<AuthenticatedApp />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 

@@ -1,14 +1,40 @@
-
+// src/components/ProtectedRoute.tsx
 import { Navigate, useLocation } from 'react-router-dom';
+import { useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
+function startOfDay(d: Date) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x.getTime();
+}
+
+// accepte 'YYYY-MM-DD' ou ISO
+function parseDateLocalMs(s: string | null | undefined): number | null {
+  if (!s) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (m) {
+    const [, Y, M, D] = m;
+    return startOfDay(new Date(Number(Y), Number(M) - 1, Number(D)));
+  }
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return null;
+  return startOfDay(d);
+}
+
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const { user, subscription, loading } = useAuth();
+  const { user, profile, loading } = useAuth();
   const location = useLocation();
+
+  const trialExpired = useMemo(() => {
+    const endMs = parseDateLocalMs(profile?.trial_end_date ?? null);
+    const todayMs = startOfDay(new Date());
+    return endMs !== null && endMs < todayMs;
+  }, [profile?.trial_end_date]);
 
   if (loading) {
     return (
@@ -22,15 +48,16 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!user) {
-    // Redirect to login but save the attempted location
+    // pas connecté → login, en mémorisant la destination
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Check if user has active subscription
-  if (subscription && !subscription.subscribed) {
-    // Redirect to offers page if no active subscription
+  // Si l'utilisateur est encore en TRIAL mais que l'essai est expiré → offres/paywall
+  if ((profile?.role === 'trial' || !profile?.role) && trialExpired) {
     return <Navigate to="/offers" replace />;
+    // ou: return <Navigate to="/app/paywall" replace />;
   }
 
+  // Sinon OK
   return <>{children}</>;
 }
