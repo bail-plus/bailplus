@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -23,8 +23,9 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { Calculator } from "lucide-react"
-import { mockData } from "@/lib/supabase"
+import { supabase } from "@/integrations/supabase/client"
 
+// ---------- Zod schema ----------
 const receiptSchema = z.object({
   leaseId: z.string().min(1, "Veuillez sélectionner un bail"),
   periodMonth: z.number().min(1).max(12, "Mois invalide"),
@@ -32,7 +33,6 @@ const receiptSchema = z.object({
   amountHC: z.number().min(1, "Le montant hors charges doit être supérieur à 0"),
   charges: z.number().min(0, "Les charges doivent être positives"),
 })
-
 type ReceiptForm = z.infer<typeof receiptSchema>
 
 interface ReceiptModalProps {
@@ -41,8 +41,24 @@ interface ReceiptModalProps {
   onSuccess?: () => void
 }
 
+// ---------- Types DB ----------
+type LeaseRow = {
+  id: string
+  unit_id: string | null
+  tenant_id: string | null
+  // champs éventuels : rent_hc, charges, start_date, etc.
+}
+type PropertyRow = { id: string; name: string | null; address: string | null }
+type ProfileRow = { id: string; first_name: string | null; last_name: string | null; full_name: string | null }
+
 export function ReceiptModal({ open, onOpenChange, onSuccess }: ReceiptModalProps) {
   const [isLoading, setIsLoading] = useState(false)
+
+  // data chargée depuis Supabase
+  const [leases, setLeases] = useState<LeaseRow[]>([])
+  const [properties, setProperties] = useState<PropertyRow[]>([])
+  const [people, setPeople] = useState<ProfileRow[]>([])
+  const [loadingData, setLoadingData] = useState(false)
 
   const form = useForm<ReceiptForm>({
     resolver: zodResolver(receiptSchema),
@@ -55,35 +71,91 @@ export function ReceiptModal({ open, onOpenChange, onSuccess }: ReceiptModalProp
     },
   })
 
+  // ---- Chargement des baux / biens / personnes ----
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        setLoadingData(true)
+        const [leasesRes, propsRes, peopleRes] = await Promise.all([
+          supabase.from("leases").select("id,unit_id,tenant_id").returns<LeaseRow[]>().throwOnError(),
+          supabase.from("properties").select("id,name,address").returns<PropertyRow[]>().throwOnError(),
+          supabase.from("profiles").select("id,first_name,last_name,full_name").returns<ProfileRow[]>().throwOnError(),
+        ])
+
+        if (cancelled) return
+        setLeases(leasesRes.data ?? [])
+        setProperties(propsRes.data ?? [])
+        setPeople(peopleRes.data ?? [])
+      } catch (e) {
+        console.error("Erreur chargement données quittance", e)
+        if (!cancelled) {
+          setLeases([])
+          setProperties([])
+          setPeople([])
+        }
+      } finally {
+        if (!cancelled) setLoadingData(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  // maps pour retrouver rapidement libellés
+  const propertyMap = useMemo(() => {
+    const m = new Map<string, { name: string; address: string }>()
+    for (const p of properties) {
+      m.set(String(p.id), {
+        name: p.name ?? "",
+        address: p.address ?? "",
+      })
+    }
+    return m
+  }, [properties])
+
+  const peopleMap = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const p of people) {
+      const full = (p.full_name ?? "").trim()
+      const basic = `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim()
+      m.set(String(p.id), full || basic || `Personne ${p.id}`)
+    }
+    return m
+  }, [people])
+
+  // options de baux pour le Select
+  const availableLeases = useMemo(() => {
+    return leases.map((lease) => {
+      const prop = propertyMap.get(String(lease.unit_id ?? "")) || { name: "", address: "" }
+      const tenantName = peopleMap.get(String(lease.tenant_id ?? "")) || "Locataire inconnu"
+      const propLabel = [prop.name, prop.address].filter(Boolean).join(" — ") || `Bien ${lease.unit_id ?? "?"}`
+      return {
+        value: String(lease.id),
+        label: `${propLabel} - ${tenantName}`,
+      }
+    })
+  }, [leases, propertyMap, peopleMap])
+
   async function onSubmit(values: ReceiptForm) {
     setIsLoading(true)
     try {
-      // Mock API call - replace with actual Supabase call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
+      // Remplace ce mock par ton insert dans la table des quittances si tu as le schéma
+      await new Promise((r) => setTimeout(r, 700))
+
       const total = values.amountHC + values.charges
-      console.log('Creating receipt:', { ...values, total })
+      console.log("Creating receipt:", { ...values, total })
       toast.success("Quittance générée avec succès")
-      
+
       form.reset()
       onOpenChange(false)
       onSuccess?.()
     } catch (error) {
-      console.error('Error creating receipt:', error)
+      console.error("Error creating receipt:", error)
       toast.error("Erreur lors de la génération de la quittance")
     } finally {
       setIsLoading(false)
     }
   }
-
-  const availableLeases = mockData.leases.map(lease => {
-    const property = mockData.properties.find(p => p.id === lease.unitId)
-    const tenant = mockData.people.find(p => p.id === lease.tenantId)
-    return {
-      value: lease.id,
-      label: `${property?.label} - ${tenant?.firstName} ${tenant?.lastName}`
-    }
-  })
 
   const months = [
     { value: 1, label: "Janvier" },
@@ -111,23 +183,22 @@ export function ReceiptModal({ open, onOpenChange, onSuccess }: ReceiptModalProp
             <Calculator className="w-5 h-5" />
             Nouvelle quittance
           </DialogTitle>
-          <DialogDescription>
-            Générez une quittance de loyer
-          </DialogDescription>
+          <DialogDescription>Générez une quittance de loyer</DialogDescription>
         </DialogHeader>
-        
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Bail concerné */}
             <FormField
               control={form.control}
               name="leaseId"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Bail concerné</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionnez un bail" />
+                      <SelectTrigger disabled={loadingData}>
+                        <SelectValue placeholder={loadingData ? "Chargement..." : "Sélectionnez un bail"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -143,6 +214,7 @@ export function ReceiptModal({ open, onOpenChange, onSuccess }: ReceiptModalProp
               )}
             />
 
+            {/* Mois / Année */}
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -150,7 +222,10 @@ export function ReceiptModal({ open, onOpenChange, onSuccess }: ReceiptModalProp
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Mois</FormLabel>
-                    <Select onValueChange={(value) => field.onChange(parseInt(value))} defaultValue={field.value?.toString()}>
+                    <Select
+                      onValueChange={(value) => field.onChange(parseInt(value))}
+                      value={field.value?.toString()}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Mois" />
@@ -176,12 +251,12 @@ export function ReceiptModal({ open, onOpenChange, onSuccess }: ReceiptModalProp
                   <FormItem>
                     <FormLabel>Année</FormLabel>
                     <FormControl>
-                     <Input 
-                       type="number" 
-                       placeholder="2024" 
-                       {...field}
-                       onChange={(e) => field.onChange(Number(e.target.value))}
-                     />
+                      <Input
+                        type="number"
+                        placeholder="2025"
+                        {...field}
+                        onChange={(e) => field.onChange(Number(e.target.value))}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -189,6 +264,7 @@ export function ReceiptModal({ open, onOpenChange, onSuccess }: ReceiptModalProp
               />
             </div>
 
+            {/* Montants */}
             <FormField
               control={form.control}
               name="amountHC"
@@ -196,12 +272,12 @@ export function ReceiptModal({ open, onOpenChange, onSuccess }: ReceiptModalProp
                 <FormItem>
                   <FormLabel>Loyer hors charges (€)</FormLabel>
                   <FormControl>
-                     <Input 
-                       type="number" 
-                       placeholder="1200" 
-                       {...field}
-                       onChange={(e) => field.onChange(Number(e.target.value))}
-                     />
+                    <Input
+                      type="number"
+                      placeholder="1200"
+                      {...field}
+                      onChange={(e) => field.onChange(Number(e.target.value))}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -215,18 +291,19 @@ export function ReceiptModal({ open, onOpenChange, onSuccess }: ReceiptModalProp
                 <FormItem>
                   <FormLabel>Charges (€)</FormLabel>
                   <FormControl>
-                     <Input 
-                       type="number" 
-                       placeholder="200" 
-                       {...field}
-                       onChange={(e) => field.onChange(Number(e.target.value))}
-                     />
+                    <Input
+                      type="number"
+                      placeholder="200"
+                      {...field}
+                      onChange={(e) => field.onChange(Number(e.target.value))}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
+            {/* Total */}
             {total > 0 && (
               <div className="p-3 bg-muted rounded-lg">
                 <div className="flex justify-between items-center">

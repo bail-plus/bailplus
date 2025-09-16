@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -24,16 +24,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
 import { Wrench } from "lucide-react"
-import { mockData } from "@/lib/supabase"
+import { supabase } from "@/integrations/supabase/client"
 
+// ----------- Zod schema -----------
 const ticketSchema = z.object({
   unitId: z.string().min(1, "Veuillez sélectionner un bien"),
   title: z.string().min(3, "Le titre doit contenir au moins 3 caractères"),
   description: z.string().min(10, "La description doit contenir au moins 10 caractères"),
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "URGENT"]),
-  reporterId: z.string().optional(),
+  reporterId: z.string().optional(), // "" = signalement propriétaire
 })
-
 type TicketForm = z.infer<typeof ticketSchema>
 
 interface TicketModalProps {
@@ -42,8 +42,22 @@ interface TicketModalProps {
   onSuccess?: () => void
 }
 
+// ----------- Types DB -----------
+type PropertyRow = { id: string; name: string | null; address: string | null }
+type ProfileRow = {
+  id: string
+  first_name: string | null
+  last_name: string | null
+  full_name: string | null
+  kind?: string | null // si tu as ce champ pour distinguer TENANT
+}
+
 export function TicketModal({ open, onOpenChange, onSuccess }: TicketModalProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const [loadingData, setLoadingData] = useState(false)
+
+  const [units, setUnits] = useState<PropertyRow[]>([])
+  const [people, setPeople] = useState<ProfileRow[]>([])
 
   const form = useForm<TicketForm>({
     resolver: zodResolver(ticketSchema),
@@ -52,51 +66,92 @@ export function TicketModal({ open, onOpenChange, onSuccess }: TicketModalProps)
       title: "",
       description: "",
       priority: "MEDIUM",
-      reporterId: "",
+      reporterId: "", // vide = propriétaire
     },
   })
 
-  async function onSubmit(values: TicketForm) {
-    setIsLoading(true)
-    try {
-      // Mock API call - replace with actual Supabase call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      console.log('Creating ticket:', values)
-      toast.success("Ticket de maintenance créé avec succès")
-      
-      form.reset()
-      onOpenChange(false)
-      onSuccess?.()
-    } catch (error) {
-      console.error('Error creating ticket:', error)
-      toast.error("Erreur lors de la création du ticket")
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  // ----------- Charger biens + personnes -----------
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        setLoadingData(true)
+        const [propsRes, peopleRes] = await Promise.all([
+          supabase.from("properties").select("id,name,address").returns<PropertyRow[]>().throwOnError(),
+          supabase
+            .from("profiles")
+            .select("id,first_name,last_name,full_name,kind")
+            .returns<ProfileRow[]>()
+            .throwOnError(),
+        ])
+        if (cancelled) return
+        setUnits(propsRes.data ?? [])
+        setPeople(peopleRes.data ?? [])
+      } catch (e) {
+        console.error("Erreur chargement données ticket", e)
+        if (!cancelled) {
+          setUnits([])
+          setPeople([])
+        }
+      } finally {
+        if (!cancelled) setLoadingData(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
-  const availableUnits = mockData.properties.map(property => ({
-    value: property.id,
-    label: `${property.label} (${property.surface}m²)`
-  }))
+  // ----------- Options UI -----------
+  const availableUnits = useMemo(() => {
+    return units.map(u => {
+      const label = [u.name ?? undefined, u.address ?? undefined].filter(Boolean).join(" — ") || `Bien ${u.id}`
+      return { value: String(u.id), label }
+    })
+  }, [units])
 
-  const availableReporters = [
-    { value: "", label: "Signalement propriétaire" },
-    ...mockData.people
-      .filter(person => person.kind === 'TENANT')
-      .map(person => ({
-        value: person.id,
-        label: `${person.firstName} ${person.lastName} (locataire)`
-      }))
-  ]
+  const availableReporters = useMemo(() => {
+    const tenants = people.filter(p => (p.kind ?? "").toUpperCase() === "TENANT" || !p.kind)
+    const options = tenants.map(p => {
+      const full = (p.full_name ?? "").trim()
+      const basic = `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim()
+      return { value: String(p.id), label: (full || basic || `Personne ${p.id}`) + " (locataire)" }
+    })
+    return [{ value: "", label: "Signalement propriétaire" }, ...options]
+  }, [people])
 
   const priorities = [
     { value: "LOW", label: "Faible", color: "text-green-600" },
     { value: "MEDIUM", label: "Moyenne", color: "text-yellow-600" },
     { value: "HIGH", label: "Haute", color: "text-orange-600" },
     { value: "URGENT", label: "Urgente", color: "text-red-600" },
-  ]
+  ] as const
+
+  // ----------- Submit -----------
+  async function onSubmit(values: TicketForm) {
+    setIsLoading(true)
+    try {
+      // 👉 Remplace par ton insert réel supabase si tu as la table, p.ex.:
+      // const { error } = await supabase.from("tickets").insert({
+      //   unit_id: values.unitId,
+      //   title: values.title,
+      //   description: values.description,
+      //   priority: values.priority,
+      //   reporter_id: values.reporterId || null,
+      // })
+      // if (error) throw error
+
+      await new Promise(r => setTimeout(r, 800)) // mock
+
+      toast.success("Ticket de maintenance créé avec succès")
+      form.reset()
+      onOpenChange(false)
+      onSuccess?.()
+    } catch (error) {
+      console.error("Error creating ticket:", error)
+      toast.error("Erreur lors de la création du ticket")
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -106,29 +161,28 @@ export function TicketModal({ open, onOpenChange, onSuccess }: TicketModalProps)
             <Wrench className="w-5 h-5" />
             Nouveau ticket de maintenance
           </DialogTitle>
-          <DialogDescription>
-            Signalez un problème ou une demande d'intervention
-          </DialogDescription>
+          <DialogDescription>Signalez un problème ou une demande d'intervention</DialogDescription>
         </DialogHeader>
-        
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Bien concerné */}
             <FormField
               control={form.control}
               name="unitId"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Bien concerné</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionnez un bien" />
+                      <SelectTrigger disabled={loadingData}>
+                        <SelectValue placeholder={loadingData ? "Chargement..." : "Sélectionnez un bien"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {availableUnits.map((unit) => (
-                        <SelectItem key={unit.value} value={unit.value}>
-                          {unit.label}
+                      {availableUnits.map((u) => (
+                        <SelectItem key={u.value} value={u.value}>
+                          {u.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -138,22 +192,23 @@ export function TicketModal({ open, onOpenChange, onSuccess }: TicketModalProps)
               )}
             />
 
+            {/* Signalé par */}
             <FormField
               control={form.control}
               name="reporterId"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Signalé par</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger>
+                      <SelectTrigger disabled={loadingData}>
                         <SelectValue placeholder="Qui signale le problème ?" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {availableReporters.map((reporter) => (
-                        <SelectItem key={reporter.value} value={reporter.value}>
-                          {reporter.label}
+                      {availableReporters.map((r) => (
+                        <SelectItem key={r.value} value={r.value}>
+                          {r.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -163,6 +218,7 @@ export function TicketModal({ open, onOpenChange, onSuccess }: TicketModalProps)
               )}
             />
 
+            {/* Titre */}
             <FormField
               control={form.control}
               name="title"
@@ -177,6 +233,7 @@ export function TicketModal({ open, onOpenChange, onSuccess }: TicketModalProps)
               )}
             />
 
+            {/* Description */}
             <FormField
               control={form.control}
               name="description"
@@ -184,10 +241,10 @@ export function TicketModal({ open, onOpenChange, onSuccess }: TicketModalProps)
                 <FormItem>
                   <FormLabel>Description détaillée</FormLabel>
                   <FormControl>
-                    <Textarea 
-                      placeholder="Décrivez le problème en détail..." 
+                    <Textarea
+                      placeholder="Décrivez le problème en détail..."
                       className="min-h-[80px]"
-                      {...field} 
+                      {...field}
                     />
                   </FormControl>
                   <FormMessage />
@@ -195,22 +252,23 @@ export function TicketModal({ open, onOpenChange, onSuccess }: TicketModalProps)
               )}
             />
 
+            {/* Priorité */}
             <FormField
               control={form.control}
               name="priority"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Priorité</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Sélectionnez la priorité" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {priorities.map((priority) => (
-                        <SelectItem key={priority.value} value={priority.value}>
-                          <span className={priority.color}>{priority.label}</span>
+                      {priorities.map((p) => (
+                        <SelectItem key={p.value} value={p.value}>
+                          <span className={p.color}>{p.label}</span>
                         </SelectItem>
                       ))}
                     </SelectContent>

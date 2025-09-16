@@ -520,12 +520,46 @@ export type Database = {
           },
         ]
       }
+      offers: {
+        Row: {
+          description: string | null
+          features: string | null
+          id: string
+          max_properties: string | null
+          name: string | null
+          period: Database["public"]["Enums"]["period_enum"] | null
+          popular: boolean | null
+          price: string | null
+        }
+        Insert: {
+          description?: string | null
+          features?: string | null
+          id?: string
+          max_properties?: string | null
+          name?: string | null
+          period?: Database["public"]["Enums"]["period_enum"] | null
+          popular?: boolean | null
+          price?: string | null
+        }
+        Update: {
+          description?: string | null
+          features?: string | null
+          id?: string
+          max_properties?: string | null
+          name?: string | null
+          period?: Database["public"]["Enums"]["period_enum"] | null
+          popular?: boolean | null
+          price?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           adress: string | null
           birthdate: string | null
           city: string | null
           created_at: string
+          current_period_end: string | null
           email: string | null
           entity_id: string | null
           first_name: string | null
@@ -535,6 +569,9 @@ export type Database = {
           phone_number: string | null
           postal_code: number | null
           role: Database["public"]["Enums"]["user_role"] | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          subscription_status: string | null
           trial_end_date: string | null
           updated_at: string
           user_id: string
@@ -544,6 +581,7 @@ export type Database = {
           birthdate?: string | null
           city?: string | null
           created_at?: string
+          current_period_end?: string | null
           email?: string | null
           entity_id?: string | null
           first_name?: string | null
@@ -553,6 +591,9 @@ export type Database = {
           phone_number?: string | null
           postal_code?: number | null
           role?: Database["public"]["Enums"]["user_role"] | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_status?: string | null
           trial_end_date?: string | null
           updated_at?: string
           user_id: string
@@ -562,6 +603,7 @@ export type Database = {
           birthdate?: string | null
           city?: string | null
           created_at?: string
+          current_period_end?: string | null
           email?: string | null
           entity_id?: string | null
           first_name?: string | null
@@ -571,6 +613,9 @@ export type Database = {
           phone_number?: string | null
           postal_code?: number | null
           role?: Database["public"]["Enums"]["user_role"] | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_status?: string | null
           trial_end_date?: string | null
           updated_at?: string
           user_id?: string
@@ -849,6 +894,7 @@ export type Database = {
     }
     Enums: {
       gender: "male" | "female" | "other"
+      period_enum: "/mois" | "/an"
       user_role: "admin" | "user" | "trial"
     }
     CompositeTypes: {
@@ -978,6 +1024,7 @@ export const Constants = {
   public: {
     Enums: {
       gender: ["male", "female", "other"],
+      period_enum: ["/mois", "/an"],
       user_role: ["admin", "user", "trial"],
     },
   },

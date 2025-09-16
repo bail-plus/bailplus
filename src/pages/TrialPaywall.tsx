@@ -1,236 +1,221 @@
+// src/pages/TrialPaywall.tsx
 import { useEffect, useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { AlertTriangle, Clock, CreditCard, Info } from "lucide-react";
+import { Navigate, useNavigate } from "react-router-dom";
+import { AlertTriangle, ArrowRight, Check, Loader2 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
+import { loadStripe } from "@stripe/stripe-js";
+import { toast } from "sonner";
+import { useOffers } from '@/hooks/useOffers';
+import { Badge } from "@/components/ui/badge";
+import { useCheckout } from "@/components/offers/useCheckout";
+// ----- ENV -----
+const PRICE_MONTHLY_STARTER = import.meta.env.VITE_STRIPE_PRICE_MONTHLY_STARTER as string;
+const PRICE_MONTHLY_STANDARD = import.meta.env.VITE_STRIPE_PRICE_MONTHLY_STANDARD as string;
+const PRICE_MONTHLY_PREMIUM = import.meta.env.VITE_STRIPE_PRICE_MONTHLY_PREMIUM as string;
 
-type ProfileLite = {
-  trial_end_date: string | null; // "YYYY-MM-DD" recommandé en DB (DATE)
-  role: string | null;
-};
-
-const ENABLE_AUTO_REDIRECT_IF_EXPIRED = false; // passe à true si tu veux rediriger vers Stripe automatiquement quand expiré
-
-function toDateOnly(d: Date) {
-  // retourne "YYYY-MM-DD" en UTC (parfait pour comparer des dates-calendrier)
-  return d.toISOString().split("T")[0];
-}
-
-export default function TrialPaywall() {
-  const { user, profile: ctxProfile, loading: authLoading } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  // État local uniquement si le contexte n'apporte pas ce qu'il faut
-  const [fetchedProfile, setFetchedProfile] = useState<ProfileLite | null>(null);
-  const [loadingProfile, setLoadingProfile] = useState(false);
-  const [redirecting, setRedirecting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Modes debug: ?debugTrial=expired|today|active
-  const params = new URLSearchParams(location.search);
-  const debugMode = params.get("debugTrial"); // 'expired' | 'today' | 'active' | null
-
-  // ----- Chargement profil (fallback si pas dans le contexte) -----
-  useEffect(() => {
-    let cancelled = false;
-
-    const needFetch =
-      !!user &&
-      (!ctxProfile || ctxProfile.trial_end_date == null || ctxProfile.role == null);
-
-    if (!needFetch) {
-      setFetchedProfile(null); // on s'appuie sur le contexte
-      return;
-    }
-
-    (async () => {
-      try {
-        setLoadingProfile(true);
-        setError(null);
-        // ⚠️ mets le bon nom de table: 'profile' ou 'profiles'
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("trial_end_date, role")
-          .eq("user_id", user!.id) // FK vers auth.users.id
-          .maybeSingle();
-
-        if (cancelled) return;
-
-        if (error) {
-          setError(error.message);
-          setFetchedProfile(null);
-        } else {
-          setFetchedProfile((data as ProfileLite) ?? { trial_end_date: null, role: null });
-        }
-      } finally {
-        if (!cancelled) setLoadingProfile(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [user, ctxProfile]);
-
-  // Profil effectif (contexte prioritaire)
-  const effectiveProfile: ProfileLite | null = ctxProfile
-    ? { trial_end_date: ctxProfile.trial_end_date ?? null, role: (ctxProfile as any).role ?? null }
-    : fetchedProfile;
-
-  // ----- Dates / règles métier -----
-  const todayStr = useMemo(() => toDateOnly(new Date()), []);
-  const trialEndStr = useMemo(() => {
-    // 1) Debug via querystring
-    if (debugMode === "expired") {
-      const d = new Date();
-      d.setDate(d.getDate() - 1);
-      return toDateOnly(d);
-    }
-    if (debugMode === "today") {
-      return todayStr;
-    }
-    if (debugMode === "active") {
-      const d = new Date();
-      d.setDate(d.getDate() + 7);
-      return toDateOnly(d);
-    }
-
-    // 2) Profil (DB)
-    if (effectiveProfile?.trial_end_date) {
-      // Si c'est déjà au format "YYYY-MM-DD", c'est idempotent
-      return toDateOnly(new Date(effectiveProfile.trial_end_date));
-    }
-
-    // 3) Fallback doux: si pas de date en DB, on suppose 14j après création du compte
-    if (user?.created_at) {
-      const end = new Date(user.created_at);
-      end.setDate(end.getDate() + 14);
-      return toDateOnly(end);
-    }
-
+// Utilitaire: parse une date 'YYYY-MM-DD' ou ISO en ms (début de journée locale)
+function parseDateOnlyMs(d: string | null | undefined): number | null {
+  if (!d) return null;
+  try {
+    // Support à la fois 'YYYY-MM-DD' et ISO string
+    const date = d.length <= 10 ? new Date(`${d}T00:00:00`) : new Date(d);
+    if (isNaN(date.getTime())) return null;
+    // début de journée
+    date.setHours(0, 0, 0, 0);
+    return date.getTime();
+  } catch {
     return null;
-  }, [debugMode, effectiveProfile?.trial_end_date, user?.created_at, todayStr]);
-
-  const isEndingToday = !!trialEndStr && trialEndStr === todayStr;
-  // Ta règle App => paywall quand trial_end_date >= today.
-  // Ici on veut distinguer l'affichage:
-  // - expiré: trial_end < today
-  // - dernier jour: trial_end === today
-  // - actif: trial_end > today
-  const isExpired = trialEndStr ? trialEndStr < todayStr : false;
-
-  // ----- Auto-redirect Stripe si expiré (optionnel) -----
-  useEffect(() => {
-    if (!ENABLE_AUTO_REDIRECT_IF_EXPIRED) return;
-    if (authLoading || loadingProfile) return;
-    if (!user) return;
-    if (!isExpired) return;
-
-    void handleCheckout();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, loadingProfile, user, isExpired]);
-
-  async function handleCheckout() {
-    try {
-      setRedirecting(true);
-      setError(null);
-
-      // ⇩ remplace par ton endpoint (edge function / API route)
-      const res = await fetch("/api/stripe/create-checkout-session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerEmail: user?.email, userId: user?.id }),
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || "Échec de la création de la session de paiement");
-      }
-      const { url } = (await res.json()) as { url?: string };
-      if (!url) throw new Error("URL de paiement manquante");
-      window.location.href = url;
-    } catch (e: any) {
-      setRedirecting(false);
-      setError(e?.message ?? "Erreur inconnue pendant la redirection Stripe");
-    }
   }
+}
+export default function TrialPaywall() {
+  const navigate = useNavigate();
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const { start, pending, errorMsg, setErrorMsg } = useCheckout();
+  const { data: offers = [], isLoading, error } = useOffers();
+  console.log("Offers from useOffers:", offers, isLoading, error);
+  // ----------------- Auth / Contexte -----------------
+  const { user, initialized, loading, profile, subscription } = useAuth();
 
-  // ----- Rendu -----
-  if (authLoading || loadingProfile) {
+  const handleSubscribe = async (offerId: string, priceId: string) => {
+    setLoadingId(offerId);
+    await start(priceId);
+    setLoadingId(null);
+  };
+
+  // ----------------- Dérivés / Mémos -----------------
+  // Normalisation du statut d’abonnement (certains schémas => subscription_status, d’autres => status)
+  const subAny = subscription as any;
+  const subStatus: string = (subAny?.subscription_status ?? subAny?.status ?? "").toLowerCase();
+  const isSubscribed = subStatus === "active" || subStatus === "trialing" || subStatus === "past_due";
+
+  // Fin d’essai : profile.trial_end_date (string ou null)
+  const trialEndMs = useMemo(() => parseDateOnlyMs((profile as any)?.trial_end_date ?? null), [profile]);
+  const todayStartMs = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }, []);
+  const trialValid = trialEndMs !== null && trialEndMs > todayStartMs;
+
+  // Décision d’accès: si pas abonné ET pas d’essai valide => paywall
+  const mustPay = !isSubscribed && !trialValid;
+
+  // ----------------- Effets (ORDRE AVANT LES RETURNS !) -----------------
+  // Si on est déjà autorisé (abonné ou essai valide), on n’a rien à faire ici → go /app
+  useEffect(() => {
+    if (initialized && !loading && user && !mustPay) {
+      navigate("/app", { replace: true });
+    }
+  }, [initialized, loading, user, mustPay, navigate]);
+  if (!user) {
+    // Pas connecté → login
+    return <Navigate to="/login" replace />;
+  }
+  // ----------------- Early-returns APRÈS les hooks -----------------
+  if (!initialized) {
+    // Pendant l’hydratation initiale uniquement — pas sur les chargements de fond
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">Vérification de votre période d’essai…</div>
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="text-sm text-muted-foreground">Chargement…</div>
       </div>
     );
   }
 
-  // (On ne redirige PAS vers /app ici pour éviter le ping-pong avec AuthenticatedApp)
-  // L'utilisateur reste sur le Paywall tant que tu l'y envoies depuis AuthenticatedApp.
+  if (!mustPay) {
+    // Accès autorisé (abonné ou essai encore valide) → rien à voir sur cette page
+    return null;
+  }
 
-  const prettyDate = trialEndStr ? new Date(trialEndStr).toLocaleDateString() : "Non définie";
-  const title = isExpired
-    ? "Votre période d’essai est terminée"
-    : isEndingToday
-    ? "Votre période d’essai se termine aujourd’hui"
-    : "Votre période d’essai est en cours";
-  const description = isExpired
-    ? "Pour continuer à utiliser l’application, passez au plan payant."
-    : isEndingToday
-    ? "Dernier jour d’essai — souscrivez maintenant pour éviter toute coupure."
-    : "Profitez de votre essai et souscrivez pour ne rien perdre à l’échéance.";
+  // ----------------- UI -----------------
+  const trialText = trialEndMs
+    ? new Date(trialEndMs).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })
+    : null;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-lg">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            {isExpired ? <AlertTriangle className="h-6 w-6" /> : <Info className="h-6 w-6" />}
-            <div>
-              <CardTitle>{title}</CardTitle>
-              <CardDescription>{description}</CardDescription>
-            </div>
+    <div className="min-h-screen bg-gradient-surface py-12">
+      <div className="container mx-auto px-6">
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-bold text-foreground mb-4">
+            Abonnez-vous à BailloGenius
+          </h1>
+          <div className="mx-auto max-w-2xl p-6">
+            <Card className="border-emerald-700/20 bg-emerald-700/5">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-emerald-700" />
+                  <CardTitle className="text-emerald-900">Accès restreint</CardTitle>
+                </div>
+                <CardDescription>
+                  Ton essai gratuit est terminé, ou aucune formule active n’a été trouvée sur ce compte.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            {errorMsg && (
+              <div className="mt-6 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                {errorMsg}
+              </div>
+            )}
           </div>
-        </CardHeader>
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            Choisissez l’offre qui correspond à votre gestion locative
+          </p>
+        </div>
 
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Clock className="h-4 w-4" />
-            <span>
-              Date de fin d’essai : <strong className="ml-1">{prettyDate}</strong>
-            </span>
-          </div>
+        {/* 👉 ici seulement on map les offres */}
+        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto">
+          {offers.map((offer) => {
+            const isPopular = !!offer.popular;
+            const priceId =
+              offer.name === "Starter"
+                ? PRICE_MONTHLY_STARTER
+                : offer.name === "Standard"
+                  ? PRICE_MONTHLY_STANDARD
+                  : offer.name === "Premium"
+                    ? PRICE_MONTHLY_PREMIUM
+                    : PRICE_MONTHLY_STARTER;
 
-          {error && (
-            <div className="text-sm text-destructive border border-destructive/40 rounded-md p-2">
-              {error}
-            </div>
-          )}
+            return (
+              <Card
+                key={offer.id}
+                className={[
+                  "relative p-6 transition-all duration-200 hover:shadow-lg",
+                  isPopular ? "ring-2 ring-primary shadow-lg" : "border",
+                ].join(" ")}
+              >
+                {isPopular && (
+                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary">
+                    Offre recommandée
+                  </Badge>
+                )}
 
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Button className="w-full sm:w-auto" onClick={handleCheckout} disabled={redirecting}>
-              <CreditCard className="mr-2 h-4 w-4" />
-              {redirecting ? "Redirection vers Stripe…" : isExpired ? "Passer au paiement" : "Souscrire maintenant"}
-            </Button>
-            <Button
-              variant="secondary"
-              className="w-full sm:w-auto"
-              onClick={() => navigate("/app")}
-              disabled={redirecting}
+                <CardHeader className="pb-6 text-center">
+                  <CardTitle className="text-3xl">{offer.name}</CardTitle>
+                  <CardDescription className="text-base">{offer.description}</CardDescription>
+                  <div className="pt-4">
+                    <div className="text-5xl font-bold text-foreground">{offer.price}</div>
+                    <div className="text-muted-foreground text-lg">
+                      {offer.period ?? "/mois"}
+                    </div>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="space-y-6">
+                  <div className="text-center text-sm text-muted-foreground">
+                    {offer.max_properties}
+                  </div>
+
+                  <ul className="space-y-3">
+                    {(offer.features ?? []).map((feature, index) => (
+                      <li key={index} className="flex items-start gap-3">
+                        <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                        <span className="text-sm">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <Button
+                    className="w-full text-lg py-6"
+                    onClick={() => handleSubscribe(String(offer.id), priceId)}
+                    disabled={loadingId === String(offer.id)}
+                    size="lg"
+                  >
+                    {loadingId === String(offer.id) ? (
+                      <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                        Redirection vers Stripe...
+                      </>
+                    ) : (
+                      <>
+                        S&apos;abonner maintenant
+                        <ArrowRight className="ml-2 h-5 w-5" />
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+
+        <div className="text-center mt-12">
+          <p className="text-sm text-muted-foreground mb-4">
+            Paiement sécurisé par Stripe • Annulation possible à tout moment
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Questions ? Contactez-nous à{" "}
+            <a
+              href="mailto:contact@bailogenius.fr"
+              className="text-primary hover:underline"
             >
-              Retour à l’accueil
-            </Button>
-          </div>
-
-          {debugMode && (
-            <p className="text-xs text-muted-foreground">
-              Mode test actif (<code>debugTrial={debugMode}</code>). Retirez ce paramètre pour le comportement réel.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+              contact@bailogenius.fr
+            </a>
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
