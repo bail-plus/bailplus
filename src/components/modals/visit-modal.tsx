@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -24,7 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "sonner"
 import { Calendar } from "lucide-react"
-import { mockData } from "@/lib/supabase"
+import { supabase } from "@/integrations/supabase/client"
 
 const visitSchema = z.object({
   unitId: z.string().min(1, "Veuillez sélectionner un bien"),
@@ -35,7 +35,6 @@ const visitSchema = z.object({
   visitTime: z.string().min(1, "L'heure est requise"),
   notes: z.string().optional(),
 })
-
 type VisitForm = z.infer<typeof visitSchema>
 
 interface VisitModalProps {
@@ -44,8 +43,12 @@ interface VisitModalProps {
   onSuccess?: () => void
 }
 
+type PropertyRow = { id: string; name: string | null; address: string | null }
+
 export function VisitModal({ open, onOpenChange, onSuccess }: VisitModalProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const [loadingProps, setLoadingProps] = useState(false)
+  const [properties, setProperties] = useState<PropertyRow[]>([])
 
   const form = useForm<VisitForm>({
     resolver: zodResolver(visitSchema),
@@ -60,37 +63,75 @@ export function VisitModal({ open, onOpenChange, onSuccess }: VisitModalProps) {
     },
   })
 
+  // Charger les biens depuis Supabase
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        setLoadingProps(true)
+        const { data } = await supabase
+          .from("properties")
+          .select("id,name,address")
+          .returns<PropertyRow[]>()
+          .throwOnError()
+
+        if (!cancelled) setProperties(data ?? [])
+      } catch (e) {
+        console.error("Erreur chargement propriétés (visites)", e)
+        if (!cancelled) setProperties([])
+      } finally {
+        if (!cancelled) setLoadingProps(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  // Options "biens"
+  const availableUnits = useMemo(() => {
+    return properties.map(p => ({
+      value: String(p.id),
+      label: [p.name ?? undefined, p.address ?? undefined].filter(Boolean).join(" — ") || `Bien ${p.id}`,
+    }))
+  }, [properties])
+
+  // Créneaux horaires 08:00 → 19:00 par pas de 30 min
+  const timeSlots = useMemo(() => {
+    const slots: { value: string; label: string }[] = []
+    for (let hour = 8; hour <= 19; hour++) {
+      for (const minute of [0, 30]) {
+        const t = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`
+        slots.push({ value: t, label: t })
+      }
+    }
+    return slots
+  }, [])
+
   async function onSubmit(values: VisitForm) {
     setIsLoading(true)
     try {
-      // Mock API call - replace with actual Supabase call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      console.log('Creating visit:', values)
+      // 👉 Remplace par ton insertion Supabase si tu as la table (ex. "visits"):
+      // const { error } = await supabase.from("visits").insert({
+      //   unit_id: values.unitId,
+      //   visitor_name: values.visitorName,
+      //   visitor_email: values.visitorEmail || null,
+      //   visitor_phone: values.visitorPhone,
+      //   visit_date: values.visitDate, // "YYYY-MM-DD"
+      //   visit_time: values.visitTime, // "HH:mm"
+      //   notes: values.notes || null,
+      // })
+      // if (error) throw error
+
+      await new Promise(resolve => setTimeout(resolve, 600)) // mock
+
       toast.success("Visite programmée avec succès")
-      
       form.reset()
       onOpenChange(false)
       onSuccess?.()
     } catch (error) {
-      console.error('Error creating visit:', error)
+      console.error("Error creating visit:", error)
       toast.error("Erreur lors de la programmation de la visite")
     } finally {
       setIsLoading(false)
-    }
-  }
-
-  const availableUnits = mockData.properties.map(property => ({
-    value: property.id,
-    label: `${property.label} (${property.surface}m²)`
-  }))
-
-  // Generate time slots from 8:00 to 19:00
-  const timeSlots = []
-  for (let hour = 8; hour <= 19; hour++) {
-    for (let minute of [0, 30]) {
-      const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`
-      timeSlots.push({ value: time, label: time })
     }
   }
 
@@ -102,23 +143,22 @@ export function VisitModal({ open, onOpenChange, onSuccess }: VisitModalProps) {
             <Calendar className="w-5 h-5" />
             Nouvelle visite
           </DialogTitle>
-          <DialogDescription>
-            Programmez une visite pour un bien immobilier
-          </DialogDescription>
+          <DialogDescription>Programmez une visite pour un bien immobilier</DialogDescription>
         </DialogHeader>
-        
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Bien à visiter */}
             <FormField
               control={form.control}
               name="unitId"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Bien à visiter</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionnez un bien" />
+                      <SelectTrigger disabled={loadingProps}>
+                        <SelectValue placeholder={loadingProps ? "Chargement..." : "Sélectionnez un bien"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -134,6 +174,7 @@ export function VisitModal({ open, onOpenChange, onSuccess }: VisitModalProps) {
               )}
             />
 
+            {/* Nom visiteur */}
             <FormField
               control={form.control}
               name="visitorName"
@@ -148,6 +189,7 @@ export function VisitModal({ open, onOpenChange, onSuccess }: VisitModalProps) {
               )}
             />
 
+            {/* Email visiteur */}
             <FormField
               control={form.control}
               name="visitorEmail"
@@ -162,6 +204,7 @@ export function VisitModal({ open, onOpenChange, onSuccess }: VisitModalProps) {
               )}
             />
 
+            {/* Téléphone */}
             <FormField
               control={form.control}
               name="visitorPhone"
@@ -176,6 +219,7 @@ export function VisitModal({ open, onOpenChange, onSuccess }: VisitModalProps) {
               )}
             />
 
+            {/* Date & Heure */}
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -197,7 +241,7 @@ export function VisitModal({ open, onOpenChange, onSuccess }: VisitModalProps) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Heure</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Heure" />
@@ -217,6 +261,7 @@ export function VisitModal({ open, onOpenChange, onSuccess }: VisitModalProps) {
               />
             </div>
 
+            {/* Notes */}
             <FormField
               control={form.control}
               name="notes"
@@ -224,10 +269,10 @@ export function VisitModal({ open, onOpenChange, onSuccess }: VisitModalProps) {
                 <FormItem>
                   <FormLabel>Notes (optionnel)</FormLabel>
                   <FormControl>
-                    <Textarea 
-                      placeholder="Informations complémentaires..." 
+                    <Textarea
+                      placeholder="Informations complémentaires..."
                       className="min-h-[60px]"
-                      {...field} 
+                      {...field}
                     />
                   </FormControl>
                   <FormMessage />

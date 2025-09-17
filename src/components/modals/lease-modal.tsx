@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { FileText } from "lucide-react"
-import { mockData } from "@/lib/supabase"
+import { supabase } from "@/integrations/supabase/client"
 
 const leaseSchema = z.object({
   unitId: z.string().min(1, "Veuillez sélectionner un bien"),
@@ -42,8 +42,58 @@ interface LeaseModalProps {
   onSuccess?: () => void
 }
 
+type Option = { value: string; label: string }
+
 export function LeaseModal({ open, onOpenChange, onSuccess }: LeaseModalProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const [unitOptions, setUnitOptions] = useState<Option[]>([])
+  const [tenantOptions, setTenantOptions] = useState<Option[]>([])
+
+  useEffect(() => {
+    let cancelled = false
+      ; (async () => {
+        try {
+          // Properties / Units
+          const { data: props, error: eProps } = await supabase
+            .from("properties") // adapte si ta table s'appelle autrement
+            .select("id,label,name,surface")
+            .limit(500)
+          if (eProps) throw eProps
+
+          if (!cancelled) {
+            const opts: Option[] = (props ?? []).map((p: any) => ({
+              value: String(p.id),
+              label: `${p.label ?? p.name ?? `Bien ${p.id}`}${p.surface ? ` (${p.surface}m²)` : ""}`,
+            }))
+            setUnitOptions(opts)
+          }
+
+          // Tenants
+          const { data: people, error: ePeople } = await supabase
+            .from("profiles") // adapte si ta table est "contacts"
+            .select("id,first_name,last_name,kind,full_name")
+            .limit(1000)
+          if (ePeople) throw ePeople
+
+          if (!cancelled) {
+            const tenants: Option[] = (people ?? [])
+              .filter((p: any) => (p.kind ?? "").toUpperCase() === "TENANT" || !p.kind)
+              .map((p: any) => ({
+                value: String(p.id),
+                label: (p.full_name ?? `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim()) || `Personne ${p.id}`,
+              }))
+            setTenantOptions(tenants)
+          }
+        } catch (err) {
+          console.error("lease-modal options load error", err)
+          if (!cancelled) {
+            setUnitOptions([])
+            setTenantOptions([])
+          }
+        }
+      })()
+    return () => { cancelled = true }
+  }, [])
 
   const form = useForm<LeaseForm>({
     resolver: zodResolver(leaseSchema),
@@ -60,12 +110,10 @@ export function LeaseModal({ open, onOpenChange, onSuccess }: LeaseModalProps) {
   async function onSubmit(values: LeaseForm) {
     setIsLoading(true)
     try {
-      // Mock API call - replace with actual Supabase call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
+      // TODO: remplace par insertion Supabase
+      await new Promise(resolve => setTimeout(resolve, 600))
       console.log('Creating lease:', values)
       toast.success("Bail créé avec succès")
-      
       form.reset()
       onOpenChange(false)
       onSuccess?.()
@@ -76,18 +124,6 @@ export function LeaseModal({ open, onOpenChange, onSuccess }: LeaseModalProps) {
       setIsLoading(false)
     }
   }
-
-  const availableUnits = mockData.properties.map(property => ({
-    value: property.id,
-    label: `${property.label} (${property.surface}m²)`
-  }))
-
-  const availableTenants = mockData.people
-    .filter(person => person.kind === 'TENANT')
-    .map(person => ({
-      value: person.id,
-      label: `${person.firstName} ${person.lastName}`
-    }))
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -101,7 +137,7 @@ export function LeaseModal({ open, onOpenChange, onSuccess }: LeaseModalProps) {
             Créez un nouveau contrat de location
           </DialogDescription>
         </DialogHeader>
-        
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
@@ -110,16 +146,16 @@ export function LeaseModal({ open, onOpenChange, onSuccess }: LeaseModalProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Bien à louer</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Sélectionnez un bien" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {availableUnits.map((unit) => (
-                        <SelectItem key={unit.value} value={unit.value}>
-                          {unit.label}
+                      {unitOptions.map((u) => (
+                        <SelectItem key={u.value} value={u.value}>
+                          {u.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -135,16 +171,16 @@ export function LeaseModal({ open, onOpenChange, onSuccess }: LeaseModalProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Locataire</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Sélectionnez un locataire" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {availableTenants.map((tenant) => (
-                        <SelectItem key={tenant.value} value={tenant.value}>
-                          {tenant.label}
+                      {tenantOptions.map((t) => (
+                        <SelectItem key={t.value} value={t.value}>
+                          {t.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -176,12 +212,12 @@ export function LeaseModal({ open, onOpenChange, onSuccess }: LeaseModalProps) {
                   <FormItem>
                     <FormLabel>Loyer HC (€)</FormLabel>
                     <FormControl>
-                     <Input 
-                       type="number" 
-                       placeholder="1200" 
-                       {...field}
-                       onChange={(e) => field.onChange(Number(e.target.value))}
-                     />
+                      <Input
+                        type="number"
+                        placeholder="1200"
+                        {...field}
+                        onChange={(e) => field.onChange(Number(e.target.value) || 0)}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -195,12 +231,12 @@ export function LeaseModal({ open, onOpenChange, onSuccess }: LeaseModalProps) {
                   <FormItem>
                     <FormLabel>Charges (€)</FormLabel>
                     <FormControl>
-                     <Input 
-                       type="number" 
-                       placeholder="200" 
-                       {...field}
-                       onChange={(e) => field.onChange(Number(e.target.value))}
-                     />
+                      <Input
+                        type="number"
+                        placeholder="200"
+                        {...field}
+                        onChange={(e) => field.onChange(Number(e.target.value) || 0)}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -215,12 +251,12 @@ export function LeaseModal({ open, onOpenChange, onSuccess }: LeaseModalProps) {
                 <FormItem>
                   <FormLabel>Dépôt de garantie (€)</FormLabel>
                   <FormControl>
-                     <Input 
-                       type="number" 
-                       placeholder="1200" 
-                       {...field}
-                       onChange={(e) => field.onChange(Number(e.target.value))}
-                     />
+                    <Input
+                      type="number"
+                      placeholder="1200"
+                      {...field}
+                      onChange={(e) => field.onChange(Number(e.target.value) || 0)}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
