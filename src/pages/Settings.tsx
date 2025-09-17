@@ -22,7 +22,7 @@ const MOCK_ORGANIZATIONS = [
     activeLeases: 2
   },
   {
-    id: "2", 
+    id: "2",
     name: "SCI Demo",
     type: "SCI",
     isDefault: false,
@@ -111,7 +111,7 @@ export default function Settings() {
                 Gérez vos entités personnelles et SCI
               </p>
             </div>
-            
+
             <Dialog>
               <DialogTrigger asChild>
                 <Button className="gap-2">
@@ -128,7 +128,7 @@ export default function Settings() {
                     <Label htmlFor="entity-name">Nom de l'entité</Label>
                     <Input id="entity-name" placeholder="Ex: SCI Investissement" />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="entity-type">Type</Label>
                     <Select>
@@ -141,7 +141,7 @@ export default function Settings() {
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   <div className="flex gap-2 pt-4">
                     <Button>Créer</Button>
                     <Button variant="outline">Annuler</Button>
@@ -183,7 +183,7 @@ export default function Settings() {
                       <span className="font-medium">{org.activeLeases}</span>
                     </div>
                   </div>
-                  
+
                   <div className="flex gap-2 mt-4 pt-3 border-t">
                     <Button size="sm" variant="outline">
                       Modifier
@@ -209,7 +209,7 @@ export default function Settings() {
                 Gérez les accès et permissions
               </p>
             </div>
-            
+
             <Dialog>
               <DialogTrigger asChild>
                 <Button className="gap-2">
@@ -284,7 +284,7 @@ export default function Settings() {
                 Connexion aux banques et agrégation
               </p>
             </div>
-            
+
             <Dialog>
               <DialogTrigger asChild>
                 <Button className="gap-2">
@@ -454,8 +454,8 @@ export default function Settings() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="irl-base">Index IRL de référence</Label>
-                  <Input 
-                    id="irl-base" 
+                  <Input
+                    id="irl-base"
                     placeholder="Ex: 131.12"
                     defaultValue="131.12"
                   />
@@ -466,8 +466,8 @@ export default function Settings() {
 
                 <div className="space-y-2">
                   <Label htmlFor="irl-current">Index IRL actuel</Label>
-                  <Input 
-                    id="irl-current" 
+                  <Input
+                    id="irl-current"
                     placeholder="Ex: 134.48"
                     defaultValue="134.48"
                   />
@@ -489,8 +489,8 @@ export default function Settings() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="rent-ref">Loyer de référence (€/m²)</Label>
-                  <Input 
-                    id="rent-ref" 
+                  <Input
+                    id="rent-ref"
                     placeholder="Ex: 25.50"
                     defaultValue="25.50"
                   />
@@ -498,8 +498,8 @@ export default function Settings() {
 
                 <div className="space-y-2">
                   <Label htmlFor="rent-major">Loyer majoré (+20%)</Label>
-                  <Input 
-                    id="rent-major" 
+                  <Input
+                    id="rent-major"
                     placeholder="Calculé automatiquement"
                     value="30.60"
                     disabled
@@ -508,8 +508,8 @@ export default function Settings() {
 
                 <div className="space-y-2">
                   <Label htmlFor="rent-minor">Loyer minoré (-30%)</Label>
-                  <Input 
-                    id="rent-minor" 
+                  <Input
+                    id="rent-minor"
                     placeholder="Calculé automatiquement"
                     value="17.85"
                     disabled
@@ -562,13 +562,13 @@ export default function Settings() {
                 <div className="space-y-2">
                   <Label htmlFor="primary-color">Couleur principale</Label>
                   <div className="flex gap-2">
-                    <Input 
-                      id="primary-color" 
+                    <Input
+                      id="primary-color"
                       type="color"
                       defaultValue="#3b82f6"
                       className="w-20"
                     />
-                    <Input 
+                    <Input
                       placeholder="#3b82f6"
                       defaultValue="#3b82f6"
                       className="flex-1"
@@ -579,13 +579,13 @@ export default function Settings() {
                 <div className="space-y-2">
                   <Label htmlFor="secondary-color">Couleur secondaire</Label>
                   <div className="flex gap-2">
-                    <Input 
-                      id="secondary-color" 
+                    <Input
+                      id="secondary-color"
                       type="color"
                       defaultValue="#64748b"
                       className="w-20"
                     />
-                    <Input 
+                    <Input
                       placeholder="#64748b"
                       defaultValue="#64748b"
                       className="flex-1"
@@ -602,7 +602,7 @@ export default function Settings() {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="org-name">Nom de l'organisation</Label>
-                  <Input 
+                  <Input
                     id="org-name"
                     defaultValue="Propriétaire Principal"
                   />
@@ -610,7 +610,7 @@ export default function Settings() {
 
                 <div className="space-y-2">
                   <Label htmlFor="org-address">Adresse</Label>
-                  <Textarea 
+                  <Textarea
                     id="org-address"
                     placeholder="Adresse complète..."
                     defaultValue="123 rue de la République&#10;75001 Paris"
@@ -620,7 +620,7 @@ export default function Settings() {
 
                 <div className="space-y-2">
                   <Label htmlFor="org-phone">Téléphone</Label>
-                  <Input 
+                  <Input
                     id="org-phone"
                     placeholder="01 23 45 67 89"
                     defaultValue="01 23 45 67 89"
@@ -629,7 +629,7 @@ export default function Settings() {
 
                 <div className="space-y-2">
                   <Label htmlFor="org-email">Email</Label>
-                  <Input 
+                  <Input
                     id="org-email"
                     type="email"
                     defaultValue="proprietaire@example.com"
@@ -647,7 +647,7 @@ export default function Settings() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="receipt-format">Format des quittances</Label>
-                  <Input 
+                  <Input
                     id="receipt-format"
                     placeholder="QUIT-YYYY-####"
                     defaultValue="QUIT-YYYY-####"
@@ -659,7 +659,7 @@ export default function Settings() {
 
                 <div className="space-y-2">
                   <Label htmlFor="lease-format">Format des baux</Label>
-                  <Input 
+                  <Input
                     id="lease-format"
                     placeholder="BAIL-YYYY-####"
                     defaultValue="BAIL-YYYY-####"
@@ -671,7 +671,7 @@ export default function Settings() {
 
                 <div className="space-y-2">
                   <Label htmlFor="ticket-format">Format des tickets</Label>
-                  <Input 
+                  <Input
                     id="ticket-format"
                     placeholder="TIC-YYYY-####"
                     defaultValue="TIC-YYYY-####"
@@ -706,12 +706,12 @@ export default function Settings() {
                 <p className="text-sm text-muted-foreground">
                   Conformément au RGPD, vous pouvez demander l'export de toutes vos données personnelles.
                 </p>
-                
+
                 <Button className="w-full gap-2">
                   <Download className="w-4 h-4" />
                   Télécharger mes données
                 </Button>
-                
+
                 <p className="text-xs text-muted-foreground">
                   L'export inclura : profil, biens, locataires, communications, documents
                 </p>
@@ -729,7 +729,7 @@ export default function Settings() {
                 <p className="text-sm text-muted-foreground">
                   La suppression de votre compte effacera définitivement toutes vos données.
                 </p>
-                
+
                 <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
                   <p className="text-sm text-destructive font-medium">
                     ⚠️ Cette action est irréversible
@@ -738,7 +738,7 @@ export default function Settings() {
                     Toutes vos données seront définitivement supprimées
                   </p>
                 </div>
-                
+
                 <Dialog>
                   <DialogTrigger asChild>
                     <Button variant="destructive" className="w-full">
@@ -783,7 +783,36 @@ export default function Settings() {
                     Accepté
                   </Badge>
                 </div>
-                
+
+                <div className="flex justify-between items-center p-3 bg-muted/20 rounded-lg">
+                  <div>
+                    <div className="font-medium text-sm">Ajout de locataires</div>
+                    <div className="text-xs text-muted-foreground">15/01/2024 à 15:45</div>
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    Traité
+                  </Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          {/* payments */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Payments</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center p-3 bg-muted/20 rounded-lg">
+                  <div>
+                    <div className="font-medium text-sm">Création du compte</div>
+                    <div className="text-xs text-muted-foreground">15/01/2024 à 14:30</div>
+                  </div>
+                  <Badge variant="outline" className="text-xs">
+                    Accepté
+                  </Badge>
+                </div>
+
                 <div className="flex justify-between items-center p-3 bg-muted/20 rounded-lg">
                   <div>
                     <div className="font-medium text-sm">Ajout de locataires</div>
