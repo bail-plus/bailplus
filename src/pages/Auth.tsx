@@ -67,7 +67,7 @@ export default function Auth() {
       trial.setDate(trial.getDate() + 8);
       const trial_end_date = trial.toISOString().slice(0, 10); // "YYYY-MM-DD"
 
-      console.log('[AUTH/UI] submit signUp', { email, hasPassword: password.length > 0, role, gender });
+      console.log('[AUTH/UI] submit signUp', { email, hasPassword: password.length > 0, role, gender, birthdate, phone_number, adress, city, postal_code, trial_end_date });
 
       const { error } = await signUp(
         email,

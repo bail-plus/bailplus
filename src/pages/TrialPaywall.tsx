@@ -1,57 +1,52 @@
 // src/pages/TrialPaywall.tsx
-import { useEffect, useMemo, useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowRight, Check, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
-import { loadStripe } from "@stripe/stripe-js";
-import { toast } from "sonner";
 import { useOffers } from '@/hooks/useOffers';
 import { Badge } from "@/components/ui/badge";
 import { useCheckout } from "@/components/offers/useCheckout";
+
 // ----- ENV -----
 const PRICE_MONTHLY_STARTER = import.meta.env.VITE_STRIPE_PRICE_MONTHLY_STARTER as string;
 const PRICE_MONTHLY_STANDARD = import.meta.env.VITE_STRIPE_PRICE_MONTHLY_STANDARD as string;
 const PRICE_MONTHLY_PREMIUM = import.meta.env.VITE_STRIPE_PRICE_MONTHLY_PREMIUM as string;
 
-// Utilitaire: parse une date 'YYYY-MM-DD' ou ISO en ms (début de journée locale)
 function parseDateOnlyMs(d: string | null | undefined): number | null {
   if (!d) return null;
   try {
-    // Support à la fois 'YYYY-MM-DD' et ISO string
     const date = d.length <= 10 ? new Date(`${d}T00:00:00`) : new Date(d);
     if (isNaN(date.getTime())) return null;
-    // début de journée
     date.setHours(0, 0, 0, 0);
     return date.getTime();
   } catch {
     return null;
   }
 }
+
 export default function TrialPaywall() {
-  const navigate = useNavigate();
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const { start, pending, errorMsg, setErrorMsg } = useCheckout();
-  const { data: offers = [], isLoading, error } = useOffers();
-  console.log("Offers from useOffers:", offers, isLoading, error);
+  const { data: offers = [], isLoading: offersLoading } = useOffers();
+
   // ----------------- Auth / Contexte -----------------
   const { user, initialized, loading, profile, subscription } = useAuth();
 
-  const handleSubscribe = async (offerId: string, priceId: string) => {
-    setLoadingId(offerId);
-    await start(priceId);
-    setLoadingId(null);
-  };
+  // 1) État "décidé" : on n’agit QUE quand tout est prêt
+  //    Si `subscription` est `undefined` pendant le fetch, on attend.
+  const authReady =
+    initialized &&
+    !loading &&
+    user !== null &&
+    // si ton hook met `null` quand pas d’abo, c’est ok ; on attend seulement l'undefined
+    typeof subscription !== "undefined";
 
-  // ----------------- Dérivés / Mémos -----------------
-  // Normalisation du statut d’abonnement (certains schémas => subscription_status, d’autres => status)
+  // 2) Derivés
   const subAny = subscription as any;
   const subStatus: string = (subAny?.subscription_status ?? subAny?.status ?? "").toLowerCase();
   const isSubscribed = subStatus === "active" || subStatus === "trialing" || subStatus === "past_due";
 
-  // Fin d’essai : profile.trial_end_date (string ou null)
   const trialEndMs = useMemo(() => parseDateOnlyMs((profile as any)?.trial_end_date ?? null), [profile]);
   const todayStartMs = useMemo(() => {
     const d = new Date();
@@ -60,23 +55,32 @@ export default function TrialPaywall() {
   }, []);
   const trialValid = trialEndMs !== null && trialEndMs > todayStartMs;
 
-  // Décision d’accès: si pas abonné ET pas d’essai valide => paywall
   const mustPay = !isSubscribed && !trialValid;
 
-  // ----------------- Effets (ORDRE AVANT LES RETURNS !) -----------------
-  // Si on est déjà autorisé (abonné ou essai valide), on n’a rien à faire ici → go /app
+  // 3) Sécuriser la navigation (une seule fois)
+  const redirected = useRef(false);
   useEffect(() => {
-    if (initialized && !loading && user && !mustPay) {
-      navigate("/app", { replace: true });
+    if (!authReady) return;
+    // Si l’accès est autorisé, on quitte cette page (mais une seule fois)
+    if (!mustPay && !redirected.current) {
+      redirected.current = true;
     }
-  }, [initialized, loading, user, mustPay, navigate]);
-  if (!user) {
-    // Pas connecté → login
-    return <Navigate to="/login" replace />;
-  }
-  // ----------------- Early-returns APRÈS les hooks -----------------
-  if (!initialized) {
-    // Pendant l’hydratation initiale uniquement — pas sur les chargements de fond
+  }, [authReady, mustPay]);
+
+  // 4) Handlers
+  const handleSubscribe = async (offerId: string, priceId: string) => {
+    if (!priceId) {
+      setErrorMsg("Configuration Stripe manquante (priceId).");
+      return;
+    }
+    setLoadingId(offerId);
+    await start(priceId); // doit faire window.location.href = data.url en succès
+    setLoadingId(null);
+  };
+
+  // ----------------- Early returns -----------------
+  // Tant qu’on n’a pas décidé (user/sub state instable), on n’affiche rien → pas de Navigate
+  if (!authReady) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
         <div className="text-sm text-muted-foreground">Chargement…</div>
@@ -85,7 +89,7 @@ export default function TrialPaywall() {
   }
 
   if (!mustPay) {
-    // Accès autorisé (abonné ou essai encore valide) → rien à voir sur cette page
+    // Accès autorisé → on ne rend rien ici, l'effet a déjà redirigé.
     return null;
   }
 
@@ -101,6 +105,7 @@ export default function TrialPaywall() {
           <h1 className="text-4xl font-bold text-foreground mb-4">
             Abonnez-vous à BailloGenius
           </h1>
+
           <div className="mx-auto max-w-2xl p-6">
             <Card className="border-emerald-700/20 bg-emerald-700/5">
               <CardHeader>
@@ -109,7 +114,9 @@ export default function TrialPaywall() {
                   <CardTitle className="text-emerald-900">Accès restreint</CardTitle>
                 </div>
                 <CardDescription>
-                  Ton essai gratuit est terminé, ou aucune formule active n’a été trouvée sur ce compte.
+                  {trialText
+                    ? `Ton essai gratuit se terminait le ${trialText}.`
+                    : `Ton essai gratuit est terminé, ou aucune formule active n’a été trouvée sur ce compte.`}
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -120,23 +127,31 @@ export default function TrialPaywall() {
               </div>
             )}
           </div>
+
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             Choisissez l’offre qui correspond à votre gestion locative
           </p>
         </div>
 
-        {/* 👉 ici seulement on map les offres */}
         <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto">
-          {offers.map((offer) => {
+          {(offersLoading ? [1, 2, 3] : offers).map((offer: any, idx: number) => {
+            if (offersLoading) {
+              return (
+                <Card key={`skeleton-${idx}`} className="p-6">
+                  <div className="animate-pulse h-6 w-32 bg-muted rounded mb-4" />
+                  <div className="animate-pulse h-4 w-48 bg-muted rounded mb-2" />
+                  <div className="animate-pulse h-8 w-24 bg-muted rounded my-6" />
+                  <div className="animate-pulse h-10 w-full bg-muted rounded" />
+                </Card>
+              );
+            }
+
             const isPopular = !!offer.popular;
             const priceId =
-              offer.name === "Starter"
-                ? PRICE_MONTHLY_STARTER
-                : offer.name === "Standard"
-                  ? PRICE_MONTHLY_STANDARD
-                  : offer.name === "Premium"
-                    ? PRICE_MONTHLY_PREMIUM
-                    : PRICE_MONTHLY_STARTER;
+              offer.name === "Starter" ? PRICE_MONTHLY_STARTER :
+                offer.name === "Standard" ? PRICE_MONTHLY_STANDARD :
+                  offer.name === "Premium" ? PRICE_MONTHLY_PREMIUM :
+                    PRICE_MONTHLY_STARTER;
 
             return (
               <Card
@@ -157,9 +172,7 @@ export default function TrialPaywall() {
                   <CardDescription className="text-base">{offer.description}</CardDescription>
                   <div className="pt-4">
                     <div className="text-5xl font-bold text-foreground">{offer.price}</div>
-                    <div className="text-muted-foreground text-lg">
-                      {offer.period ?? "/mois"}
-                    </div>
+                    <div className="text-muted-foreground text-lg">{offer.period ?? "/mois"}</div>
                   </div>
                 </CardHeader>
 
@@ -169,7 +182,7 @@ export default function TrialPaywall() {
                   </div>
 
                   <ul className="space-y-3">
-                    {(offer.features ?? []).map((feature, index) => (
+                    {(offer.features ?? []).map((feature: string, index: number) => (
                       <li key={index} className="flex items-start gap-3">
                         <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
                         <span className="text-sm">{feature}</span>
@@ -180,10 +193,10 @@ export default function TrialPaywall() {
                   <Button
                     className="w-full text-lg py-6"
                     onClick={() => handleSubscribe(String(offer.id), priceId)}
-                    disabled={loadingId === String(offer.id)}
+                    disabled={loadingId === String(offer.id) || pending}
                     size="lg"
                   >
-                    {loadingId === String(offer.id) ? (
+                    {loadingId === String(offer.id) || pending ? (
                       <>
                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                         Redirection vers Stripe...
@@ -207,10 +220,7 @@ export default function TrialPaywall() {
           </p>
           <p className="text-sm text-muted-foreground">
             Questions ? Contactez-nous à{" "}
-            <a
-              href="mailto:contact@bailogenius.fr"
-              className="text-primary hover:underline"
-            >
+            <a href="mailto:contact@bailogenius.fr" className="text-primary hover:underline">
               contact@bailogenius.fr
             </a>
           </p>

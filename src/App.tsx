@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import RequireAccess from "./components/routing/RequireAccess";
 
@@ -44,6 +44,7 @@ import Imprint from "./pages/marketing/legal/Imprint";
 // 404 pages
 import NotFound from "./pages/NotFound";
 import { MarketingLayout } from "./components/marketing/marketing-layout";
+import { useEffect, useRef } from "react";
 
 
 const queryClient = new QueryClient();
@@ -84,79 +85,73 @@ function DebugAuthPanel() {
 const AuthenticatedApp = () => {
   const { user, loading, initialized, profile, subscription } = useAuth();
   const location = useLocation();
-  console.log("trial end date (raw)", profile?.trial_end_date ?? null);
-  const trialEndRaw = profile?.trial_end_date ?? null; // "YYYY-MM-DD"
+  const navigate = useNavigate();
+  const navOnce = useRef(false);
 
-
-  const parseDateLocalMs = (s?: string | null) => s ? startOfDay(new Date(s)) : null;
-
-  // // ⚠️ Tu as dit de ne pas toucher au paywall : je ne change PAS la ligne suivante
-  // const shouldGoPaywall = trialEndMs !== null && trialEndMs >= todayMs;
-  console.log("!user", !user);
-  console.log("loading", loading);
-
-  console.log('[APP]', {
-    user: !!user,
-    loading,
-    initialized,
-    trialEnd: profile?.trial_end_date ?? null,
-    subStatus: subscription?.status ?? null,
-  });
-
-  // helpers
-  const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x.getTime(); };
+  // Helpers purs
+  const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0,0,0,0); return x.getTime(); };
   const parseDateOnlyMs = (s?: string | null) => {
     if (!s) return null;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d).setHours(0, 0, 0, 0); }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) { const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d).setHours(0,0,0,0); }
     const dt = new Date(s); return isNaN(dt.getTime()) ? null : startOfDay(dt);
   };
 
-  // ⚠️ normalisation pour tolérer plusieurs schémas
+  // 👉 gating minimal : on ne bloque que sur initialized
+  const appReady = initialized && !loading;
+
+  // Derivés "best effort"
   const subAny = subscription as any;
   const subStatus = (subAny?.subscription_status ?? subAny?.status ?? "").toLowerCase();
   const isSubscribed = subStatus === "active" || subStatus === "trialing" || subStatus === "past_due";
 
-  const trialRef = subAny?.trial_end ?? profile?.trial_end_date ?? null;
+  const trialRef   = subAny?.trial_end ?? profile?.trial_end_date ?? null;
   const trialEndMs = parseDateOnlyMs(trialRef);
   const trialValid = trialEndMs !== null && trialEndMs > startOfDay(new Date());
 
-  // 👉 décision d’accès
-  const mustPay = !isSubscribed && !trialValid;
+  // Si sub/profile sont inconnus (null/undefined), on ne décide pas => undefined
+  const mustPay: boolean | undefined =
+    typeof subAny === "undefined" && typeof profile === "undefined"
+      ? undefined
+      : (!isSubscribed && !trialValid);
 
-  // ✅ NE DÉCIDE QUE SI ON A AU MOINS UNE INFO FIABLE
-  const hasSubKnown = !!subAny && (typeof subAny.status !== "undefined" || typeof subAny.subscription_status !== "undefined");
-  const hasTrialKnown = typeof profile?.trial_end_date !== "undefined"; // false tant que profile pas hydraté
-  const decisionReady = hasSubKnown || hasTrialKnown;
+  // Navigation unique après stabilisation
+  useEffect(() => {
+    if (!appReady || navOnce.current) return;
 
-  console.log("[GATE]", { path: location.pathname, subStatus, isSubscribed, trialRef, trialEndMs, trialValid, mustPay, hasSubKnown, hasTrialKnown, decisionReady });
-
-
-
-  // spinners init
-  if (!initialized ) {
-    return <div className="min-h-screen flex items-center justify-center"><div className="text-center">Chargement...</div></div>;
-  }
-  if (!user) return <Auth />;
-  console.log("isSubscribed", isSubscribed);
-  console.log("trialEndMs", trialEndMs);
-  console.log("trialValid", trialValid);
-  console.log("mustPay", mustPay);
-  console.log("user", user.user_metadata );
-
-
-  // ⛔️ ne redirige que si la décision est prête
-  if (decisionReady) {
-    if (mustPay && location.pathname !== "/app/paywall") {
-      return <Navigate to="/app/paywall" replace />;
+    // 1) non connecté -> /auth (publique)
+    if (!user) {
+      if (location.pathname !== "/auth") {
+        navOnce.current = true;
+        navigate("/auth", { replace: true });
+      }
+      return;
     }
-    if (!mustPay && location.pathname === "/app/paywall") {
-      return <Navigate to="/app" replace />;
-    }
-  }
 
-  // if (shouldGoPaywall && location.pathname !== "/app/paywall") {
-  //   return <Navigate to="/app/paywall" replace />;
-  // }
+    // 2) connecté -> ne navigue que si décision claire
+    if (mustPay === true && location.pathname !== "/app/paywall") {
+      navOnce.current = true;
+      navigate("/app/paywall", { replace: true });
+      return;
+    }
+    if (mustPay === false && location.pathname === "/app/paywall") {
+      navOnce.current = true;
+      navigate("/app", { replace: true });
+      return;
+    }
+    // mustPay === undefined => on ne bouge pas (on laisse l'app se charger)
+  }, [appReady, user, mustPay, location.pathname, navigate]);
+
+  // 🔁 Important : quand l’URL change, on autorise une nouvelle navigation unique
+  useEffect(() => { navOnce.current = false; }, [location.pathname]);
+
+  // Spinner uniquement tant que initialized n’est pas terminé
+  if (!initialized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">Chargement…</div>
+      </div>
+    );
+  }
 
 
   return (
@@ -181,8 +176,7 @@ const AuthenticatedApp = () => {
 
         {/* Le paywall est en dehors du garde pour pouvoir y accéder */}
         <Route path="paywall" element={<TrialPaywall />} />
-
-        <Route path="auth" element={<Auth />} />
+        {/* <Route path="auth" element={<Auth />} /> */}
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Layout>
@@ -210,8 +204,16 @@ const App = () => (
             <Route path="/legal/imprint" element={<MarketingLayout><Imprint /></MarketingLayout>} />
             <Route path="offers" element={<MarketingLayout><Offers /></MarketingLayout>} />
 
-            {/* App routes (authenticated) */}
+            {/* ✅ Routes d'auth publiques au niveau racine */}
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+
+            {/* App (authenticated) */}
             <Route path="/app/*" element={<AuthenticatedApp />} />
+
+            {/* ✅ Catch-all racine */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
