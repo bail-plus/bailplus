@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Settings as SettingsIcon, Plus, Building, Users, CreditCard, FileText, Palette, Shield, Upload, Download } from "lucide-react"
+import SubscriptionPanel from "@/components/dashboard/settings/payment/SubscriptionPanel"
 
 const MOCK_ORGANIZATIONS = [
   {
@@ -797,34 +798,7 @@ export default function Settings() {
             </CardContent>
           </Card>
           {/* payments */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Payments</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center p-3 bg-muted/20 rounded-lg">
-                  <div>
-                    <div className="font-medium text-sm">Création du compte</div>
-                    <div className="text-xs text-muted-foreground">15/01/2024 à 14:30</div>
-                  </div>
-                  <Badge variant="outline" className="text-xs">
-                    Accepté
-                  </Badge>
-                </div>
-
-                <div className="flex justify-between items-center p-3 bg-muted/20 rounded-lg">
-                  <div>
-                    <div className="font-medium text-sm">Ajout de locataires</div>
-                    <div className="text-xs text-muted-foreground">15/01/2024 à 15:45</div>
-                  </div>
-                  <Badge variant="outline" className="text-xs">
-                    Traité
-                  </Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <SubscriptionPanel />
         </TabsContent>
       </Tabs>
     </div>
