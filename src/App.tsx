@@ -89,25 +89,26 @@ const AuthenticatedApp = () => {
   const navOnce = useRef(false);
 
   // Helpers purs
-  const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0,0,0,0); return x.getTime(); };
+  const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x.getTime(); };
   const parseDateOnlyMs = (s?: string | null) => {
     if (!s) return null;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) { const [y,m,d] = s.split("-").map(Number); return new Date(y, m-1, d).setHours(0,0,0,0); }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d).setHours(0, 0, 0, 0); }
     const dt = new Date(s); return isNaN(dt.getTime()) ? null : startOfDay(dt);
   };
 
   // 👉 gating minimal : on ne bloque que sur initialized
-  const appReady = initialized && !loading;
+  //const appReady = initialized && !loading;
+  const appReady = initialized;
 
   // Derivés "best effort"
   const subAny = subscription as any;
   const subStatus = (subAny?.subscription_status ?? subAny?.status ?? "").toLowerCase();
   const isSubscribed = subStatus === "active" || subStatus === "trialing" || subStatus === "past_due";
 
-  const trialRef   = subAny?.trial_end ?? profile?.trial_end_date ?? null;
+  const trialRef = subAny?.trial_end ?? profile?.trial_end_date ?? null;
   const trialEndMs = parseDateOnlyMs(trialRef);
   const trialValid = trialEndMs !== null && trialEndMs > startOfDay(new Date());
-
+  console.log('[APP] initialized:', initialized, 'loading:', loading, 'user:', user);
   // Si sub/profile sont inconnus (null/undefined), on ne décide pas => undefined
   const mustPay: boolean | undefined =
     typeof subAny === "undefined" && typeof profile === "undefined"

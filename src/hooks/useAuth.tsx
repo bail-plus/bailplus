@@ -146,7 +146,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionState | null>(null);
-  const [loading, setLoading] = useState(true);
+  //const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
 
@@ -237,14 +238,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   /** Rafraîchit uniquement le profil */
+  // const refreshProfile = async () => {
+  //   if (!user?.id) return;
+  //   setLoading(true);
+  //   try {
+  //     await fetchProfile(user.id);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
   const refreshProfile = async () => {
     if (!user?.id) return;
-    setLoading(true);
-    try {
-      await fetchProfile(user.id);
-    } finally {
-      setLoading(false);
-    }
+    await fetchProfile(user.id);
   };
 
   useEffect(() => {
@@ -266,15 +271,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setInitialized(true);
       }
 
+      // if (u?.id && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN')) {
+      //   setLoading(true);
+      //   try {
+      //     await upsertProfileFromUser(u);
+      //     await Promise.all([fetchProfile(u.id), loadSubscription(u.id)]);
+      //   } catch (e) {
+      //     console.error('auth hydrate error', e);
+      //   } finally {
+      //     setLoading(false);
+      //   }
+      // }
       if (u?.id && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN')) {
-        setLoading(true);
         try {
           await upsertProfileFromUser(u);
           await Promise.all([fetchProfile(u.id), loadSubscription(u.id)]);
         } catch (e) {
           console.error('auth hydrate error', e);
-        } finally {
-          setLoading(false);
         }
       }
 
@@ -288,7 +301,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // --- 2) Hydratation initiale (au cas où aucun event n'arrive tout de suite) ---
     (async () => {
       LG('init effect start → setLoading(true)');
-      setLoading(true);
+      //setLoading(true);
       try {
         const { data, error } = await supabase.auth.getSession();
         if (cancelled) return;
@@ -437,7 +450,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   //console.log('[AUTH] fetchProfile done', !!data);
 
   console.log('[AUTH] setLoading(false) init');
-
+  console.log('[AUTH] initialized:', initialized, 'loading:', loading, 'user:', user);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
