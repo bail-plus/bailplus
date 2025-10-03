@@ -547,6 +547,7 @@ export type Database = {
           tenant_id: string
           unit_id: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           charges_amount?: number | null
@@ -561,6 +562,7 @@ export type Database = {
           tenant_id: string
           unit_id: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           charges_amount?: number | null
@@ -575,6 +577,7 @@ export type Database = {
           tenant_id?: string
           unit_id?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -755,37 +758,35 @@ export type Database = {
       properties: {
         Row: {
           address: string
+          city: string | null
           created_at: string
-          entity_id: string | null
           id: string
           name: string
+          postal_code: string | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           address: string
+          city?: string | null
           created_at?: string
-          entity_id?: string | null
           id?: string
           name: string
+          postal_code?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           address?: string
+          city?: string | null
           created_at?: string
-          entity_id?: string | null
           id?: string
           name?: string
+          postal_code?: string | null
           updated_at?: string
+          user_id?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "properties_entity_id_fkey"
-            columns: ["entity_id"]
-            isOneToOne: false
-            referencedRelation: "entities"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       rent_invoices: {
         Row: {
