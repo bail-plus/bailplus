@@ -34,7 +34,7 @@ const items = [
   { title: "Accueil", url: "/app", icon: BarChart3 },
   { title: "Calendrier", url: "/app/calendar", icon: Calendar },
   { title: "Parc", url: "/app/properties", icon: Building2 },
-  { title: "Location", url: "/app/leasing", icon: UserCheck },
+  { title: "Baux", url: "/app/leases", icon: UserCheck },
   { title: "Personnes", url: "/app/people", icon: Users },
   { title: "Maintenance", url: "/app/maintenance", icon: Wrench },
   { title: "Comptabilité", url: "/app/accounting", icon: Calculator },

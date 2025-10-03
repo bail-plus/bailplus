@@ -45,17 +45,19 @@ async function fetchPropertiesWithUnits(): Promise<PropertyWithUnits[]> {
   if (propertiesError) throw new Error(propertiesError.message);
   if (!properties) return [];
 
-  // Get units count for each property
+  // Get units for each property
   const propertiesWithUnits = await Promise.all(
     properties.map(async (property) => {
-      const { count } = await supabase
+      const { data: units } = await supabase
         .from('units')
-        .select('*', { count: 'exact', head: true })
-        .eq('property_id', property.id);
+        .select('*')
+        .eq('property_id', property.id)
+        .order('unit_number', { ascending: true });
 
       return {
         ...property,
-        unitsCount: count ?? 0,
+        units: units ?? [],
+        unitsCount: units?.length ?? 0,
       };
     })
   );

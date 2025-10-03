@@ -12,7 +12,7 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Calendar from "./pages/Calendar";
 import Properties from "./pages/Properties";
-import Leasing from "./pages/Leasing";
+import Leases from "./pages/Leases";
 import LeaseDetail from "./pages/LeaseDetail";
 import People from "./pages/People";
 import Maintenance from "./pages/Maintenance";
@@ -163,7 +163,7 @@ const AuthenticatedApp = () => {
           <Route index element={<Index />} />
           <Route path="calendar" element={<Calendar />} />
           <Route path="properties" element={<Properties />} />
-          <Route path="leasing" element={<Leasing />} />
+          <Route path="leases" element={<Leases />} />
           <Route path="leases/:id" element={<LeaseDetail />} />
           <Route path="people" element={<People />} />
           <Route path="maintenance" element={<Maintenance />} />
