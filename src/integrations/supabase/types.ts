@@ -151,6 +151,42 @@ export type Database = {
         }
         Relationships: []
       }
+      contacts: {
+        Row: {
+          address: string | null
+          created_at: string
+          email: string | null
+          first_name: string | null
+          id: string
+          last_name: string | null
+          phone: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          phone?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          phone?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       deposits: {
         Row: {
           amount: number
@@ -403,6 +439,100 @@ export type Database = {
           },
         ]
       }
+      lease_guarantors: {
+        Row: {
+          created_at: string
+          guarantor_contact_id: string | null
+          id: number
+          lease_id: string | null
+          tenant_contact_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          guarantor_contact_id?: string | null
+          id?: number
+          lease_id?: string | null
+          tenant_contact_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          guarantor_contact_id?: string | null
+          id?: number
+          lease_id?: string | null
+          tenant_contact_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lease_guarantors_guarantor_contact_id_fkey"
+            columns: ["guarantor_contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lease_guarantors_lease_id_fkey"
+            columns: ["lease_id"]
+            isOneToOne: false
+            referencedRelation: "leases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lease_guarantors_tenant_contact_id_fkey"
+            columns: ["tenant_contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lease_tenants: {
+        Row: {
+          contact_id: string | null
+          created_at: string
+          id: string
+          lease_id: string | null
+          role: Database["public"]["Enums"]["role_lease_tenants_enum"] | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          contact_id?: string | null
+          created_at?: string
+          id?: string
+          lease_id?: string | null
+          role?: Database["public"]["Enums"]["role_lease_tenants_enum"] | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          contact_id?: string | null
+          created_at?: string
+          id?: string
+          lease_id?: string | null
+          role?: Database["public"]["Enums"]["role_lease_tenants_enum"] | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lease_tenants_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lease_tenants_lease_id_fkey"
+            columns: ["lease_id"]
+            isOneToOne: false
+            referencedRelation: "leases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leases: {
         Row: {
           charges_amount: number | null
@@ -451,7 +581,7 @@ export type Database = {
             foreignKeyName: "leases_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
-            referencedRelation: "tenants"
+            referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
           {
@@ -563,12 +693,12 @@ export type Database = {
           email: string | null
           entity_id: string | null
           first_name: string | null
-          gender: Database["public"]["Enums"]["gender"] | null
+          gender: Database["public"]["Enums"]["gender_enum"] | null
           id: string
           last_name: string | null
           phone_number: string | null
           postal_code: number | null
-          role: Database["public"]["Enums"]["user_role"] | null
+          role: Database["public"]["Enums"]["user_role_enum"] | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           subscription_status: string | null
@@ -585,12 +715,12 @@ export type Database = {
           email?: string | null
           entity_id?: string | null
           first_name?: string | null
-          gender?: Database["public"]["Enums"]["gender"] | null
+          gender?: Database["public"]["Enums"]["gender_enum"] | null
           id?: string
           last_name?: string | null
           phone_number?: string | null
           postal_code?: number | null
-          role?: Database["public"]["Enums"]["user_role"] | null
+          role?: Database["public"]["Enums"]["user_role_enum"] | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_status?: string | null
@@ -607,12 +737,12 @@ export type Database = {
           email?: string | null
           entity_id?: string | null
           first_name?: string | null
-          gender?: Database["public"]["Enums"]["gender"] | null
+          gender?: Database["public"]["Enums"]["gender_enum"] | null
           id?: string
           last_name?: string | null
           phone_number?: string | null
           postal_code?: number | null
-          role?: Database["public"]["Enums"]["user_role"] | null
+          role?: Database["public"]["Enums"]["user_role_enum"] | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_status?: string | null
@@ -716,7 +846,6 @@ export type Database = {
       subscriptions: {
         Row: {
           created_at: string
-          email: string
           id: string
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
@@ -725,13 +854,11 @@ export type Database = {
           subscription_start: string | null
           subscription_status: string | null
           subscription_tier: string | null
-          trial_end: string | null
           updated_at: string
           user_id: string | null
         }
         Insert: {
           created_at?: string
-          email: string
           id?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -740,13 +867,11 @@ export type Database = {
           subscription_start?: string | null
           subscription_status?: string | null
           subscription_tier?: string | null
-          trial_end?: string | null
           updated_at?: string
           user_id?: string | null
         }
         Update: {
           created_at?: string
-          email?: string
           id?: string
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
@@ -755,42 +880,8 @@ export type Database = {
           subscription_start?: string | null
           subscription_status?: string | null
           subscription_tier?: string | null
-          trial_end?: string | null
           updated_at?: string
           user_id?: string | null
-        }
-        Relationships: []
-      }
-      tenants: {
-        Row: {
-          address: string | null
-          created_at: string
-          email: string | null
-          first_name: string
-          id: string
-          last_name: string
-          phone: string | null
-          updated_at: string
-        }
-        Insert: {
-          address?: string | null
-          created_at?: string
-          email?: string | null
-          first_name: string
-          id?: string
-          last_name: string
-          phone?: string | null
-          updated_at?: string
-        }
-        Update: {
-          address?: string | null
-          created_at?: string
-          email?: string | null
-          first_name?: string
-          id?: string
-          last_name?: string
-          phone?: string | null
-          updated_at?: string
         }
         Relationships: []
       }
@@ -893,9 +984,10 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      gender: "male" | "female" | "other"
+      gender_enum: "male" | "female" | "other"
       period_enum: "/mois" | "/an"
-      user_role: "admin" | "user" | "trial"
+      role_lease_tenants_enum: "tenant" | "co-tenant"
+      user_role_enum: "admin" | "user" | "trial"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1023,9 +1115,10 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      gender: ["male", "female", "other"],
+      gender_enum: ["male", "female", "other"],
       period_enum: ["/mois", "/an"],
-      user_role: ["admin", "user", "trial"],
+      role_lease_tenants_enum: ["tenant", "co-tenant"],
+      user_role_enum: ["admin", "user", "trial"],
     },
   },
 } as const

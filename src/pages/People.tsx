@@ -1,58 +1,160 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Users, Plus, Search, Phone, Mail, MapPin, FileText, User, Wrench } from "lucide-react"
+import { Label } from "@/components/ui/label"
+import { Users, Plus, Search, Phone, Mail, MapPin, User, ShieldCheck, Edit, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/integrations/supabase/client"
+import {
+  useContactsWithLeaseInfo,
+  useCreateContact,
+  useUpdateContact,
+  useDeleteContact,
+  type ContactWithLeaseInfo,
+  type ContactInsert
+} from "@/hooks/useContacts"
 
 export default function People() {
   const [searchTerm, setSearchTerm] = useState("")
-  const [typeFilter, setTypeFilter] = useState("all")
-  const [selectedPerson, setSelectedPerson] = useState<any>(null)
-  const [tenants, setTenants] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [typeFilter, setTypeFilter] = useState<"all" | "tenant" | "guarantor">("all")
+  const [selectedPerson, setSelectedPerson] = useState<ContactWithLeaseInfo | null>(null)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [formData, setFormData] = useState<ContactInsert>({
+    first_name: "",
+    last_name: "",
+    email: "",
+    phone: "",
+    address: "",
+  })
+
   const { toast } = useToast()
+  const { data: contacts = [], isLoading, error } = useContactsWithLeaseInfo()
+  const createContact = useCreateContact()
+  const updateContact = useUpdateContact()
+  const deleteContact = useDeleteContact()
 
-  useEffect(() => {
-    loadTenants()
-  }, [])
+  const resetForm = () => {
+    setFormData({
+      first_name: "",
+      last_name: "",
+      email: "",
+      phone: "",
+      address: "",
+    })
+    setIsEditMode(false)
+    setSelectedPerson(null)
+  }
 
-  const loadTenants = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('tenants')
-        .select('*')
-      
-      if (error) throw error
-      setTenants(data || [])
-    } catch (error) {
-      console.error('Error loading tenants:', error)
+  const handleOpenDialog = () => {
+    resetForm()
+    setIsDialogOpen(true)
+  }
+
+  const handleEditPerson = (person: ContactWithLeaseInfo) => {
+    setFormData({
+      first_name: person.first_name,
+      last_name: person.last_name,
+      email: person.email ?? "",
+      phone: person.phone ?? "",
+      address: person.address ?? "",
+    })
+    setSelectedPerson(person)
+    setIsEditMode(true)
+    setIsDialogOpen(true)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!formData.first_name || !formData.last_name) {
       toast({
         title: "Erreur",
-        description: "Impossible de charger les personnes",
-        variant: "destructive"
+        description: "Le prénom et le nom sont requis",
+        variant: "destructive",
       })
-    } finally {
-      setLoading(false)
+      return
+    }
+
+    try {
+      if (isEditMode && selectedPerson) {
+        await updateContact.mutateAsync({
+          id: selectedPerson.id,
+          ...formData,
+        })
+        toast({
+          title: "Succès",
+          description: "Contact modifié avec succès",
+        })
+      } else {
+        await createContact.mutateAsync(formData)
+        toast({
+          title: "Succès",
+          description: "Contact créé avec succès",
+        })
+      }
+      setIsDialogOpen(false)
+      resetForm()
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Une erreur est survenue",
+        variant: "destructive",
+      })
     }
   }
 
-  const filteredPeople = tenants.filter(person => {
-    const matchesSearch = 
+  const handleDelete = async (id: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer ce contact ?")) return
+
+    try {
+      await deleteContact.mutateAsync(id)
+      toast({
+        title: "Succès",
+        description: "Contact supprimé avec succès",
+      })
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de supprimer le contact",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const filteredPeople = contacts.filter(person => {
+    const matchesSearch =
       person.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       person.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       person.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    
-    return matchesSearch
+
+    const matchesType = typeFilter === "all" || person.role === typeFilter ||
+      (typeFilter === "tenant" && person.role === "both") ||
+      (typeFilter === "guarantor" && person.role === "both")
+
+    return matchesSearch && matchesType
   })
 
-  if (loading) {
+  const tenantsCount = contacts.filter(p => p.role === "tenant" || p.role === "both").length
+  const guarantorsCount = contacts.filter(p => p.role === "guarantor" || p.role === "both").length
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <p className="text-destructive">Erreur lors du chargement des personnes</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-center min-h-[400px]">
@@ -65,21 +167,15 @@ export default function People() {
     )
   }
 
-  const getPersonTypeLabel = (type: string) => {
-    const types = {
-      TENANT: { label: "Locataire", icon: User, variant: "default" as const },
-      GUARANTOR: { label: "Garant", icon: User, variant: "secondary" as const },
-      VENDOR: { label: "Prestataire", icon: Wrench, variant: "outline" as const }
-    }
-    return types[type as keyof typeof types] || { label: type, icon: User, variant: "secondary" as const }
-  }
+  const getRoleBadge = (role?: 'tenant' | 'guarantor' | 'both') => {
+    if (!role) return null
 
-  const getStatusBadge = (status: string) => {
-    const variants = {
-      active: { label: "Actif", variant: "default" as const },
-      inactive: { label: "Inactif", variant: "secondary" as const }
+    const badges = {
+      tenant: { label: "Locataire", icon: User, variant: "default" as const },
+      guarantor: { label: "Garant", icon: ShieldCheck, variant: "secondary" as const },
+      both: { label: "Locataire & Garant", icon: User, variant: "outline" as const }
     }
-    return variants[status as keyof typeof variants] || { label: status, variant: "secondary" as const }
+    return badges[role]
   }
 
   return (
@@ -93,22 +189,79 @@ export default function People() {
           </p>
         </div>
         
-        <Dialog>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2">
+            <Button className="gap-2" onClick={handleOpenDialog}>
               <Plus className="w-4 h-4" />
               Nouvelle personne
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Ajouter une personne</DialogTitle>
+              <DialogTitle>
+                {isEditMode ? "Modifier la personne" : "Ajouter une personne"}
+              </DialogTitle>
             </DialogHeader>
-            <div className="space-y-4 pt-4">
-              <p className="text-sm text-muted-foreground">
-                Fonctionnalité en cours de développement
-              </p>
-            </div>
+            <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="first_name">Prénom *</Label>
+                  <Input
+                    id="first_name"
+                    value={formData.first_name}
+                    onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="last_name">Nom *</Label>
+                  <Input
+                    id="last_name"
+                    value={formData.last_name}
+                    onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={formData.email ?? ""}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="phone">Téléphone</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={formData.phone ?? ""}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="address">Adresse</Label>
+                <Input
+                  id="address"
+                  value={formData.address ?? ""}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                />
+              </div>
+
+              <div className="flex gap-2 pt-4">
+                <Button type="submit" className="flex-1" disabled={createContact.isPending || updateContact.isPending}>
+                  {isEditMode ? "Modifier" : "Créer"}
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  Annuler
+                </Button>
+              </div>
+            </form>
           </DialogContent>
         </Dialog>
       </div>
@@ -125,15 +278,14 @@ export default function People() {
           />
         </div>
         
-        <Select value={typeFilter} onValueChange={setTypeFilter}>
+        <Select value={typeFilter} onValueChange={(value: any) => setTypeFilter(value)}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Type" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tous</SelectItem>
-            <SelectItem value="TENANT">Locataires</SelectItem>
-            <SelectItem value="GUARANTOR">Garants</SelectItem>
-            <SelectItem value="VENDOR">Prestataires</SelectItem>
+            <SelectItem value="tenant">Locataires</SelectItem>
+            <SelectItem value="guarantor">Garants</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -146,7 +298,7 @@ export default function People() {
               <Users className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm font-medium">Total</span>
             </div>
-            <div className="text-2xl font-bold">{tenants.length}</div>
+            <div className="text-2xl font-bold">{contacts.length}</div>
           </CardContent>
         </Card>
         
@@ -156,27 +308,17 @@ export default function People() {
               <User className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm font-medium">Locataires</span>
             </div>
-            <div className="text-2xl font-bold">{tenants.length}</div>
+            <div className="text-2xl font-bold">{tenantsCount}</div>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-muted-foreground" />
+              <ShieldCheck className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm font-medium">Garants</span>
             </div>
-            <div className="text-2xl font-bold">0</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2">
-              <Wrench className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Prestataires</span>
-            </div>
-            <div className="text-2xl font-bold">0</div>
+            <div className="text-2xl font-bold">{guarantorsCount}</div>
           </CardContent>
         </Card>
       </div>
@@ -193,206 +335,102 @@ export default function People() {
                 <TableHead>Nom</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Contact</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead>Relation</TableHead>
-                <TableHead>Documents</TableHead>
-                <TableHead>Actions</TableHead>
+                <TableHead>Baux actifs</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredPeople.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
+                  <TableCell colSpan={5} className="text-center py-8">
                     <div className="text-center">
                       <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                       <h3 className="text-lg font-semibold mb-2">Aucune personne trouvée</h3>
                       <p className="text-muted-foreground">
-                        Vous n'avez pas encore ajouté de locataires ou autres personnes.
+                        Vous n'avez pas encore ajouté de locataires ou garants.
                       </p>
                     </div>
                   </TableCell>
                 </TableRow>
-              ) : filteredPeople.map((person) => {
-                
-                return (
-                  <TableRow 
-                    key={person.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => setSelectedPerson(person)}
-                  >
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">
-                          {person.first_name} {person.last_name}
-                        </div>
-                        <div className="text-sm text-muted-foreground flex items-center gap-1">
-                          <Mail className="w-3 h-3" />
-                          {person.email}
-                        </div>
-                      </div>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <Badge variant="default" className="gap-1">
-                        <User className="w-3 h-3" />
-                        Locataire
-                      </Badge>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <div className="text-sm">
-                        <div className="flex items-center gap-1">
-                          <Phone className="w-3 h-3" />
-                          {person.phone}
-                        </div>
-                        {person.address && (
-                          <div className="flex items-center gap-1 text-muted-foreground mt-1">
-                            <MapPin className="w-3 h-3" />
-                            {person.address}
+              ) : (
+                filteredPeople.map((person) => {
+                  const roleBadge = getRoleBadge(person.role);
+
+                  return (
+                    <TableRow key={person.id} className="hover:bg-muted/50">
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">
+                            {person.first_name} {person.last_name}
                           </div>
+                          {person.email && (
+                            <div className="text-sm text-muted-foreground flex items-center gap-1">
+                              <Mail className="w-3 h-3" />
+                              {person.email}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+
+                      <TableCell>
+                        {roleBadge && (
+                          <Badge variant={roleBadge.variant} className="gap-1">
+                            <roleBadge.icon className="w-3 h-3" />
+                            {roleBadge.label}
+                          </Badge>
                         )}
-                      </div>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <Badge variant="default">
-                        Actif
-                      </Badge>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <div className="text-sm text-muted-foreground">
-                        -
-                      </div>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <FileText className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">0</span>
-                      </div>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          toast({
-                            title: "Voir la personne",
-                            description: `${person.first_name} ${person.last_name}`
-                          })
-                        }}
-                      >
-                        Voir
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="text-sm">
+                          {person.phone && (
+                            <div className="flex items-center gap-1">
+                              <Phone className="w-3 h-3" />
+                              {person.phone}
+                            </div>
+                          )}
+                          {person.address && (
+                            <div className="flex items-center gap-1 text-muted-foreground mt-1">
+                              <MapPin className="w-3 h-3" />
+                              {person.address}
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="text-sm">
+                          {person.activeLeases ?? 0}
+                        </div>
+                      </TableCell>
+
+                      <TableCell className="text-right">
+                        <div className="flex gap-1 justify-end">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditPerson(person)}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDelete(person.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
 
-      {/* Person Detail Modal */}
-      {selectedPerson && (
-        <Dialog open={!!selectedPerson} onOpenChange={() => setSelectedPerson(null)}>
-          <DialogContent className="max-w-3xl">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <User className="w-5 h-5" />
-                {selectedPerson.firstName} {selectedPerson.lastName}
-              </DialogTitle>
-            </DialogHeader>
-            
-            <Tabs defaultValue="profile" className="mt-4">
-              <TabsList>
-                <TabsTrigger value="profile">Profil</TabsTrigger>
-                <TabsTrigger value="documents">Documents</TabsTrigger>
-                <TabsTrigger value="history">Historique</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="profile" className="space-y-4">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <span className="font-medium">Email:</span> {selectedPerson.email}
-                  </div>
-                  <div>
-                    <span className="font-medium">Téléphone:</span> {selectedPerson.phone}
-                  </div>
-                  <div className="col-span-2">
-                    <span className="font-medium">Adresse:</span> {selectedPerson.address}
-                  </div>
-                  <div>
-                    <span className="font-medium">Type:</span>
-                    <Badge variant="secondary" className="ml-2">
-                      {getPersonTypeLabel(selectedPerson.type).label}
-                    </Badge>
-                  </div>
-                  <div>
-                    <span className="font-medium">Statut:</span>
-                    <Badge variant="secondary" className="ml-2">
-                      {getStatusBadge(selectedPerson.status).label}
-                    </Badge>
-                  </div>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="documents" className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  {selectedPerson.documents} document(s) associé(s)
-                </p>
-                <div className="text-sm text-muted-foreground">
-                  Gestion des documents en cours de développement
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="history" className="space-y-4">
-                <div className="text-sm text-muted-foreground">
-                  Historique des interactions en cours de développement
-                </div>
-              </TabsContent>
-            </Tabs>
-            
-            <div className="flex gap-2 pt-4 border-t">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => toast({
-                  title: "Modifier la personne",
-                  description: `${selectedPerson.firstName} ${selectedPerson.lastName}`
-                })}
-              >
-                Modifier
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => toast({
-                  title: "Message envoyé",
-                  description: `Message envoyé à ${selectedPerson.firstName} ${selectedPerson.lastName}`
-                })}
-              >
-                Envoyer message
-              </Button>
-              {selectedPerson.type === "TENANT" && (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => toast({
-                    title: "Ticket créé",
-                    description: `Ticket créé pour ${selectedPerson.firstName} ${selectedPerson.lastName}`
-                  })}
-                >
-                  Créer ticket
-                </Button>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   )
 }
