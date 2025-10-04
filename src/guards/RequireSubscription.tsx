@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -31,9 +32,22 @@ const parseDateOnly = (s?: string | null): number | null => {
  */
 export function RequireSubscription() {
   const { profile, subscription, isReady } = useAuth();
+  const [forceReady, setForceReady] = useState(false);
+
+  // Timeout de sécurité : forcer le passage après 5 secondes
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (!isReady) {
+        console.warn('[GUARD/SUB] ⚠️ Forcing ready after timeout');
+        setForceReady(true);
+      }
+    }, 5000);
+
+    return () => clearTimeout(timeout);
+  }, [isReady]);
 
   // Attendre que le profil et l'abonnement soient complètement chargés
-  if (!isReady) {
+  if (!isReady && !forceReady) {
     console.log('[GUARD/SUB] Waiting for data to load... (isReady = false)');
     return (
       <div className="min-h-screen flex items-center justify-center">

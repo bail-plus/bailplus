@@ -286,12 +286,20 @@ export function useProfile() {
 
   return useQuery({
     queryKey: ['profile', user?.id],
-    queryFn: () => {
+    queryFn: async () => {
       console.log('[QUERY/PROFILE] Fetching profile for user:', user?.id);
-      return fetchProfile(user!.id);
+      try {
+        const data = await fetchProfile(user!.id);
+        console.log('[QUERY/PROFILE] ✅ Profile fetched successfully');
+        return data;
+      } catch (error) {
+        console.error('[QUERY/PROFILE] ❌ Error fetching profile:', error);
+        throw error;
+      }
     },
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
+    retry: 1, // Limiter les retry à 1 tentative
   });
 }
 
@@ -300,12 +308,20 @@ export function useSubscription() {
 
   return useQuery({
     queryKey: ['subscription', user?.id],
-    queryFn: () => {
+    queryFn: async () => {
       console.log('[QUERY/SUBSCRIPTION] Fetching subscription for user:', user?.id);
-      return fetchSubscription(user!.id);
+      try {
+        const data = await fetchSubscription(user!.id);
+        console.log('[QUERY/SUBSCRIPTION] ✅ Subscription fetched successfully:', data ? 'exists' : 'null');
+        return data;
+      } catch (error) {
+        console.error('[QUERY/SUBSCRIPTION] ❌ Error fetching subscription:', error);
+        throw error;
+      }
     },
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
+    retry: 1, // Limiter les retry à 1 tentative
   });
 }
 
@@ -356,10 +372,10 @@ export function useSignOut() {
 // Hook principal qui combine tout
 export function useAuth() {
   const { user, session, loading, initialized } = useAuthContext();
-  const { data: profile, isLoading: profileLoading } = useProfile();
-  const { data: subscription, isLoading: subscriptionLoading } = useSubscription();
+  const { data: profile, isLoading: profileLoading, error: profileError } = useProfile();
+  const { data: subscription, isLoading: subscriptionLoading, error: subscriptionError } = useSubscription();
 
-  // Le système est prêt quand tout est chargé
+  // Le système est prêt quand tout est chargé OU si une erreur est survenue (pour ne pas bloquer)
   const isReady = initialized && !profileLoading && !subscriptionLoading;
 
   const result = {
@@ -379,8 +395,10 @@ export function useAuth() {
     isReady,
     profile: !!profile,
     profileLoading,
+    profileError: profileError ? (profileError as any).message : null,
     subscription: !!subscription,
     subscriptionLoading,
+    subscriptionError: subscriptionError ? (subscriptionError as any).message : null,
     trial_end_date: profile?.trial_end_date,
     subscription_status: subscription?.subscription_status,
   });
