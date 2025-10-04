@@ -1,122 +1,422 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Calculator, Plus, Download, Upload, Euro, Receipt, FileText, TrendingUp, AlertCircle, CreditCard } from "lucide-react"
-import { supabase } from "@/integrations/supabase/client"
-import { BankConnectionModal } from "@/components/bank-connection-modal"
-import BatchReceiptGenerator from "@/components/batch-receipt-generator"
-import ExpenseManager from "@/components/expense-manager"
-import DepositManager from "@/components/deposit-manager"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { TrendingUp, TrendingDown, Wallet, Plus, Euro, Calendar, Building, Search, Edit, Trash2, FileText } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import {
+  useExpenses,
+  useRentInvoices,
+  useBankTransactions,
+  useCreateExpense,
+  useUpdateExpense,
+  useDeleteExpense,
+  useCreateBankTransaction,
+  useUpdateBankTransaction,
+  useDeleteBankTransaction,
+  type ExpenseWithDetails,
+  type ExpenseInsert,
+  type BankTransactionWithDetails,
+  type BankTransactionInsert,
+} from "@/hooks/useAccounting"
+import { usePropertiesWithUnits } from "@/hooks/useProperties"
+import { useQueryClient } from "@tanstack/react-query"
+import { supabase } from "@/integrations/supabase/client"
 
-interface RentInvoice {
-  id: string
-  lease_id: string
-  tenant_name?: string
-  property_name?: string
-  period_month: number
-  period_year: number
-  rent_amount: number
-  charges_amount: number
-  total_amount: number
-  status: string
-  due_date: string
-  paid_date?: string
-}
+const EXPENSE_CATEGORIES = [
+  { value: "MAINTENANCE", label: "Maintenance" },
+  { value: "TAXE", label: "Taxe" },
+  { value: "ASSURANCE", label: "Assurance" },
+  { value: "CHARGES", label: "Charges" },
+  { value: "TRAVAUX", label: "Travaux" },
+  { value: "AUTRE", label: "Autre" },
+]
 
-interface Expense {
-  id: string
-  description: string
-  category: string
-  amount: number
-  expense_date: string
-}
+const EXPENSE_STATUS = [
+  { value: "pending", label: "En attente" },
+  { value: "approved", label: "Approuvée" },
+  { value: "rejected", label: "Rejetée" },
+]
 
-interface Deposit {
-  id: string
-  lease_id: string
-  amount: number
-  status: string
-  created_at: string
-}
+const TRANSACTION_STATUS = [
+  { value: "PENDING", label: "En attente de rapprochement" },
+  { value: "MATCHED", label: "Rapprochée (validée)" },
+  { value: "UNMATCHED", label: "À catégoriser" },
+]
 
 export default function Accounting() {
-  const [activeTab, setActiveTab] = useState("receipts")
-  const [rentInvoices, setRentInvoices] = useState<RentInvoice[]>([])
-  const [expenses, setExpenses] = useState<Expense[]>([])
-  const [deposits, setDeposits] = useState<Deposit[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+  const [searchTerm, setSearchTerm] = useState("")
+  const [categoryFilter, setCategoryFilter] = useState("all")
+  const [periodFilter, setPeriodFilter] = useState("all")
+  const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false)
+  const [isTransactionDialogOpen, setIsTransactionDialogOpen] = useState(false)
+  const [isRevenueDialogOpen, setIsRevenueDialogOpen] = useState(false)
+  const [selectedExpense, setSelectedExpense] = useState<ExpenseWithDetails | null>(null)
+  const [selectedTransaction, setSelectedTransaction] = useState<BankTransactionWithDetails | null>(null)
+
+  const [expenseFormData, setExpenseFormData] = useState<ExpenseInsert>({
+    amount: 0,
+    description: "",
+    expense_date: new Date().toISOString().slice(0, 10),
+    category: "AUTRE",
+    status: "pending",
+    property_id: null,
+    unit_id: null,
+    invoice_file_url: null,
+  })
+
+  const [transactionFormData, setTransactionFormData] = useState<BankTransactionInsert>({
+    amount: 0,
+    label: "",
+    date: new Date().toISOString().slice(0, 10),
+    status: "PENDING",
+    matched_expense_id: null,
+    matched_rent_invoice_id: null,
+    match_score: null,
+  })
+  const [revenueFormData, setRevenueFormData] = useState<BankTransactionInsert>({
+    amount: 0,
+    label: "",
+    date: new Date().toISOString().slice(0, 10),
+    status: "MATCHED",
+    matched_expense_id: null,
+    matched_rent_invoice_id: null,
+    match_score: null,
+  })
+
   const { toast } = useToast()
+  const { data: expenses = [], isLoading: expensesLoading } = useExpenses()
+  const { data: rentInvoices = [], isLoading: invoicesLoading } = useRentInvoices()
+  const { data: transactions = [], isLoading: transactionsLoading } = useBankTransactions()
+  const { data: properties = [] } = usePropertiesWithUnits()
+  const createExpense = useCreateExpense()
+  const updateExpense = useUpdateExpense()
+  const deleteExpense = useDeleteExpense()
+  const createTransaction = useCreateBankTransaction()
+  const updateTransaction = useUpdateBankTransaction()
+  const deleteTransaction = useDeleteBankTransaction()
 
-  const loadAccountingData = useCallback(async () => {
-    try {
-      const [rentResult, expensesResult, depositsResult] = await Promise.all([
-        supabase.from('rent_invoices').select('*'),
-        supabase.from('expenses').select('*'), 
-        supabase.from('deposits').select('*')
-      ])
-
-      setRentInvoices(rentResult.data || [])
-      setExpenses(expensesResult.data || [])
-      setDeposits(depositsResult.data || [])
-    } catch (error) {
-      console.error('Error loading accounting data:', error)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
+  // Realtime refresh for rent invoices
   useEffect(() => {
-    loadAccountingData()
-  }, [loadAccountingData])
+    const channel = supabase
+      .channel('rent_invoices_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rent_invoices' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['rent-invoices'] })
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [queryClient])
 
-  const getStatusBadge = (status: string) => {
-    const statuses = {
-      PAID: { label: "Payé", variant: "default" as const },
-      DUE: { label: "Dû", variant: "secondary" as const },
-      OVERDUE: { label: "En retard", variant: "destructive" as const },
-      PARTIAL: { label: "Partiel", variant: "outline" as const },
-      HELD: { label: "Détenu", variant: "default" as const },
-      REFUNDED: { label: "Restitué", variant: "secondary" as const }
+  // Get units for selected property
+  const selectedProperty = properties.find(p => p.id === expenseFormData.property_id)
+  const availableUnits = selectedProperty?.units ?? []
+
+  // Calculate statistics
+  const stats = useMemo(() => {
+    // Revenus des loyers payés
+    const rentRevenue = rentInvoices
+      .filter(inv => inv.status === "paid")
+      .reduce((sum, inv) => sum + inv.total_amount, 0)
+
+    // Revenus des transactions bancaires (montant positif et statut MATCHED)
+    const transactionRevenue = transactions
+      .filter(t => t.amount > 0 && t.status === "MATCHED")
+      .reduce((sum, t) => sum + t.amount, 0)
+
+    const totalRevenue = rentRevenue + transactionRevenue
+
+    // Dépenses approuvées
+    const approvedExpenses = expenses
+      .filter(exp => exp.status === "approved")
+      .reduce((sum, exp) => sum + exp.amount, 0)
+
+    // Dépenses des transactions bancaires (montant négatif et statut MATCHED)
+    const transactionExpenses = transactions
+      .filter(t => t.amount < 0 && t.status === "MATCHED")
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+
+    const totalExpenses = approvedExpenses + transactionExpenses
+
+    const balance = totalRevenue - totalExpenses
+
+    // En attente
+    const pendingRevenue = rentInvoices
+      .filter(inv => inv.status === "pending")
+      .reduce((sum, inv) => sum + inv.total_amount, 0) +
+      transactions
+        .filter(t => t.amount > 0 && t.status === "PENDING")
+        .reduce((sum, t) => sum + t.amount, 0)
+
+    const pendingExpenses = expenses
+      .filter(exp => exp.status === "pending")
+      .reduce((sum, exp) => sum + exp.amount, 0) +
+      transactions
+        .filter(t => t.amount < 0 && t.status === "PENDING")
+        .reduce((sum, t) => sum + Math.abs(t.amount), 0)
+
+    return {
+      totalRevenue,
+      totalExpenses,
+      balance,
+      pendingRevenue,
+      pendingExpenses,
     }
-    return statuses[status as keyof typeof statuses] || { label: status, variant: "secondary" as const }
+  }, [rentInvoices, expenses, transactions])
+
+  const resetExpenseForm = () => {
+    setExpenseFormData({
+      amount: 0,
+      description: "",
+      expense_date: new Date().toISOString().slice(0, 10),
+      category: "AUTRE",
+      status: "pending",
+      property_id: null,
+      unit_id: null,
+      invoice_file_url: null,
+    })
+    setSelectedExpense(null)
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('fr-FR')
+  const resetTransactionForm = () => {
+    setTransactionFormData({
+      amount: 0,
+      label: "",
+      date: new Date().toISOString().slice(0, 10),
+      status: "PENDING",
+      matched_expense_id: null,
+      matched_rent_invoice_id: null,
+      match_score: null,
+    })
+    setSelectedTransaction(null)
   }
+
+  const handleOpenExpenseDialog = () => {
+    resetExpenseForm()
+    setIsExpenseDialogOpen(true)
+  }
+
+  const handleEditExpense = (expense: ExpenseWithDetails) => {
+    setExpenseFormData({
+      amount: expense.amount,
+      description: expense.description,
+      expense_date: expense.expense_date,
+      category: expense.category || "AUTRE",
+      status: expense.status || "pending",
+      property_id: expense.property_id || null,
+      unit_id: expense.unit_id || null,
+      invoice_file_url: expense.invoice_file_url || null,
+    })
+    setSelectedExpense(expense)
+    setIsExpenseDialogOpen(true)
+  }
+
+  const handleSubmitExpense = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!expenseFormData.amount || !expenseFormData.description) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez remplir tous les champs requis",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const cleanData = {
+        amount: expenseFormData.amount,
+        description: expenseFormData.description,
+        expense_date: expenseFormData.expense_date,
+        category: expenseFormData.category,
+        status: expenseFormData.status,
+        property_id: expenseFormData.property_id || null,
+        unit_id: expenseFormData.unit_id || null,
+        invoice_file_url: expenseFormData.invoice_file_url || null,
+      }
+
+      if (selectedExpense) {
+        await updateExpense.mutateAsync({
+          id: selectedExpense.id,
+          ...cleanData,
+        })
+        toast({
+          title: "Succès",
+          description: "Dépense modifiée avec succès",
+        })
+      } else {
+        await createExpense.mutateAsync(cleanData)
+        toast({
+          title: "Succès",
+          description: "Dépense créée avec succès",
+        })
+      }
+      setIsExpenseDialogOpen(false)
+      resetExpenseForm()
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Une erreur est survenue",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteExpense = async (id: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer cette dépense ?")) return
+
+    try {
+      await deleteExpense.mutateAsync(id)
+      toast({
+        title: "Succès",
+        description: "Dépense supprimée avec succès",
+      })
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de supprimer la dépense",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleOpenTransactionDialog = () => {
+    resetTransactionForm()
+    setIsTransactionDialogOpen(true)
+  }
+
+  const handleEditTransaction = (transaction: BankTransactionWithDetails) => {
+    setTransactionFormData({
+      amount: transaction.amount,
+      label: transaction.label,
+      date: transaction.date,
+      status: transaction.status || "PENDING",
+      matched_expense_id: transaction.matched_expense_id || null,
+      matched_rent_invoice_id: transaction.matched_rent_invoice_id || null,
+      match_score: transaction.match_score || null,
+    })
+    setSelectedTransaction(transaction)
+    setIsTransactionDialogOpen(true)
+  }
+
+  const handleSubmitTransaction = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!transactionFormData.amount || !transactionFormData.label) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez remplir tous les champs requis",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      if (selectedTransaction) {
+        await updateTransaction.mutateAsync({
+          id: selectedTransaction.id,
+          ...transactionFormData,
+        })
+        toast({
+          title: "Succès",
+          description: "Transaction modifiée avec succès",
+        })
+      } else {
+        await createTransaction.mutateAsync(transactionFormData)
+        toast({
+          title: "Succès",
+          description: "Transaction créée avec succès",
+        })
+      }
+      setIsTransactionDialogOpen(false)
+      resetTransactionForm()
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Une erreur est survenue",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteTransaction = async (id: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer cette transaction ?")) return
+
+    try {
+      await deleteTransaction.mutateAsync(id)
+      toast({
+        title: "Succès",
+        description: "Transaction supprimée avec succès",
+      })
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de supprimer la transaction",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const filteredExpenses = expenses.filter(expense => {
+    const matchesSearch =
+      expense.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      expense.property?.name.toLowerCase().includes(searchTerm.toLowerCase())
+
+    const matchesCategory = categoryFilter === "all" || expense.category === categoryFilter
+
+    return matchesSearch && matchesCategory
+  })
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
-      currency: 'EUR'
+      currency: 'EUR',
     }).format(amount)
   }
 
-  // Calculate stats
-  const totalRentDue = rentInvoices
-    .filter(invoice => invoice.status === "pending" || invoice.status === "overdue")
-    .reduce((sum, invoice) => sum + invoice.total_amount, 0)
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    })
+  }
 
-  const totalOverdue = rentInvoices
-    .filter(invoice => invoice.status === "overdue")
-    .reduce((sum, invoice) => sum + invoice.total_amount, 0)
+  const getStatusBadge = (status: string | null) => {
+    const statuses = {
+      "pending": { label: "En attente", variant: "secondary" as const, className: "bg-yellow-100 text-yellow-800" },
+      "approved": { label: "Approuvée", variant: "default" as const, className: "bg-green-100 text-green-800" },
+      "rejected": { label: "Rejetée", variant: "destructive" as const, className: "bg-red-100 text-red-800" },
+    }
+    return statuses[status as keyof typeof statuses] || { label: status || "En attente", variant: "secondary" as const, className: "" }
+  }
 
-  const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0)
+  const getTransactionStatusBadge = (status: string | null) => {
+    const key = (status || '').toUpperCase()
+    const map: Record<string, { label: string; className: string }> = {
+      PENDING: { label: 'En attente de rapprochement', className: 'bg-yellow-100 text-yellow-800' },
+      MATCHED: { label: 'Rapprochée (validée)', className: 'bg-green-100 text-green-800' },
+      UNMATCHED: { label: 'À catégoriser', className: 'bg-gray-100 text-gray-800' },
+    }
+    return map[key] || { label: status || '—', className: 'bg-gray-100 text-gray-800' }
+  }
 
-  const totalDeposits = deposits
-    .filter(deposit => deposit.status === "held")
-    .reduce((sum, deposit) => sum + deposit.amount, 0)
-
-  if (loading) {
+  if (expensesLoading || invoicesLoading || transactionsLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-muted-foreground">Chargement des données comptables...</div>
+      <div className="space-y-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Chargement des données...</p>
+          </div>
+        </div>
       </div>
     )
   }
@@ -124,178 +424,320 @@ export default function Accounting() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Comptabilité</h1>
-          <p className="text-muted-foreground mt-1">
-            Hub financier : loyers, charges, dépenses et révisions
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <BankConnectionModal 
-            trigger={
-              <Button variant="outline" className="gap-2">
-                <CreditCard className="w-4 h-4" />
-                Connecter banque
-              </Button>
-            }
-          />
-          <Button 
-            variant="outline" 
-            className="gap-2"
-            onClick={() => toast({
-              title: "Export en cours",
-              description: "Export des données comptables..."
-            })}
-          >
-            <Download className="w-4 h-4" />
-            Exporter
-          </Button>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="w-4 h-4" />
-                Nouvelle opération
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Nouvelle opération comptable</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-4">
-                <p className="text-sm text-muted-foreground">
-                  Fonctionnalité en cours de développement
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Comptabilité</h1>
+        <p className="text-muted-foreground mt-1">
+          Gérez vos revenus, dépenses et transactions bancaires
+        </p>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Revenus</p>
+                <p className="text-2xl font-bold text-green-600">{formatCurrency(stats.totalRevenue)}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formatCurrency(stats.pendingRevenue)} en attente
                 </p>
               </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+              <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center">
+                <TrendingUp className="w-6 h-6 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Financial Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-6">
-            <div className="flex items-center gap-2">
-              <Euro className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Loyers à encaisser</span>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Dépenses</p>
+                <p className="text-2xl font-bold text-red-600">{formatCurrency(stats.totalExpenses)}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {formatCurrency(stats.pendingExpenses)} en attente
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center">
+                <TrendingDown className="w-6 h-6 text-red-600" />
+              </div>
             </div>
-            <div className="text-2xl font-bold">{formatCurrency(totalRentDue)}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {rentInvoices.filter(i => i.status === "pending").length} facture(s)
-            </p>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-6">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-destructive" />
-              <span className="text-sm font-medium">Impayés</span>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Solde</p>
+                <p className={`text-2xl font-bold ${stats.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {formatCurrency(stats.balance)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Revenus - Dépenses
+                </p>
+              </div>
+              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${stats.balance >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
+                <Wallet className={`w-6 h-6 ${stats.balance >= 0 ? 'text-green-600' : 'text-red-600'}`} />
+              </div>
             </div>
-            <div className="text-2xl font-bold text-destructive">{formatCurrency(totalOverdue)}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {rentInvoices.filter(i => i.status === "overdue").length} en retard
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2">
-              <Receipt className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Dépenses du mois</span>
-            </div>
-            <div className="text-2xl font-bold">{formatCurrency(totalExpenses)}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {expenses.length} dépense(s)
-            </p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Dépôts de garantie</span>
-            </div>
-            <div className="text-2xl font-bold">{formatCurrency(totalDeposits)}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {deposits.filter(d => d.status === "held").length} détenu(s)
-            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Main Content Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="receipts">Encaissements</TabsTrigger>
-          <TabsTrigger value="quittances">Quittances</TabsTrigger>
-          <TabsTrigger value="charges">Charges</TabsTrigger>
-          <TabsTrigger value="deposits">Dépôts</TabsTrigger>
-          <TabsTrigger value="revisions">Révisions</TabsTrigger>
-          <TabsTrigger value="reconciliation">Rapprochement</TabsTrigger>
+      {/* Tabs */}
+      <Tabs defaultValue="expenses" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="expenses">Dépenses ({expenses.length})</TabsTrigger>
+          
+          <TabsTrigger value="transactions">Transactions bancaires ({transactions.length})</TabsTrigger>
         </TabsList>
 
-        {/* Encaissements Tab */}
-        <TabsContent value="receipts" className="space-y-4">
+        {/* EXPENSES TAB */}
+        <TabsContent value="expenses" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4 flex-1">
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  placeholder="Rechercher une dépense..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Catégorie" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Toutes</SelectItem>
+                  {EXPENSE_CATEGORIES.map((cat) => (
+                    <SelectItem key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Dialog open={isExpenseDialogOpen} onOpenChange={setIsExpenseDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2" onClick={handleOpenExpenseDialog}>
+                  <Plus className="w-4 h-4" />
+                  Nouvelle dépense
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>
+                    {selectedExpense ? "Modifier la dépense" : "Créer une dépense"}
+                  </DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmitExpense} className="space-y-4 pt-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="amount">Montant (€) *</Label>
+                      <Input
+                        id="amount"
+                        type="number"
+                        step="0.01"
+                        value={expenseFormData.amount}
+                        onChange={(e) => setExpenseFormData({ ...expenseFormData, amount: Number(e.target.value) })}
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="expense_date">Date *</Label>
+                      <Input
+                        id="expense_date"
+                        type="date"
+                        value={expenseFormData.expense_date}
+                        onChange={(e) => setExpenseFormData({ ...expenseFormData, expense_date: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Description *</Label>
+                    <Textarea
+                      id="description"
+                      value={expenseFormData.description}
+                      onChange={(e) => setExpenseFormData({ ...expenseFormData, description: e.target.value })}
+                      rows={3}
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="category">Catégorie</Label>
+                      <Select
+                        value={expenseFormData.category || "AUTRE"}
+                        onValueChange={(value) => setExpenseFormData({ ...expenseFormData, category: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Catégorie" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {EXPENSE_CATEGORIES.map((cat) => (
+                            <SelectItem key={cat.value} value={cat.value}>
+                              {cat.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="status">Statut</Label>
+                      <Select
+                        value={expenseFormData.status || "pending"}
+                        onValueChange={(value) => setExpenseFormData({ ...expenseFormData, status: value })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Statut" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {EXPENSE_STATUS.map((status) => (
+                            <SelectItem key={status.value} value={status.value}>
+                              {status.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="property_id">Propriété</Label>
+                      <Select
+                        value={expenseFormData.property_id || "none"}
+                        onValueChange={(value) => setExpenseFormData({ ...expenseFormData, property_id: value === "none" ? null : value, unit_id: null })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner une propriété" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Aucune propriété</SelectItem>
+                          {properties.map((property) => (
+                            <SelectItem key={property.id} value={property.id}>
+                              {property.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="unit_id">Logement</Label>
+                      <Select
+                        value={expenseFormData.unit_id || "none"}
+                        onValueChange={(value) => setExpenseFormData({ ...expenseFormData, unit_id: value === "none" ? null : value })}
+                        disabled={!expenseFormData.property_id}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner un logement" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Aucun logement</SelectItem>
+                          {availableUnits.map((unit) => (
+                            <SelectItem key={unit.id} value={unit.id}>
+                              {unit.unit_number}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-4">
+                    <Button type="submit" className="flex-1" disabled={createExpense.isPending || updateExpense.isPending}>
+                      {selectedExpense ? "Modifier" : "Créer"}
+                    </Button>
+                    <Button type="button" variant="outline" onClick={() => setIsExpenseDialogOpen(false)}>
+                      Annuler
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-base font-semibold">Loyers à encaisser</CardTitle>
-              <Button size="sm" variant="outline">
-                Générer les quittances du mois
-              </Button>
-            </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Locataire</TableHead>
-                    <TableHead>Bien</TableHead>
-                    <TableHead>Période</TableHead>
-                    <TableHead>Loyer HC</TableHead>
-                    <TableHead>Charges</TableHead>
-                    <TableHead>Total</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Catégorie</TableHead>
+                    <TableHead>Propriété</TableHead>
+                    <TableHead>Montant</TableHead>
                     <TableHead>Statut</TableHead>
-                    <TableHead>Échéance</TableHead>
-                    <TableHead>Actions</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rentInvoices.length === 0 ? (
+                  {filteredExpenses.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                        Aucune facture de loyer trouvée
+                      <TableCell colSpan={7} className="text-center py-8">
+                        <div className="text-center">
+                          <Euro className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                          <h3 className="text-lg font-semibold mb-2">Aucune dépense trouvée</h3>
+                          <p className="text-muted-foreground">
+                            Commencez par créer votre première dépense.
+                          </p>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ) : (
-                    rentInvoices.map((invoice) => (
-                      <TableRow key={invoice.id}>
-                        <TableCell className="font-medium">{invoice.tenant_name || 'N/A'}</TableCell>
-                        <TableCell>{invoice.property_name || 'N/A'}</TableCell>
+                    filteredExpenses.map((expense) => (
+                      <TableRow key={expense.id}>
+                        <TableCell>{formatDate(expense.expense_date)}</TableCell>
+                        <TableCell className="max-w-xs truncate">{expense.description}</TableCell>
                         <TableCell>
-                          {String(invoice.period_month).padStart(2, '0')}/{invoice.period_year}
+                          <Badge variant="outline">{expense.category || "Autre"}</Badge>
                         </TableCell>
-                        <TableCell>{formatCurrency(invoice.rent_amount)}</TableCell>
-                        <TableCell>{formatCurrency(invoice.charges_amount || 0)}</TableCell>
-                        <TableCell className="font-medium">{formatCurrency(invoice.total_amount)}</TableCell>
                         <TableCell>
-                          <Badge {...getStatusBadge(invoice.status.toUpperCase())} className="text-xs">
-                            {getStatusBadge(invoice.status.toUpperCase()).label}
+                          {expense.property ? (
+                            <div className="text-sm">
+                              <div>{expense.property.name}</div>
+                              {expense.unit && (
+                                <div className="text-xs text-muted-foreground">{expense.unit.unit_number}</div>
+                              )}
+                            </div>
+                          ) : (
+                            "-"
+                          )}
+                        </TableCell>
+                        <TableCell className="font-medium">{formatCurrency(expense.amount)}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={getStatusBadge(expense.status).className}>
+                            {getStatusBadge(expense.status).label}
                           </Badge>
                         </TableCell>
-                        <TableCell>{formatDate(invoice.due_date)}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            {invoice.status !== "paid" && (
-                              <Button size="sm" variant="outline">
-                                Enregistrer paiement
-                              </Button>
-                            )}
-                            <Button size="sm" variant="ghost">
-                              Quittance
+                        <TableCell className="text-right">
+                          <div className="flex gap-1 justify-end">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditExpense(expense)}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteExpense(expense.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
                         </TableCell>
@@ -308,106 +750,333 @@ export default function Accounting() {
           </Card>
         </TabsContent>
 
-        {/* Sprint 2 Implementation */}
-        <TabsContent value="quittances" className="space-y-4">
-          <BatchReceiptGenerator />
-        </TabsContent>
-
-        {/* Charges Tab */}
-        <TabsContent value="charges" className="space-y-4">
-          <ExpenseManager />
-        </TabsContent>
-
-        {/* Deposits Tab */}
-        <TabsContent value="deposits" className="space-y-4">
-          <DepositManager />
-        </TabsContent>
-
-        {/* Revisions Tab */}
-        <TabsContent value="revisions" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base font-semibold flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4" />
-                  Révision IRL
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Index IRL de référence</label>
-                  <Input placeholder="Ex: 131.12" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Nouvel index IRL</label>
-                  <Input placeholder="Ex: 134.48" />
-                </div>
-                <Button className="w-full gap-2">
-                  <Calculator className="w-4 h-4" />
-                  Calculer les nouveaux loyers
-                </Button>
-                <div className="text-xs text-muted-foreground">
-                  Calcul automatique : Nouveau loyer = Loyer actuel × (IRL nouveau / IRL référence)
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base font-semibold">Encadrement des loyers</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-sm space-y-2">
-                  <div className="flex justify-between">
-                    <span>Loyer de référence:</span>
-                    <span className="font-medium">25.50€/m²</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Loyer majoré (+20%):</span>
-                    <span className="font-medium">30.60€/m²</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Loyer minoré (-30%):</span>
-                    <span className="font-medium">17.85€/m²</span>
-                  </div>
-                </div>
-                <Button variant="outline" className="w-full">
-                  Configurer les références
-                </Button>
-                <div className="text-xs text-muted-foreground">
-                  Vérification automatique lors de la création des baux
-                </div>
-              </CardContent>
-            </Card>
+        {/* REVENUES TAB */}
+        <TabsContent value="revenues" className="space-y-4">
+          <div className="flex items-center justify-end mb-4">
+            <Button
+              className="gap-2"
+              onClick={() => {
+                setRevenueFormData({
+                  amount: 0,
+                  label: "",
+                  date: new Date().toISOString().slice(0, 10),
+                  status: "MATCHED",
+                  matched_expense_id: null,
+                  matched_rent_invoice_id: null,
+                  match_score: null,
+                })
+                setIsRevenueDialogOpen(true)
+              }}
+            >
+              <Plus className="w-4 h-4" />
+              Ajouter un revenu
+            </Button>
           </div>
+
+          <Dialog open={isRevenueDialogOpen} onOpenChange={setIsRevenueDialogOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>Ajouter un revenu</DialogTitle>
+              </DialogHeader>
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault()
+                  if (revenueFormData.amount <= 0) {
+                    toast({ title: "Montant invalide", description: "Le montant doit être positif", variant: "destructive" })
+                    return
+                  }
+                  try {
+                    await createTransaction.mutateAsync({
+                      ...revenueFormData,
+                      amount: Math.abs(revenueFormData.amount),
+                      status: revenueFormData.status || "MATCHED",
+                    })
+                    toast({ title: "Succès", description: "Revenu ajouté" })
+                    setIsRevenueDialogOpen(false)
+                  } catch (err: any) {
+                    toast({ title: "Erreur", description: err?.message || "Impossible d'ajouter le revenu", variant: "destructive" })
+                  }
+                }}
+                className="space-y-4 pt-2"
+              >
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="rev_amount">Montant (€) *</Label>
+                    <Input
+                      id="rev_amount"
+                      type="number"
+                      step="0.01"
+                      value={revenueFormData.amount}
+                      onChange={(e) => setRevenueFormData({ ...revenueFormData, amount: Number(e.target.value) })}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="rev_date">Date *</Label>
+                    <Input
+                      id="rev_date"
+                      type="date"
+                      value={revenueFormData.date}
+                      onChange={(e) => setRevenueFormData({ ...revenueFormData, date: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="rev_label">Libellé *</Label>
+                  <Input
+                    id="rev_label"
+                    value={revenueFormData.label}
+                    onChange={(e) => setRevenueFormData({ ...revenueFormData, label: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <Button type="submit" className="flex-1" disabled={createTransaction.isPending}>
+                    Créer
+                  </Button>
+                  <Button type="button" variant="outline" onClick={() => setIsRevenueDialogOpen(false)}>
+                    Annuler
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Factures de loyer</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Période</TableHead>
+                    <TableHead>Locataire</TableHead>
+                    <TableHead>Propriété</TableHead>
+                    <TableHead>Loyer</TableHead>
+                    <TableHead>Charges</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>Date d'échéance</TableHead>
+                    <TableHead>Statut</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rentInvoices.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="text-center py-8">
+                        <div className="text-center">
+                          <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                          <h3 className="text-lg font-semibold mb-2">Aucune facture</h3>
+                          <p className="text-muted-foreground">
+                            Les factures de loyer s'afficheront ici.
+                          </p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    rentInvoices.map((invoice) => (
+                      <TableRow key={invoice.id}>
+                        <TableCell>
+                          {invoice.period_month.toString().padStart(2, '0')}/{invoice.period_year}
+                        </TableCell>
+                        <TableCell>
+                          {invoice.lease?.tenant ?
+                            `${invoice.lease.tenant.first_name} ${invoice.lease.tenant.last_name}` :
+                            "-"
+                          }
+                        </TableCell>
+                        <TableCell>
+                          {invoice.lease?.unit?.property?.name || "-"}
+                          {invoice.lease?.unit && (
+                            <div className="text-xs text-muted-foreground">
+                              {invoice.lease.unit.unit_number}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>{formatCurrency(invoice.rent_amount)}</TableCell>
+                        <TableCell>{formatCurrency(invoice.charges_amount || 0)}</TableCell>
+                        <TableCell className="font-medium">{formatCurrency(invoice.total_amount)}</TableCell>
+                        <TableCell>{formatDate(invoice.due_date)}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={getStatusBadge(invoice.status).className}>
+                            {getStatusBadge(invoice.status).label}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
 
-        {/* Reconciliation Tab */}
-        <TabsContent value="reconciliation" className="space-y-4">
+        {/* TRANSACTIONS TAB */}
+        <TabsContent value="transactions" className="space-y-4">
+          <div className="flex items-center justify-end">
+            <Dialog open={isTransactionDialogOpen} onOpenChange={setIsTransactionDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2" onClick={handleOpenTransactionDialog}>
+                  <Plus className="w-4 h-4" />
+                  Nouvelle transaction
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>
+                    {selectedTransaction ? "Modifier la transaction" : "Créer une transaction bancaire"}
+                  </DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmitTransaction} className="space-y-4 pt-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="trans_amount">Montant (€) *</Label>
+                      <Input
+                        id="trans_amount"
+                        type="number"
+                        step="0.01"
+                        value={transactionFormData.amount}
+                        onChange={(e) => setTransactionFormData({ ...transactionFormData, amount: Number(e.target.value) })}
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="trans_date">Date *</Label>
+                      <Input
+                        id="trans_date"
+                        type="date"
+                        value={transactionFormData.date}
+                        onChange={(e) => setTransactionFormData({ ...transactionFormData, date: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="trans_label">Libellé *</Label>
+                    <Input
+                      id="trans_label"
+                      value={transactionFormData.label}
+                      onChange={(e) => setTransactionFormData({ ...transactionFormData, label: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="trans_status">Statut</Label>
+                    <Select
+                      value={transactionFormData.status || "PENDING"}
+                      onValueChange={(value) => setTransactionFormData({ ...transactionFormData, status: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Statut" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TRANSACTION_STATUS.map((status) => (
+                          <SelectItem key={status.value} value={status.value}>
+                            {status.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex gap-2 pt-4">
+                    <Button type="submit" className="flex-1" disabled={createTransaction.isPending || updateTransaction.isPending}>
+                      {selectedTransaction ? "Modifier" : "Créer"}
+                    </Button>
+                    <Button type="button" variant="outline" onClick={() => setIsTransactionDialogOpen(false)}>
+                      Annuler
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-base font-semibold">Rapprochement bancaire</CardTitle>
-              <Button size="sm" className="gap-2">
-                <Upload className="w-4 h-4" />
-                Importer relevé CSV
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="text-sm text-muted-foreground space-y-2">
-                <p>• Import des relevés bancaires au format CSV</p>
-                <p>• Matching automatique avec les loyers et dépenses</p>
-                <p>• Validation manuelle des correspondances</p>
-                <p>• Suivi des écarts et régularisations</p>
-              </div>
-              
-              <div className="border rounded-lg p-4 bg-muted/20">
-                <h4 className="font-medium text-sm mb-2">Dernière synchronisation</h4>
-                <div className="text-sm text-muted-foreground">
-                  <p>• 15/01/2024 : 3 transactions matchées automatiquement</p>
-                  <p>• 1 transaction en attente de validation manuelle</p>
-                  <p>• Solde comptable équilibré</p>
-                </div>
-              </div>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Libellé</TableHead>
+                    <TableHead>Montant</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead>Rapprochement</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {transactions.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-8">
+                        <div className="text-center">
+                          <Building className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                          <h3 className="text-lg font-semibold mb-2">Aucune transaction</h3>
+                          <p className="text-muted-foreground">
+                            Commencez par créer votre première transaction.
+                          </p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    transactions.map((transaction) => (
+                      <TableRow key={transaction.id}>
+                        <TableCell>{formatDate(transaction.date)}</TableCell>
+                        <TableCell className="max-w-xs truncate">{transaction.label}</TableCell>
+                        <TableCell className={`font-medium ${transaction.amount >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {formatCurrency(transaction.amount)}
+                        </TableCell>
+                        <TableCell>
+                          {(() => { const b = getTransactionStatusBadge(transaction.status); return (
+                            <Badge variant="outline" className={b.className}>{b.label}</Badge>
+                          )})()}
+                        </TableCell>
+                        <TableCell>
+                          {transaction.matched_expense ? (
+                            <div className="text-sm">
+                              <Badge variant="outline">Dépense</Badge>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {transaction.matched_expense.description}
+                              </div>
+                            </div>
+                          ) : transaction.matched_rent_invoice ? (
+                            <div className="text-sm">
+                              <Badge variant="outline">Loyer</Badge>
+                              <div className="text-xs text-muted-foreground mt-1">
+                                {transaction.matched_rent_invoice.period_month}/{transaction.matched_rent_invoice.period_year}
+                              </div>
+                            </div>
+                          ) : (
+                            "-"
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex gap-1 justify-end">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditTransaction(transaction)}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteTransaction(transaction.id)}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
         </TabsContent>
