@@ -26,6 +26,7 @@ export type Database = {
           matched_rent_invoice_id: string | null
           status: string | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           amount: number
@@ -38,6 +39,7 @@ export type Database = {
           matched_rent_invoice_id?: string | null
           status?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           amount?: number
@@ -50,6 +52,7 @@ export type Database = {
           matched_rent_invoice_id?: string | null
           status?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -395,6 +398,7 @@ export type Database = {
           status: string | null
           unit_id: string | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           amount: number
@@ -408,6 +412,7 @@ export type Database = {
           status?: string | null
           unit_id?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           amount?: number
@@ -421,6 +426,7 @@ export type Database = {
           status?: string | null
           unit_id?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -603,12 +609,17 @@ export type Database = {
           created_by: string | null
           description: string | null
           id: string
-          priority: string | null
+          priority:
+            | Database["public"]["Enums"]["maintenance_tickets_priority_enum"]
+            | null
           property_id: string
-          status: string | null
+          status:
+            | Database["public"]["Enums"]["maintenance_tickets_status_enum"]
+            | null
           title: string
           unit_id: string | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           assigned_to?: string | null
@@ -616,12 +627,17 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
-          priority?: string | null
+          priority?:
+            | Database["public"]["Enums"]["maintenance_tickets_priority_enum"]
+            | null
           property_id: string
-          status?: string | null
+          status?:
+            | Database["public"]["Enums"]["maintenance_tickets_status_enum"]
+            | null
           title: string
           unit_id?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           assigned_to?: string | null
@@ -629,12 +645,17 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
-          priority?: string | null
+          priority?:
+            | Database["public"]["Enums"]["maintenance_tickets_priority_enum"]
+            | null
           property_id?: string
-          status?: string | null
+          status?:
+            | Database["public"]["Enums"]["maintenance_tickets_status_enum"]
+            | null
           title?: string
           unit_id?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -896,6 +917,7 @@ export type Database = {
           type: string | null
           unit_number: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -906,6 +928,7 @@ export type Database = {
           type?: string | null
           unit_number: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -916,6 +939,7 @@ export type Database = {
           type?: string | null
           unit_number?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -937,9 +961,10 @@ export type Database = {
           estimated_cost: number | null
           id: string
           scheduled_date: string | null
-          status: string | null
+          status: Database["public"]["Enums"]["work_orders_satus_enum"] | null
           ticket_id: string
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           actual_cost?: number | null
@@ -950,9 +975,10 @@ export type Database = {
           estimated_cost?: number | null
           id?: string
           scheduled_date?: string | null
-          status?: string | null
+          status?: Database["public"]["Enums"]["work_orders_satus_enum"] | null
           ticket_id: string
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           actual_cost?: number | null
@@ -963,9 +989,10 @@ export type Database = {
           estimated_cost?: number | null
           id?: string
           scheduled_date?: string | null
-          status?: string | null
+          status?: Database["public"]["Enums"]["work_orders_satus_enum"] | null
           ticket_id?: string
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -986,9 +1013,21 @@ export type Database = {
     }
     Enums: {
       gender_enum: "male" | "female" | "other"
+      maintenance_tickets_priority_enum: "FAIBLE" | "MOYEN" | "ELEVE" | "URGENT"
+      maintenance_tickets_status_enum:
+        | "NOUVEAU"
+        | "EN COURS"
+        | "EN ATTENTE DE PIECE"
+        | "TERMINE"
       period_enum: "/mois" | "/an"
       role_lease_tenants_enum: "tenant" | "co-tenant"
       user_role_enum: "admin" | "user" | "trial"
+      work_orders_satus_enum:
+        | "EN ATTENTE"
+        | "PLANIFIE"
+        | "EN COURS"
+        | "TERMINE"
+        | "ANNULE"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1117,9 +1156,23 @@ export const Constants = {
   public: {
     Enums: {
       gender_enum: ["male", "female", "other"],
+      maintenance_tickets_priority_enum: ["FAIBLE", "MOYEN", "ELEVE", "URGENT"],
+      maintenance_tickets_status_enum: [
+        "NOUVEAU",
+        "EN COURS",
+        "EN ATTENTE DE PIECE",
+        "TERMINE",
+      ],
       period_enum: ["/mois", "/an"],
       role_lease_tenants_enum: ["tenant", "co-tenant"],
       user_role_enum: ["admin", "user", "trial"],
+      work_orders_satus_enum: [
+        "EN ATTENTE",
+        "PLANIFIE",
+        "EN COURS",
+        "TERMINE",
+        "ANNULE",
+      ],
     },
   },
 } as const

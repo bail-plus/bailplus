@@ -1,67 +1,401 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { AlertTriangle, Clock, CheckCircle, Wrench, Plus, Search, Calendar, User, MapPin, Image } from "lucide-react"
+import { AlertTriangle, Clock, CheckCircle, Wrench, Plus, Search, Edit, Trash2, DollarSign } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { supabase } from "@/integrations/supabase/client"
+import {
+  useMaintenanceTicketsWithDetails,
+  useCreateMaintenanceTicket,
+  useUpdateMaintenanceTicket,
+  useDeleteMaintenanceTicket,
+  useCreateWorkOrder,
+  useUpdateWorkOrder,
+  useDeleteWorkOrder,
+  type MaintenanceTicketWithDetails,
+  type MaintenanceTicketInsert,
+  type WorkOrderInsert,
+  type WorkOrder
+} from "@/hooks/useMaintenance"
+import { usePropertiesWithUnits } from "@/hooks/useProperties"
+import { useContactsWithLeaseInfo } from "@/hooks/useContacts"
 
 const KANBAN_COLUMNS = [
-  { id: "NEW", title: "Nouveau", color: "bg-red-50", icon: AlertTriangle },
-  { id: "IN_PROGRESS", title: "En cours", color: "bg-yellow-50", icon: Clock },
-  { id: "WAITING_PARTS", title: "Attente pièces", color: "bg-blue-50", icon: Clock },
-  { id: "DONE", title: "Terminé", color: "bg-green-50", icon: CheckCircle }
+  { id: "NOUVEAU", title: "Nouveau", color: "bg-red-50", icon: AlertTriangle },
+  { id: "EN COURS", title: "En cours", color: "bg-yellow-50", icon: Clock },
+  { id: "EN ATTENTE DE PIECE", title: "Attente pièces", color: "bg-blue-50", icon: Clock },
+  { id: "TERMINE", title: "Terminé", color: "bg-green-50", icon: CheckCircle }
+]
+
+const WORK_ORDER_STATUSES = [
+  { value: "EN ATTENTE", label: "En attente" },
+  { value: "PLANIFIE", label: "Planifié" },
+  { value: "EN COURS", label: "En cours" },
+  { value: "TERMINE", label: "Terminé" },
+  { value: "ANNULE", label: "Annulé" }
 ]
 
 export default function Maintenance() {
   const [viewMode, setViewMode] = useState<"list" | "kanban">("kanban")
   const [searchTerm, setSearchTerm] = useState("")
   const [priorityFilter, setPriorityFilter] = useState("all")
-  const [selectedTicket, setSelectedTicket] = useState<any>(null)
-  const [tickets, setTickets] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [selectedTicket, setSelectedTicket] = useState<MaintenanceTicketWithDetails | null>(null)
+  const [isTicketDialogOpen, setIsTicketDialogOpen] = useState(false)
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [isWorkOrderDialogOpen, setIsWorkOrderDialogOpen] = useState(false)
+  const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null)
+  const [draggedTicket, setDraggedTicket] = useState<MaintenanceTicketWithDetails | null>(null)
+  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null)
+
+  const [ticketFormData, setTicketFormData] = useState<MaintenanceTicketInsert>({
+    title: "",
+    description: "",
+    property_id: "",
+    unit_id: "none",
+    status: "NOUVEAU",
+    priority: "MOYEN",
+  })
+
+  const [workOrderFormData, setWorkOrderFormData] = useState<WorkOrderInsert>({
+    ticket_id: "",
+    description: "",
+    contractor_name: "",
+    estimated_cost: 0,
+    actual_cost: 0,
+    scheduled_date: "",
+    completed_date: "",
+    status: "EN ATTENTE",
+  })
+
   const { toast } = useToast()
+  const { data: tickets = [], isLoading, error } = useMaintenanceTicketsWithDetails()
+  const { data: properties = [] } = usePropertiesWithUnits()
+  const { data: contacts = [] } = useContactsWithLeaseInfo()
+  const createTicket = useCreateMaintenanceTicket()
+  const updateTicket = useUpdateMaintenanceTicket()
+  const deleteTicket = useDeleteMaintenanceTicket()
+  const createWorkOrder = useCreateWorkOrder()
+  const updateWorkOrder = useUpdateWorkOrder()
+  const deleteWorkOrder = useDeleteWorkOrder()
 
-  useEffect(() => {
-    loadTickets()
-  }, [])
+  // Get units for selected property
+  const selectedProperty = properties.find(p => p.id === ticketFormData.property_id)
+  const availableUnits = selectedProperty?.units ?? []
 
-  const loadTickets = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('maintenance_tickets')
-        .select('*')
-      
-      if (error) throw error
-      setTickets(data || [])
-    } catch (error) {
-      console.error('Error loading tickets:', error)
+  const resetTicketForm = () => {
+    setTicketFormData({
+      title: "",
+      description: "",
+      property_id: "",
+      unit_id: "none",
+      status: "NOUVEAU",
+      priority: "MOYEN",
+    })
+    setIsEditMode(false)
+    setSelectedTicket(null)
+  }
+
+  const resetWorkOrderForm = () => {
+    setWorkOrderFormData({
+      ticket_id: "",
+      description: "",
+      contractor_name: "",
+      estimated_cost: 0,
+      actual_cost: 0,
+      scheduled_date: "",
+      completed_date: "",
+      status: "EN ATTENTE",
+    })
+    setSelectedWorkOrder(null)
+  }
+
+  const handleOpenTicketDialog = () => {
+    resetTicketForm()
+    setIsTicketDialogOpen(true)
+  }
+
+  const handleEditTicket = (ticket: MaintenanceTicketWithDetails) => {
+    setTicketFormData({
+      title: ticket.title,
+      description: ticket.description ?? "",
+      property_id: ticket.property_id,
+      unit_id: ticket.unit_id || "none",
+      status: ticket.status ?? "NOUVEAU",
+      priority: ticket.priority ?? "MOYEN",
+    })
+    setSelectedTicket(ticket)
+    setIsEditMode(true)
+    setIsTicketDialogOpen(true)
+  }
+
+  const handleSubmitTicket = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!ticketFormData.title || !ticketFormData.property_id) {
       toast({
         title: "Erreur",
-        description: "Impossible de charger les tickets",
-        variant: "destructive"
+        description: "Veuillez remplir tous les champs requis",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      if (isEditMode && selectedTicket) {
+        await updateTicket.mutateAsync({
+          id: selectedTicket.id,
+          ...ticketFormData,
+          unit_id: ticketFormData.unit_id === "none" ? null : ticketFormData.unit_id,
+          description: ticketFormData.description || null,
+        })
+        toast({
+          title: "Succès",
+          description: "Ticket modifié avec succès",
+        })
+      } else {
+        await createTicket.mutateAsync({
+          ...ticketFormData,
+          unit_id: ticketFormData.unit_id === "none" ? null : ticketFormData.unit_id,
+          description: ticketFormData.description || null,
+        })
+        toast({
+          title: "Succès",
+          description: "Ticket créé avec succès",
+        })
+      }
+      setIsTicketDialogOpen(false)
+      resetTicketForm()
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Une erreur est survenue",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteTicket = async (id: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer ce ticket ?")) return
+
+    try {
+      await deleteTicket.mutateAsync(id)
+      toast({
+        title: "Succès",
+        description: "Ticket supprimé avec succès",
+      })
+      if (selectedTicket?.id === id) {
+        setSelectedTicket(null)
+      }
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de supprimer le ticket",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleOpenWorkOrderDialog = (ticket: MaintenanceTicketWithDetails) => {
+    resetWorkOrderForm()
+    setWorkOrderFormData({ ...workOrderFormData, ticket_id: ticket.id })
+    setSelectedTicket(ticket)
+    setIsWorkOrderDialogOpen(true)
+  }
+
+  const handleEditWorkOrder = (workOrder: WorkOrder) => {
+    setWorkOrderFormData({
+      ticket_id: workOrder.ticket_id,
+      description: workOrder.description ?? "",
+      contractor_name: workOrder.contractor_name ?? "",
+      estimated_cost: workOrder.estimated_cost ?? 0,
+      actual_cost: workOrder.actual_cost ?? 0,
+      scheduled_date: workOrder.scheduled_date ?? "",
+      completed_date: workOrder.completed_date ?? "",
+      status: workOrder.status ?? "EN ATTENTE",
+    })
+    setSelectedWorkOrder(workOrder)
+    setIsWorkOrderDialogOpen(true)
+  }
+
+  const handleSubmitWorkOrder = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!workOrderFormData.ticket_id || !workOrderFormData.contractor_name) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez remplir tous les champs requis",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      if (selectedWorkOrder) {
+        await updateWorkOrder.mutateAsync({
+          id: selectedWorkOrder.id,
+          ...workOrderFormData,
+          description: workOrderFormData.description || null,
+          estimated_cost: workOrderFormData.estimated_cost || null,
+          actual_cost: workOrderFormData.actual_cost || null,
+          scheduled_date: workOrderFormData.scheduled_date || null,
+          completed_date: workOrderFormData.completed_date || null,
+        })
+        toast({
+          title: "Succès",
+          description: "Ordre de travail modifié avec succès",
+        })
+      } else {
+        await createWorkOrder.mutateAsync({
+          ...workOrderFormData,
+          description: workOrderFormData.description || null,
+          estimated_cost: workOrderFormData.estimated_cost || null,
+          actual_cost: workOrderFormData.actual_cost || null,
+          scheduled_date: workOrderFormData.scheduled_date || null,
+          completed_date: workOrderFormData.completed_date || null,
+        })
+        toast({
+          title: "Succès",
+          description: "Ordre de travail créé avec succès",
+        })
+      }
+      setIsWorkOrderDialogOpen(false)
+      resetWorkOrderForm()
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Une erreur est survenue",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeleteWorkOrder = async (id: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer cet ordre de travail ?")) return
+
+    try {
+      await deleteWorkOrder.mutateAsync(id)
+      toast({
+        title: "Succès",
+        description: "Ordre de travail supprimé avec succès",
+      })
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de supprimer l'ordre de travail",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDragStart = (ticket: MaintenanceTicketWithDetails) => {
+    setDraggedTicket(ticket)
+  }
+
+  const handleDragOver = (e: React.DragEvent, columnId: string) => {
+    e.preventDefault()
+    setDragOverColumn(columnId)
+  }
+
+  const handleDragLeave = () => {
+    setDragOverColumn(null)
+  }
+
+  const handleDrop = async (newStatus: string) => {
+    if (!draggedTicket) return
+
+    try {
+      await updateTicket.mutateAsync({
+        id: draggedTicket.id,
+        status: newStatus,
+      })
+      toast({
+        title: "Succès",
+        description: "Statut mis à jour avec succès",
+      })
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de mettre à jour le statut",
+        variant: "destructive",
       })
     } finally {
-      setLoading(false)
+      setDraggedTicket(null)
+      setDragOverColumn(null)
     }
   }
 
   const filteredTickets = tickets.filter(ticket => {
-    const matchesSearch = 
+    const matchesSearch =
       ticket.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ticket.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    
+      ticket.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ticket.property?.name.toLowerCase().includes(searchTerm.toLowerCase())
+
     const matchesPriority = priorityFilter === "all" || ticket.priority === priorityFilter
-    
+
     return matchesSearch && matchesPriority
   })
 
-  if (loading) {
+  const getPriorityBadge = (priority: string | null) => {
+    const priorities = {
+      URGENT: { label: "Urgente", variant: "destructive" as const },
+      ELEVE: { label: "Élevée", variant: "destructive" as const },
+      MOYEN: { label: "Moyenne", variant: "default" as const },
+      FAIBLE: { label: "Faible", variant: "secondary" as const }
+    }
+    return priorities[priority as keyof typeof priorities] || { label: priority || "Moyenne", variant: "secondary" as const }
+  }
+
+  const getStatusBadge = (status: string | null) => {
+    const statuses = {
+      NOUVEAU: { label: "Nouveau", variant: "destructive" as const },
+      "EN COURS": { label: "En cours", variant: "default" as const },
+      "EN ATTENTE DE PIECE": { label: "Attente pièces", variant: "secondary" as const },
+      TERMINE: { label: "Terminé", variant: "outline" as const }
+    }
+    return statuses[status as keyof typeof statuses] || { label: status || "Nouveau", variant: "secondary" as const }
+  }
+
+  const getWorkOrderStatusBadge = (status: string | null) => {
+    const statuses = {
+      "EN ATTENTE": { label: "En attente", variant: "secondary" as const },
+      "PLANIFIE": { label: "Planifié", variant: "default" as const },
+      "EN COURS": { label: "En cours", variant: "default" as const },
+      "TERMINE": { label: "Terminé", variant: "outline" as const },
+      "ANNULE": { label: "Annulé", variant: "destructive" as const }
+    }
+    return statuses[status as keyof typeof statuses] || { label: status || "En attente", variant: "secondary" as const }
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <p className="text-destructive">Erreur lors du chargement des tickets</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-center min-h-[400px]">
@@ -74,35 +408,6 @@ export default function Maintenance() {
     )
   }
 
-  const getPriorityBadge = (priority: string) => {
-    const priorities = {
-      HIGH: { label: "Élevée", variant: "destructive" as const },
-      MEDIUM: { label: "Moyenne", variant: "default" as const },
-      LOW: { label: "Faible", variant: "secondary" as const }
-    }
-    return priorities[priority as keyof typeof priorities] || { label: priority, variant: "secondary" as const }
-  }
-
-  const getStatusBadge = (status: string) => {
-    const statuses = {
-      NEW: { label: "Nouveau", variant: "destructive" as const },
-      IN_PROGRESS: { label: "En cours", variant: "default" as const },
-      WAITING_PARTS: { label: "Attente pièces", variant: "secondary" as const },
-      DONE: { label: "Terminé", variant: "outline" as const }
-    }
-    return statuses[status as keyof typeof statuses] || { label: status, variant: "secondary" as const }
-  }
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('fr-FR', {
-      day: '2-digit',
-      month: '2-digit', 
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -113,7 +418,7 @@ export default function Maintenance() {
             Tickets de maintenance et ordres de travail
           </p>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <div className="flex items-center bg-muted rounded-lg p-1">
             <Button
@@ -131,23 +436,132 @@ export default function Maintenance() {
               Liste
             </Button>
           </div>
-          
-          <Dialog>
+
+          <Dialog open={isTicketDialogOpen} onOpenChange={setIsTicketDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
+              <Button className="gap-2" onClick={handleOpenTicketDialog}>
                 <Plus className="w-4 h-4" />
                 Nouveau ticket
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Créer un ticket de maintenance</DialogTitle>
+                <DialogTitle>
+                  {isEditMode ? "Modifier le ticket" : "Créer un ticket de maintenance"}
+                </DialogTitle>
               </DialogHeader>
-              <div className="space-y-4 pt-4">
-                <p className="text-sm text-muted-foreground">
-                  Fonctionnalité en cours de développement
-                </p>
-              </div>
+              <form onSubmit={handleSubmitTicket} className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="title">Titre *</Label>
+                  <Input
+                    id="title"
+                    value={ticketFormData.title}
+                    onChange={(e) => setTicketFormData({ ...ticketFormData, title: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    value={ticketFormData.description}
+                    onChange={(e) => setTicketFormData({ ...ticketFormData, description: e.target.value })}
+                    rows={3}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="property_id">Propriété *</Label>
+                    <Select
+                      value={ticketFormData.property_id}
+                      onValueChange={(value) => {
+                        setTicketFormData({ ...ticketFormData, property_id: value, unit_id: "none" })
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner une propriété" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {properties.map((property) => (
+                          <SelectItem key={property.id} value={property.id}>
+                            {property.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="unit_id">Logement</Label>
+                    <Select
+                      value={ticketFormData.unit_id || "none"}
+                      onValueChange={(value) => setTicketFormData({ ...ticketFormData, unit_id: value === "none" ? "" : value })}
+                      disabled={!ticketFormData.property_id}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner un logement" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Tous les logements</SelectItem>
+                        {availableUnits.map((unit) => (
+                          <SelectItem key={unit.id} value={unit.id}>
+                            {unit.unit_number} {unit.type ? `- ${unit.type}` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="priority">Priorité</Label>
+                    <Select
+                      value={ticketFormData.priority ?? "MOYEN"}
+                      onValueChange={(value) => setTicketFormData({ ...ticketFormData, priority: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Priorité" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="FAIBLE">Faible</SelectItem>
+                        <SelectItem value="MOYEN">Moyenne</SelectItem>
+                        <SelectItem value="ELEVE">Élevée</SelectItem>
+                        <SelectItem value="URGENT">Urgente</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="status">Statut</Label>
+                    <Select
+                      value={ticketFormData.status ?? "NOUVEAU"}
+                      onValueChange={(value) => setTicketFormData({ ...ticketFormData, status: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Statut" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="NOUVEAU">Nouveau</SelectItem>
+                        <SelectItem value="EN COURS">En cours</SelectItem>
+                        <SelectItem value="EN ATTENTE DE PIECE">Attente pièces</SelectItem>
+                        <SelectItem value="TERMINE">Terminé</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-4">
+                  <Button type="submit" className="flex-1" disabled={createTicket.isPending || updateTicket.isPending}>
+                    {isEditMode ? "Modifier" : "Créer"}
+                  </Button>
+                  <Button type="button" variant="outline" onClick={() => setIsTicketDialogOpen(false)}>
+                    Annuler
+                  </Button>
+                </div>
+              </form>
             </DialogContent>
           </Dialog>
         </div>
@@ -164,16 +578,17 @@ export default function Maintenance() {
             className="pl-9"
           />
         </div>
-        
+
         <Select value={priorityFilter} onValueChange={setPriorityFilter}>
           <SelectTrigger className="w-40">
             <SelectValue placeholder="Priorité" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Toutes</SelectItem>
-            <SelectItem value="HIGH">Élevée</SelectItem>
-            <SelectItem value="MEDIUM">Moyenne</SelectItem>
-            <SelectItem value="LOW">Faible</SelectItem>
+            <SelectItem value="URGENT">Urgente</SelectItem>
+            <SelectItem value="ELEVE">Élevée</SelectItem>
+            <SelectItem value="MOYEN">Moyenne</SelectItem>
+            <SelectItem value="FAIBLE">Faible</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -201,9 +616,19 @@ export default function Maintenance() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 min-h-[600px]">
           {KANBAN_COLUMNS.map(column => {
             const columnTickets = filteredTickets.filter(ticket => ticket.status === column.id)
-            
+
             return (
-              <div key={column.id} className="space-y-3">
+              <div
+                key={column.id}
+                className={`space-y-3 rounded-lg p-2 transition-all ${
+                  dragOverColumn === column.id
+                    ? 'bg-primary/10 border-2 border-primary border-dashed'
+                    : 'border-2 border-transparent'
+                }`}
+                onDragOver={(e) => handleDragOver(e, column.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={() => handleDrop(column.id)}
+              >
                 {/* Column Header */}
                 <div className="flex items-center justify-between p-3 rounded-lg bg-card border">
                   <div className="flex items-center gap-2">
@@ -216,15 +641,19 @@ export default function Maintenance() {
                 </div>
 
                 {/* Column Cards */}
-                <div className="space-y-3">
+                <div className="space-y-3 min-h-[100px]">
                   {columnTickets.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground text-sm">
-                      Aucun ticket {column.title.toLowerCase()}
+                      Aucun ticket
                     </div>
                   ) : columnTickets.map(ticket => (
-                    <Card 
-                      key={ticket.id} 
-                      className={`cursor-pointer transition-shadow hover:shadow-md ${column.color}`}
+                    <Card
+                      key={ticket.id}
+                      draggable
+                      onDragStart={() => handleDragStart(ticket)}
+                      className={`cursor-move transition-all hover:shadow-md ${column.color} ${
+                        draggedTicket?.id === ticket.id ? 'opacity-50' : ''
+                      }`}
                       onClick={() => setSelectedTicket(ticket)}
                     >
                       <CardContent className="p-4">
@@ -235,17 +664,23 @@ export default function Maintenance() {
                             <Badge {...getPriorityBadge(ticket.priority)} className="text-xs" />
                           </div>
 
-                          {/* Created Date */}
+                          {/* Property & Unit */}
                           <div className="text-xs text-muted-foreground">
-                            Créé le: {formatDate(ticket.created_at)}
+                            {ticket.property?.name}
+                            {ticket.unit && ` - ${ticket.unit.unit_number}`}
                           </div>
 
-                          {/* Description */}
-                          {ticket.description && (
-                            <div className="text-xs text-muted-foreground line-clamp-2">
-                              {ticket.description}
+                          {/* Work Orders Count */}
+                          {ticket.work_orders && ticket.work_orders.length > 0 && (
+                            <div className="text-xs text-muted-foreground">
+                              {ticket.work_orders.length} ordre(s) de travail
                             </div>
                           )}
+
+                          {/* Created Date */}
+                          <div className="text-xs text-muted-foreground">
+                            {formatDate(ticket.created_at)}
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -268,65 +703,92 @@ export default function Maintenance() {
                   <TableHead>Priorité</TableHead>
                   <TableHead>Statut</TableHead>
                   <TableHead>Lieu</TableHead>
-                  <TableHead>Demandeur</TableHead>
                   <TableHead>Assigné à</TableHead>
-                  <TableHead>Coût</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredTickets.map((ticket) => (
-                  <TableRow 
-                    key={ticket.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => setSelectedTicket(ticket)}
-                  >
-                    <TableCell>
-                      <div>
-                        <div className="font-medium text-sm line-clamp-1">{ticket.title}</div>
-                        <div className="text-xs text-muted-foreground">
-                          #{ticket.id} • {formatDate(ticket.createdAt)}
-                        </div>
+                {filteredTickets.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
+                      <div className="text-center">
+                        <Wrench className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold mb-2">Aucun ticket trouvé</h3>
+                        <p className="text-muted-foreground">
+                          Commencez par créer votre premier ticket.
+                        </p>
                       </div>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <Badge {...getPriorityBadge(ticket.priority)} className="text-xs" />
-                    </TableCell>
-                    
-                    <TableCell>
-                      <Badge {...getStatusBadge(ticket.status)} className="text-xs" />
-                    </TableCell>
-                    
-                    <TableCell>
-                      <div className="text-sm">
-                        <div>{ticket.property}</div>
-                        <div className="text-xs text-muted-foreground">{ticket.unit}</div>
-                      </div>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <div className="text-sm">{ticket.reporter}</div>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <div className="text-sm">{ticket.assignedTo || "-"}</div>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <div className="text-sm">
-                        {ticket.finalCost ? `${ticket.finalCost}€` : 
-                         ticket.estimatedCost ? `~${ticket.estimatedCost}€` : "-"}
-                      </div>
-                    </TableCell>
-                    
-                    <TableCell>
-                      <Button variant="ghost" size="sm">
-                        Voir
-                      </Button>
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  filteredTickets.map((ticket) => (
+                    <TableRow
+                      key={ticket.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => setSelectedTicket(ticket)}
+                    >
+                      <TableCell>
+                        <div>
+                          <div className="font-medium text-sm line-clamp-1">{ticket.title}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatDate(ticket.created_at)}
+                          </div>
+                        </div>
+                      </TableCell>
+
+                      <TableCell>
+                        <Badge {...getPriorityBadge(ticket.priority)} className="text-xs" />
+                      </TableCell>
+
+                      <TableCell>
+                        <Badge {...getStatusBadge(ticket.status)} className="text-xs" />
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="text-sm">
+                          <div>{ticket.property?.name}</div>
+                          {ticket.unit && (
+                            <div className="text-xs text-muted-foreground">{ticket.unit.unit_number}</div>
+                          )}
+                        </div>
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="text-sm">
+                          {ticket.assigned_contact ?
+                            `${ticket.assigned_contact.first_name} ${ticket.assigned_contact.last_name}` :
+                            "-"
+                          }
+                        </div>
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleEditTicket(ticket)
+                            }}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteTicket(ticket.id)
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </CardContent>
@@ -336,21 +798,22 @@ export default function Maintenance() {
       {/* Ticket Detail Modal */}
       {selectedTicket && (
         <Dialog open={!!selectedTicket} onOpenChange={() => setSelectedTicket(null)}>
-          <DialogContent className="max-w-3xl">
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
                 <Wrench className="w-5 h-5" />
-                Ticket #{selectedTicket.id} - {selectedTicket.title}
+                {selectedTicket.title}
               </DialogTitle>
             </DialogHeader>
-            
+
             <Tabs defaultValue="summary" className="mt-4">
               <TabsList>
                 <TabsTrigger value="summary">Résumé</TabsTrigger>
-                <TabsTrigger value="workorders">Work Orders</TabsTrigger>
-                <TabsTrigger value="attachments">Pièces jointes</TabsTrigger>
+                <TabsTrigger value="workorders">
+                  Ordres de travail ({selectedTicket.work_orders?.length || 0})
+                </TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="summary" className="space-y-4">
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
@@ -361,47 +824,80 @@ export default function Maintenance() {
                     <span className="font-medium">Statut:</span>
                     <Badge {...getStatusBadge(selectedTicket.status)} className="ml-2 text-xs" />
                   </div>
-                  <div className="col-span-2">
-                    <span className="font-medium">Description:</span>
-                    <p className="mt-1 text-muted-foreground">{selectedTicket.description}</p>
-                  </div>
+                  {selectedTicket.description && (
+                    <div className="col-span-2">
+                      <span className="font-medium">Description:</span>
+                      <p className="mt-1 text-muted-foreground">{selectedTicket.description}</p>
+                    </div>
+                  )}
                   <div>
-                    <span className="font-medium">Bien:</span> {selectedTicket.property}
+                    <span className="font-medium">Bien:</span> {selectedTicket.property?.name}
                   </div>
+                  {selectedTicket.unit && (
+                    <div>
+                      <span className="font-medium">Unité:</span> {selectedTicket.unit.unit_number}
+                    </div>
+                  )}
+                  {selectedTicket.assigned_contact && (
+                    <div>
+                      <span className="font-medium">Assigné à:</span> {selectedTicket.assigned_contact.first_name} {selectedTicket.assigned_contact.last_name}
+                    </div>
+                  )}
+                  {selectedTicket.created_by_contact && (
+                    <div>
+                      <span className="font-medium">Créé par:</span> {selectedTicket.created_by_contact.first_name} {selectedTicket.created_by_contact.last_name}
+                    </div>
+                  )}
                   <div>
-                    <span className="font-medium">Unité:</span> {selectedTicket.unit}
-                  </div>
-                  <div>
-                    <span className="font-medium">Demandeur:</span> {selectedTicket.reporter}
-                  </div>
-                  <div>
-                    <span className="font-medium">Créé le:</span> {formatDate(selectedTicket.createdAt)}
+                    <span className="font-medium">Créé le:</span> {formatDate(selectedTicket.created_at)}
                   </div>
                 </div>
               </TabsContent>
-              
+
               <TabsContent value="workorders" className="space-y-4">
-                {selectedTicket.workOrders.length > 0 ? (
+                {selectedTicket.work_orders && selectedTicket.work_orders.length > 0 ? (
                   <div className="space-y-3">
-                    {selectedTicket.workOrders.map((wo: any) => (
+                    {selectedTicket.work_orders.map((wo) => (
                       <Card key={wo.id}>
                         <CardContent className="p-4">
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                              <span className="font-medium">{wo.vendor}</span>
-                              {wo.approved && (
-                                <Badge variant="outline" className="text-xs">Approuvé</Badge>
-                              )}
+                              <span className="font-medium">{wo.contractor_name}</span>
+                              <Badge {...getWorkOrderStatusBadge(wo.status)} className="text-xs" />
                             </div>
-                            <div className="text-sm text-muted-foreground">
-                              Devis: {wo.estimatedAmount}€
-                              {wo.finalAmount && ` • Final: ${wo.finalAmount}€`}
-                            </div>
-                            {wo.scheduledAt && (
+                            {wo.description && (
                               <div className="text-sm text-muted-foreground">
-                                Programmé: {formatDate(wo.scheduledAt)}
+                                {wo.description}
                               </div>
                             )}
+                            <div className="text-sm text-muted-foreground flex items-center gap-1">
+                              <DollarSign className="w-3 h-3" />
+                              Devis: {wo.estimated_cost ?? 0}€
+                              {wo.actual_cost && wo.actual_cost > 0 && ` • Réel: ${wo.actual_cost}€`}
+                            </div>
+                            {wo.scheduled_date && (
+                              <div className="text-sm text-muted-foreground">
+                                Programmé: {new Date(wo.scheduled_date).toLocaleDateString('fr-FR')}
+                              </div>
+                            )}
+                            <div className="flex gap-2 pt-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEditWorkOrder(wo)}
+                              >
+                                <Edit className="w-4 h-4 mr-1" />
+                                Modifier
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDeleteWorkOrder(wo.id)}
+                              >
+                                <Trash2 className="w-4 h-4 mr-1" />
+                                Supprimer
+                              </Button>
+                            </div>
                           </div>
                         </CardContent>
                       </Card>
@@ -412,42 +908,137 @@ export default function Maintenance() {
                     Aucun ordre de travail créé
                   </p>
                 )}
-                
-                <Button variant="outline" size="sm">
-                  Créer un work order
+
+                <Button variant="outline" size="sm" onClick={() => handleOpenWorkOrderDialog(selectedTicket)}>
+                  <Plus className="w-4 h-4 mr-1" />
+                  Créer un ordre de travail
                 </Button>
               </TabsContent>
-              
-              <TabsContent value="attachments" className="space-y-4">
-                {selectedTicket.photos > 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    {selectedTicket.photos} photo(s) associée(s)
-                  </p>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Aucune pièce jointe
-                  </p>
-                )}
-                <div className="text-sm text-muted-foreground">
-                  Gestion des pièces jointes en cours de développement
-                </div>
-              </TabsContent>
             </Tabs>
-            
+
             <div className="flex gap-2 pt-4 border-t">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={() => handleEditTicket(selectedTicket)}>
+                <Edit className="w-4 h-4 mr-1" />
                 Modifier
               </Button>
-              <Button variant="outline" size="sm">
-                Assigner
-              </Button>
-              <Button variant="outline" size="sm">
-                Changer statut
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  handleDeleteTicket(selectedTicket.id)
+                }}
+              >
+                <Trash2 className="w-4 h-4 mr-1" />
+                Supprimer
               </Button>
             </div>
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Work Order Dialog */}
+      <Dialog open={isWorkOrderDialogOpen} onOpenChange={setIsWorkOrderDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedWorkOrder ? "Modifier l'ordre de travail" : "Créer un ordre de travail"}
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmitWorkOrder} className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="contractor_name">Prestataire *</Label>
+              <Input
+                id="contractor_name"
+                value={workOrderFormData.contractor_name}
+                onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, contractor_name: e.target.value })}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="wo_description">Description</Label>
+              <Textarea
+                id="wo_description"
+                value={workOrderFormData.description}
+                onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, description: e.target.value })}
+                rows={3}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="estimated_cost">Coût estimé (€)</Label>
+                <Input
+                  id="estimated_cost"
+                  type="number"
+                  value={workOrderFormData.estimated_cost ?? ""}
+                  onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, estimated_cost: Number(e.target.value) })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="actual_cost">Coût réel (€)</Label>
+                <Input
+                  id="actual_cost"
+                  type="number"
+                  value={workOrderFormData.actual_cost ?? ""}
+                  onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, actual_cost: Number(e.target.value) })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="scheduled_date">Date programmée</Label>
+                <Input
+                  id="scheduled_date"
+                  type="date"
+                  value={workOrderFormData.scheduled_date ?? ""}
+                  onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, scheduled_date: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="completed_date">Date de fin</Label>
+                <Input
+                  id="completed_date"
+                  type="date"
+                  value={workOrderFormData.completed_date ?? ""}
+                  onChange={(e) => setWorkOrderFormData({ ...workOrderFormData, completed_date: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="wo_status">Statut</Label>
+              <Select
+                value={workOrderFormData.status ?? "EN ATTENTE"}
+                onValueChange={(value) => setWorkOrderFormData({ ...workOrderFormData, status: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Statut" />
+                </SelectTrigger>
+                <SelectContent>
+                  {WORK_ORDER_STATUSES.map((status) => (
+                    <SelectItem key={status.value} value={status.value}>
+                      {status.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <Button type="submit" className="flex-1" disabled={createWorkOrder.isPending || updateWorkOrder.isPending}>
+                {selectedWorkOrder ? "Modifier" : "Créer"}
+              </Button>
+              <Button type="button" variant="outline" onClick={() => setIsWorkOrderDialogOpen(false)}>
+                Annuler
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
