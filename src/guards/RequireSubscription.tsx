@@ -77,12 +77,14 @@ export function RequireSubscription() {
       trial_end_date: profile?.trial_end_date,
       trialEndMs,
       todayMs,
+      hasValidTrial,
     },
     subscription: {
       exists: !!subscription,
       subscribed: subscription?.subscribed,
       status: subscription?.subscription_status,
       subStatus,
+      hasActiveSubscription,
     },
     result: {
       hasActiveSubscription,
@@ -91,9 +93,19 @@ export function RequireSubscription() {
     }
   });
 
+  // MODE DEBUG: Toujours autoriser l'accès si VITE_DEBUG_SKIP_PAYWALL est défini
+  if (import.meta.env.VITE_DEBUG_SKIP_PAYWALL === 'true') {
+    console.warn('[GUARD/SUB] 🔧 DEBUG MODE: Skipping paywall check');
+    return <Outlet />;
+  }
+
   // Si ni abonnement ni trial valide, rediriger vers le paywall
   if (!hasActiveSubscription && !hasValidTrial) {
-    console.log('[GUARD/SUB] ❌ Access denied - Redirecting to paywall');
+    console.error('[GUARD/SUB] ❌ Access denied - Redirecting to paywall', {
+      reason: !hasActiveSubscription ? 'No active subscription' : 'Trial expired',
+      subscription,
+      profile,
+    });
     return <Navigate to="/app/paywall" replace />;
   }
 

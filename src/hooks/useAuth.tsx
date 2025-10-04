@@ -74,28 +74,64 @@ const upsertProfileFromUser = async (u: User) => {
 /* =======================
    API Functions
    ======================= */
-async function fetchProfile(userId: string): Promise<Profile> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('user_id', userId)
-    .single();
+async function fetchProfile(userId: string): Promise<Profile | null> {
+  console.log('[FETCH/PROFILE] Starting for userId:', userId);
+  try {
+    // Timeout de 5 secondes
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Timeout after 5s')), 5000)
+    );
 
-  if (error) throw error;
-  return data;
+    const fetchPromise = supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+
+    if (error) {
+      console.error('[FETCH/PROFILE] ❌ Error:', error);
+      return null;
+    }
+
+    console.log('[FETCH/PROFILE] ✅ Success:', data ? 'found' : 'not found', data);
+    return data;
+  } catch (err) {
+    console.error('[FETCH/PROFILE] ❌ Exception:', err);
+    return null;
+  }
 }
 
 async function fetchSubscription(userId: string): Promise<Subscription | null> {
-  const { data, error } = await supabase
-    .from('subscriptions')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  console.log('[FETCH/SUBSCRIPTION] Starting for userId:', userId);
+  try {
+    // Timeout de 5 secondes
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Timeout after 5s')), 5000)
+    );
 
-  if (error) throw error;
-  return data;
+    const fetchPromise = supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+
+    if (error) {
+      console.error('[FETCH/SUBSCRIPTION] ❌ Error:', error);
+      return null;
+    }
+
+    console.log('[FETCH/SUBSCRIPTION] ✅ Success:', data ? 'found' : 'not found', data);
+    return data;
+  } catch (err) {
+    console.error('[FETCH/SUBSCRIPTION] ❌ Exception:', err);
+    return null;
+  }
 }
 
 async function signUpUser(params: {
@@ -186,6 +222,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     let cancelled = false;
@@ -194,6 +231,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Listener Auth
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (cancelled) return;
+
+      console.log('[AUTH] Event:', event, 'Session:', !!session);
 
       setSession(session ?? null);
       const u = session?.user ?? null;
@@ -212,8 +251,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       }
 
+      // Invalider toutes les queries quand le token est rafraîchi
+      if (event === 'TOKEN_REFRESHED') {
+        console.log('[AUTH] Token refreshed, invalidating all queries');
+        queryClient.invalidateQueries();
+      }
+
       if (event === 'SIGNED_OUT') {
         setLoading(false);
+        queryClient.clear();
       }
     });
 
@@ -288,18 +334,14 @@ export function useProfile() {
     queryKey: ['profile', user?.id],
     queryFn: async () => {
       console.log('[QUERY/PROFILE] Fetching profile for user:', user?.id);
-      try {
-        const data = await fetchProfile(user!.id);
-        console.log('[QUERY/PROFILE] ✅ Profile fetched successfully');
-        return data;
-      } catch (error) {
-        console.error('[QUERY/PROFILE] ❌ Error fetching profile:', error);
-        throw error;
-      }
+      const data = await fetchProfile(user!.id);
+      console.log('[QUERY/PROFILE] ✅ Query completed, data:', data ? 'found' : 'null');
+      return data;
     },
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
     retry: 1, // Limiter les retry à 1 tentative
+    retryDelay: 1000,
   });
 }
 
@@ -310,18 +352,14 @@ export function useSubscription() {
     queryKey: ['subscription', user?.id],
     queryFn: async () => {
       console.log('[QUERY/SUBSCRIPTION] Fetching subscription for user:', user?.id);
-      try {
-        const data = await fetchSubscription(user!.id);
-        console.log('[QUERY/SUBSCRIPTION] ✅ Subscription fetched successfully:', data ? 'exists' : 'null');
-        return data;
-      } catch (error) {
-        console.error('[QUERY/SUBSCRIPTION] ❌ Error fetching subscription:', error);
-        throw error;
-      }
+      const data = await fetchSubscription(user!.id);
+      console.log('[QUERY/SUBSCRIPTION] ✅ Query completed, data:', data ? 'found' : 'null');
+      return data;
     },
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000,
     retry: 1, // Limiter les retry à 1 tentative
+    retryDelay: 1000,
   });
 }
 
