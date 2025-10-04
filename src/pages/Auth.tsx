@@ -6,10 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useAuth, Gender, Role } from '@/hooks/useAuth';
+import { useAuth, useSignIn, useSignUp, Gender, Role } from '@/hooks/useAuth';
 
 export default function Auth() {
-  const { user, signIn, signUp, loading } = useAuth();
+  const { user, loading } = useAuth();
+  const signIn = useSignIn();
+  const signUp = useSignUp();
   const [isLoading, setIsLoading] = useState(false);
 
   // Déjà authentifié → redirect
@@ -25,15 +27,19 @@ export default function Auth() {
 
       console.log('[AUTH/UI] submit signIn', { email, hasPassword: password.length > 0, loadingFromCtx: loading });
 
-      const { error } = await signIn(email, password); // renvoie { error }
-      if (error) {
-        console.warn('[AUTH/UI] signIn error', error);
-      } else {
-        console.log('[AUTH/UI] signIn OK');
-      }
+      signIn.mutate({ email, password }, {
+        onSuccess: () => {
+          console.log('[AUTH/UI] signIn OK');
+        },
+        onError: (error) => {
+          console.warn('[AUTH/UI] signIn error', error);
+        },
+        onSettled: () => {
+          setIsLoading(false);
+        }
+      });
     } catch (err) {
       console.error('[AUTH/UI] handleSignIn exception', err);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -56,9 +62,8 @@ export default function Auth() {
       const birthdateStr = String(fd.get('birthdate') ?? ''); // "YYYY-MM-DD"
       const birthdate = birthdateStr || null;
 
-
       const phone_number = String(fd.get('phone_number') ?? '').trim();
-      const adress = String(fd.get('adress') ?? '').trim(); // orthographe alignée avec ta DB
+      const adress = String(fd.get('adress') ?? '').trim();
       const city = String(fd.get('city') ?? '').trim();
       const postal_code = String(fd.get('postal_code') ?? '').trim();
 
@@ -69,7 +74,7 @@ export default function Auth() {
 
       console.log('[AUTH/UI] submit signUp', { email, hasPassword: password.length > 0, role, gender, birthdate, phone_number, adress, city, postal_code, trial_end_date });
 
-      const { error } = await signUp(
+      signUp.mutate({
         email,
         password,
         firstName,
@@ -82,16 +87,19 @@ export default function Auth() {
         adress,
         city,
         postal_code
-      );
-
-      if (error) {
-        console.warn('[AUTH/UI] signUp error', error);
-      } else {
-        console.log('[AUTH/UI] signUp OK');
-      }
+      }, {
+        onSuccess: () => {
+          console.log('[AUTH/UI] signUp OK');
+        },
+        onError: (error) => {
+          console.warn('[AUTH/UI] signUp error', error);
+        },
+        onSettled: () => {
+          setIsLoading(false);
+        }
+      });
     } catch (err) {
       console.error('[AUTH/UI] handleSignUp exception', err);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -122,8 +130,8 @@ export default function Auth() {
                   <Input id="signin-password" name="password" type="password" required placeholder="••••••••" />
                 </div>
 
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? 'Connexion…' : 'Se connecter'}
+                <Button type="submit" className="w-full" disabled={isLoading || signIn.isPending}>
+                  {isLoading || signIn.isPending ? 'Connexion…' : 'Se connecter'}
                 </Button>
 
                 <div className="text-xs text-muted-foreground">
@@ -196,11 +204,11 @@ export default function Auth() {
 
                 {/* trial_end_date → today + 8 jours (calculé côté UI, pas d'input) */}
                 <div className="text-xs text-muted-foreground">
-                  La période d’essai se termine automatiquement dans <b>7 jours</b>.
+                  La période d'essai se termine automatiquement dans <b>7 jours</b>.
                 </div>
 
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? "Création…" : "Créer un compte"}
+                <Button type="submit" className="w-full" disabled={isLoading || signUp.isPending}>
+                  {isLoading || signUp.isPending ? "Création…" : "Créer un compte"}
                 </Button>
 
                 {/* <div className="text-xs text-muted-foreground">

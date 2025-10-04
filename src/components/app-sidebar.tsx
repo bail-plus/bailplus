@@ -26,12 +26,12 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { useAuth } from "@/hooks/useAuth"
+import { useAuth, useSignOut } from "@/hooks/useAuth"
 import { LogOut } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 
 const items = [
-  { title: "Accueil", url: "/app", icon: BarChart3 },
+  { title: "Accueil", url: "/app/dashboard", icon: BarChart3 },
   { title: "Calendrier", url: "/app/calendar", icon: Calendar },
   { title: "Parc", url: "/app/properties", icon: Building2 },
   { title: "Baux", url: "/app/leases", icon: UserCheck },
@@ -48,13 +48,14 @@ const items = [
 export function AppSidebar() {
   const { state } = useSidebar()
   const location = useLocation()
-  const { user, loading, signOut } = useAuth();
+  const { user, loading } = useAuth();
+  const signOut = useSignOut();
   const currentPath = location.pathname
   const collapsed = state === "collapsed"
   const navigate = useNavigate()
   const isActive = (path: string) => {
-    if (path === "/app") {
-      return currentPath === "/app"
+    if (path === "/app/dashboard") {
+      return currentPath === "/app/dashboard" || currentPath === "/app"
     }
     return currentPath.startsWith(path)
   }
@@ -65,12 +66,8 @@ export function AppSidebar() {
       : "hover:bg-sidebar-accent/50 text-sidebar-foreground"
   }
 
-  const handleSignOut = async () => {
-    await signOut()
-    // Si tu as un <RequireAuth />, pas besoin du navigate;
-    // sinon décommente la redirection choisie :
-    // navigate("/login", { replace: true })
-    // navigate("/", { replace: true })
+  const handleSignOut = () => {
+    signOut.mutate()
   }
   return (
     <Sidebar

@@ -1,78 +1,34 @@
-import { useState, useEffect, createContext, useContext, useMemo } from 'react';
+import { useState, useEffect, createContext, useContext } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { User, Session } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { tr } from 'date-fns/locale';
+import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 
 /* =======================
    Types
    ======================= */
-type Profile = {
-  id: string;
-  user_id: string;
-  first_name: string | null;
-  last_name: string | null;
-  email: string | null;
-  entity_id: string | null;
-  role: string | null;               // "admin" | "user" | "trial" | ...
-  trial_end_date: string | null;     // "YYYY-MM-DD" (DATE)
-  gender?: string | null;
-  birthdate?: string | null;
-  phone_number?: string | null;
-  adress?: string | null;
-  city?: string | null;
-  postal_code?: number | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-};
+export type Profile = Tables<'profiles'>;
+export type ProfileInsert = TablesInsert<'profiles'>;
+export type ProfileUpdate = TablesUpdate<'profiles'>;
 
-type SubscriptionState = {
-  subscribed: boolean;
-  status: string;                     // ex: 'active', 'trialing', ...
-  current_period_end?: string | null; // ISO ou date string si présent
-};
+export type Subscription = Tables<'subscriptions'>;
+export type SubscriptionInsert = TablesInsert<'subscriptions'>;
+export type SubscriptionUpdate = TablesUpdate<'subscriptions'>;
+
+export type Gender = 'male' | 'female' | 'other';
+export type Role = 'admin' | 'user' | 'trial';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
-
-  profile: Profile | null;
-  subscription: SubscriptionState | null;
-
-  refreshProfile: () => Promise<void>;
-  checkSubscription: () => Promise<void>;
-
-  signUp: (
-    email: string,
-    password: string,
-    firstName: string,
-    lastName: string,
-    role: Role,
-    trial_end_date: string | null,
-    gender: Gender,
-    birthdate: string | null,
-    phone_number: string,
-    adress: string,
-    city: string,
-    postal_code: string
-  ) => Promise<{ error: any }>;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signOut: () => Promise<void>;
   loading: boolean;
   initialized: boolean;
 }
 
 /* =======================
-   Contexte
+   Helpers
    ======================= */
-// 1) Ajoute ces imports utils en haut si tu veux des timestamps lisibles
-const ts = () => new Date().toISOString().slice(11, 19); // HH:MM:SS
-const LG = (...a: any[]) => console.log(`[AUTH ${ts()}]`, ...a);
-
-export type Gender = 'male' | 'female' | 'other';
-export type Role = 'admin' | 'user' | 'trial';
-
-/// en haut de useAuth.tsx (hors composant)
 const toDateOnly = (v: any): string | null => {
   if (!v) return null;
   if (v instanceof Date && !isNaN(v.getTime())) return v.toISOString().slice(0, 10);
@@ -109,199 +65,160 @@ const upsertProfileFromUser = async (u: User) => {
 
   if (error) {
     console.error('upsertProfileFromUser error', error);
-  } else {
-    // ✅ hydrate immédiatement pour éviter "hasProfile: false"
-    // (déplace 'setProfile' ici si la fonction est hors composant → voir option ci-dessous)
-    console.log('upsertProfileFromUser OK →', data);
-
+    throw error;
   }
+
+  return data;
 };
 
+/* =======================
+   API Functions
+   ======================= */
+async function fetchProfile(userId: string): Promise<Profile> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
 
+  if (error) throw error;
+  return data;
+}
+
+async function fetchSubscription(userId: string): Promise<Subscription | null> {
+  const { data, error } = await supabase
+    .from('subscriptions')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+async function signUpUser(params: {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  role?: Role;
+  trial_end_date?: string | null;
+  gender?: Gender;
+  birthdate?: string | null;
+  phone_number?: string;
+  adress?: string;
+  city?: string;
+  postal_code?: string;
+}) {
+  const {
+    email,
+    password,
+    firstName,
+    lastName,
+    role = 'trial',
+    trial_end_date = null,
+    gender = 'other',
+    birthdate = null,
+    phone_number = '',
+    adress = '',
+    city = '',
+    postal_code = ''
+  } = params;
+
+  // Calculer la date de fin d'essai (30 jours à partir d'aujourd'hui)
+  const trialEndDate = trial_end_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  const { error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: `${window.location.origin}/`,
+      data: {
+        first_name: firstName,
+        last_name: lastName,
+        role,
+        trial_end_date: trialEndDate,
+        gender,
+        birthdate,
+        phone_number,
+        adress,
+        city,
+        postal_code
+      },
+    }
+  });
+
+  if (error) throw error;
+  return { success: true };
+}
+
+async function signInUser(email: string, password: string) {
+  const { error, data } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+
+  const u = data.session?.user;
+  if (u?.id) {
+    await upsertProfileFromUser(u);
+  }
+
+  return data;
+}
+
+async function signOutUser() {
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+}
+
+/* =======================
+   Context
+   ======================= */
 const AuthContext = createContext<AuthContextType>({
   user: null,
   session: null,
-  profile: null,
-  subscription: null,
-  refreshProfile: async () => { },
-  checkSubscription: async () => { },
-  signUp: async () => ({ error: null }),
-  signIn: async () => ({ error: null }),
-  signOut: async () => { },
   loading: true,
   initialized: false,
 });
 
-export const useAuth = () => {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-  return ctx;
-};
-
-/* =======================
-   Provider
-   ======================= */
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [subscription, setSubscription] = useState<SubscriptionState | null>(null);
-  //const [loading, setLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
-
-  /** Charge le profil pour un user donné (table: profiles) */
-  const fetchProfile = async (uid: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', uid)
-        .single();
-
-      if (error) {
-        // 406/PGRST116: pas de ligne
-        if (error.code !== 'PGRST116' && error.code !== '406') {
-          console.error('fetchProfile error', error);
-        }
-        setProfile(null);
-        return;
-      }
-      setProfile(data as Profile);
-    } catch (e) {
-      console.error('fetchProfile exception', e);
-      setProfile(null);
-    }
-  };
-
-  /** Charge l’état d’abonnement (table: subscriptions), tolérant aux noms de colonnes
-   *  et RETOURNE l’état calculé pour éviter l’état stale côté appelant.
-   */
-  const loadSubscription = async (uid: string): Promise<SubscriptionState | null> => {
-    try {
-      const { data, error } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', uid)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.warn('loadSubscription error', error);
-        setSubscription(null);
-        return null;
-      }
-
-      const row: Record<string, any> = data ?? {};
-      const rawStatus: string =
-        row.status ??
-        row.stripe_status ??
-        row.subscription_status ??
-        row.state ??
-        'none';
-
-      const status = String(rawStatus).toLowerCase();
-
-      const current_period_end: string | null =
-        row.current_period_end ??
-        row.current_period_ends_at ??
-        row.period_end ??
-        row.cancel_at ??
-        row.ended_at ??
-        null;
-
-      const isActive = status === 'active' || status === 'trialing';
-
-      const nextState: SubscriptionState = {
-        subscribed: isActive,
-        status,
-        current_period_end,
-      };
-      setSubscription(nextState);
-      return nextState;
-    } catch (e) {
-      console.error('loadSubscription exception', e);
-      setSubscription(null);
-      return null;
-    }
-  };
-
-  /** Vérifie l’abonnement en le rechargeant (pas d’état stale) */
-  const checkSubscription = async () => {
-    if (!user?.id) return;
-    const s = await loadSubscription(user.id);
-    if (s && !s.subscribed) {
-      toast.info("Votre abonnement n'est pas actif.");
-    }
-  };
-
-  /** Rafraîchit uniquement le profil */
-  // const refreshProfile = async () => {
-  //   if (!user?.id) return;
-  //   setLoading(true);
-  //   try {
-  //     await fetchProfile(user.id);
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-  const refreshProfile = async () => {
-    if (!user?.id) return;
-    await fetchProfile(user.id);
-  };
-
   useEffect(() => {
     let cancelled = false;
-    let hydrated = false; // évite la course entre getSession et le listener
+    let hydrated = false;
 
-    // --- 1) Listener Auth (arrive aussi bien au boot qu'après login) ---
+    // Listener Auth
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      LG('onAuthStateChange event =', event);
       if (cancelled) return;
 
       setSession(session ?? null);
       const u = session?.user ?? null;
       setUser(u);
 
-      // ⚑ On déclare l'app "hydratée" dès le premier event
       if (!hydrated) {
         hydrated = true;
         setInitialized(true);
       }
 
-      // if (u?.id && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN')) {
-      //   setLoading(true);
-      //   try {
-      //     await upsertProfileFromUser(u);
-      //     await Promise.all([fetchProfile(u.id), loadSubscription(u.id)]);
-      //   } catch (e) {
-      //     console.error('auth hydrate error', e);
-      //   } finally {
-      //     setLoading(false);
-      //   }
-      // }
       if (u?.id && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN')) {
         try {
           await upsertProfileFromUser(u);
-          await Promise.all([fetchProfile(u.id), loadSubscription(u.id)]);
         } catch (e) {
           console.error('auth hydrate error', e);
         }
       }
 
       if (event === 'SIGNED_OUT') {
-        setProfile(null);
-        setSubscription(null);
         setLoading(false);
       }
     });
 
-    // --- 2) Hydratation initiale (au cas où aucun event n'arrive tout de suite) ---
+    // Hydratation initiale
     (async () => {
-      LG('init effect start → setLoading(true)');
-      //setLoading(true);
       try {
         const { data, error } = await supabase.auth.getSession();
         if (cancelled) return;
@@ -314,24 +231,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setSession(sess);
         setUser(u);
 
-        // Quoi qu’il arrive, on débloque l’UI
         if (!hydrated) {
           hydrated = true;
           setInitialized(true);
         }
-
-        if (u?.id) {
-          // charge en arrière-plan
-          fetchProfile(u.id).catch(console.error);
-          loadSubscription(u.id).catch(console.error);
-        } else {
-          setProfile(null);
-          setSubscription(null);
-        }
       } catch (e) {
         console.error('getSession exception', e);
-        setProfile(null);
-        setSubscription(null);
         if (!hydrated) {
           hydrated = true;
           setInitialized(true);
@@ -339,12 +244,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } finally {
         if (!cancelled) {
           setLoading(false);
-          LG('init effect end');
         }
       }
     })();
 
-    // --- 3) Safety: ne jamais rester bloqué > 2s même si tout plante ---
+    // Safety timeout
     const t = setTimeout(() => {
       if (!hydrated) {
         console.warn('[AUTH] force initialized=true after 2s safety');
@@ -361,96 +265,135 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
 
-
-
-
-
-
-  const signUp = async (email: string, password: string, firstName: string, lastName: string, role: Role, trial_end_date: string | null, gender: Gender,
-    birthdate: string | null, phone_number: string, adress: string, city: string, postal_code: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-        data: { first_name: firstName, last_name: lastName, role: role, trial_end_date: trial_end_date, gender: gender, birthdate: birthdate, phone_number: phone_number, adress: adress, city: city, postal_code: postal_code },
-      }
-    });
-
-    if (error) {
-      toast.error(error.message);
-      return { error };
-    }
-
-    toast.success('Compte créé avec succès ! Vérifiez vos emails.');
-    return { error: null };
-  };
-
-  const signIn = async (email: string, password: string) => {
-    setLoading(true);
-    const { error, data } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) { toast.error(error.message); setLoading(false); return { error }; }
-    toast.success('Connexion réussie !');
-
-    // 🔎 Vérification immédiate de persistance
-    console.log('[AUTH/SIGNIN RESULT]', { hasSession: !!data?.session });
-    console.log('[AUTH/LOCALSTORAGE KEYS]', Object.keys(localStorage));
-    console.log('[AUTH/STORED TOKEN]', localStorage.getItem(Object.keys(localStorage).find(k => k.includes('sb-') && k.includes('-auth-token')) || ''));
-
-    // Double-check via SDK
-    const after = await supabase.auth.getSession();
-    console.log('[AUTH/GET_SESSION AFTER SIGNIN]', { restored: !!after.data.session });
-
-    const u = data.session?.user;
-    if (u?.id) {
-      await upsertProfileFromUser(u);
-      await Promise.all([fetchProfile(u.id), loadSubscription(u.id)]);
-    }
-    setLoading(false);
-    return { error: null };
-  };
-
-
-
-
-  const signOut = async () => {
-    await supabase.auth.signOut();
-    setProfile(null);
-    setSubscription(null);
-    toast.success('Déconnexion réussie');
-  };
-
-  const value = useMemo(
-    () => ({
-      user,
-      session,
-      profile,
-      subscription,
-      refreshProfile,
-      checkSubscription,
-      signUp,
-      signIn,
-      signOut,
-      loading,
-      initialized,
-    }),
-    [user, session, profile, subscription, loading, initialized]
+  return (
+    <AuthContext.Provider value={{ user, session, loading, initialized }}>
+      {children}
+    </AuthContext.Provider>
   );
-  // Logs synthétiques à chaque render de provider
-  LG('render provider →',
-    {
-      user: !!user, loading, initialized,
-      hasProfile: !!profile, sub: subscription?.status
-    });
-
-  console.log('[AUTH] mount init');
-
-  console.log('[AUTH] getSession done', !!session?.user);
-
-  //console.log('[AUTH] fetchProfile done', !!data);
-
-  console.log('[AUTH] setLoading(false) init');
-  console.log('[AUTH] initialized:', initialized, 'loading:', loading, 'user:', user);
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+
+/* =======================
+   Hooks React Query
+   ======================= */
+export function useAuthContext() {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
+}
+
+export function useProfile() {
+  const { user } = useAuthContext();
+
+  return useQuery({
+    queryKey: ['profile', user?.id],
+    queryFn: () => {
+      console.log('[QUERY/PROFILE] Fetching profile for user:', user?.id);
+      return fetchProfile(user!.id);
+    },
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useSubscription() {
+  const { user } = useAuthContext();
+
+  return useQuery({
+    queryKey: ['subscription', user?.id],
+    queryFn: () => {
+      console.log('[QUERY/SUBSCRIPTION] Fetching subscription for user:', user?.id);
+      return fetchSubscription(user!.id);
+    },
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useSignUp() {
+  return useMutation({
+    mutationFn: signUpUser,
+    onSuccess: () => {
+      toast.success('Compte créé avec succès ! Vérifiez vos emails.');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Erreur lors de la création du compte');
+    },
+  });
+}
+
+export function useSignIn() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ email, password }: { email: string; password: string }) =>
+      signInUser(email, password),
+    onSuccess: () => {
+      toast.success('Connexion réussie !');
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: ['subscription'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Erreur de connexion');
+    },
+  });
+}
+
+export function useSignOut() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: signOutUser,
+    onSuccess: () => {
+      toast.success('Déconnexion réussie');
+      queryClient.clear();
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Erreur lors de la déconnexion');
+    },
+  });
+}
+
+// Hook principal qui combine tout
+export function useAuth() {
+  const { user, session, loading, initialized } = useAuthContext();
+  const { data: profile, isLoading: profileLoading } = useProfile();
+  const { data: subscription, isLoading: subscriptionLoading } = useSubscription();
+
+  // Le système est prêt quand tout est chargé
+  const isReady = initialized && !profileLoading && !subscriptionLoading;
+
+  const result = {
+    user,
+    session,
+    profile: profile ?? null,
+    subscription: subscription ?? null,
+    loading,
+    initialized,
+    isReady, // Nouveau flag qui indique que TOUT est chargé
+  };
+
+  console.log('[HOOK/useAuth]', {
+    user: !!user,
+    loading,
+    initialized,
+    isReady,
+    profile: !!profile,
+    profileLoading,
+    subscription: !!subscription,
+    subscriptionLoading,
+    trial_end_date: profile?.trial_end_date,
+    subscription_status: subscription?.subscription_status,
+  });
+
+  return result;
+}
+
+// Hook utilitaire pour vérifier l'abonnement
+export function useIsSubscribed() {
+  const { subscription } = useAuth();
+
+  if (!subscription) return false;
+
+  const status = subscription.subscription_status?.toLowerCase() ?? '';
+  return subscription.subscribed || status === 'active' || status === 'trialing';
+}
