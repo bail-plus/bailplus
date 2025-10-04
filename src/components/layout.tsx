@@ -6,7 +6,7 @@ import { GlobalSearch } from "@/components/global-search"
 import { CreateButton } from "@/components/create-button"
 import { Button } from "@/components/ui/button"
 import { LogOut, User } from "lucide-react"
-import { useAuth } from "@/hooks/useAuth"
+import { useAuth, useSignOut } from "@/hooks/useAuth"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,10 +20,11 @@ interface LayoutProps {
 }
 
 export function Layout({ children }: LayoutProps) {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
+  const signOut = useSignOut();
 
-  const handleSignOut = async () => {
-    await signOut();
+  const handleSignOut = () => {
+    signOut.mutate();
   };
 
   return (
