@@ -56,14 +56,14 @@ export function LeaseModal({ open, onOpenChange, onSuccess }: LeaseModalProps) {
           // Properties / Units
           const { data: props, error: eProps } = await supabase
             .from("properties") // adapte si ta table s'appelle autrement
-            .select("id,label,name,surface")
+            .select("id,name")
             .limit(500)
           if (eProps) throw eProps
 
           if (!cancelled) {
             const opts: Option[] = (props ?? []).map((p: any) => ({
               value: String(p.id),
-              label: `${p.label ?? p.name ?? `Bien ${p.id}`}${p.surface ? ` (${p.surface}m²)` : ""}`,
+              label: p.name ?? `Bien ${p.id}`,
             }))
             setUnitOptions(opts)
           }
@@ -71,16 +71,15 @@ export function LeaseModal({ open, onOpenChange, onSuccess }: LeaseModalProps) {
           // Tenants
           const { data: people, error: ePeople } = await supabase
             .from("profiles") // adapte si ta table est "contacts"
-            .select("id,first_name,last_name,kind,full_name")
+            .select("id,first_name,last_name")
             .limit(1000)
           if (ePeople) throw ePeople
 
           if (!cancelled) {
             const tenants: Option[] = (people ?? [])
-              .filter((p: any) => (p.kind ?? "").toUpperCase() === "TENANT" || !p.kind)
               .map((p: any) => ({
                 value: String(p.id),
-                label: (p.full_name ?? `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim()) || `Personne ${p.id}`,
+                label: `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || `Personne ${p.id}`,
               }))
             setTenantOptions(tenants)
           }

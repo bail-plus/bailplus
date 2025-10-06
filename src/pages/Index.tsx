@@ -20,15 +20,15 @@ const Index = () => {
 
   const loadStats = async () => {
     try {
-      const [propertiesRes, tenantsRes, ticketsRes] = await Promise.all([
+      const [propertiesRes, profilesRes, ticketsRes] = await Promise.all([
         supabase.from('properties').select('id', { count: 'exact' }),
-        supabase.from('tenants').select('id', { count: 'exact' }),
+        supabase.from('profiles').select('id', { count: 'exact' }),
         supabase.from('maintenance_tickets').select('id', { count: 'exact' })
       ])
 
       setStats({
         properties: propertiesRes.count || 0,
-        tenants: tenantsRes.count || 0,
+        tenants: profilesRes.count || 0,
         tickets: ticketsRes.count || 0,
         loading: false
       })

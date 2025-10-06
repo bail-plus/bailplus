@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -31,24 +31,36 @@ const parseDateOnly = (s?: string | null): number | null => {
  * Si pas d'accès, redirige vers /app/paywall
  */
 export function RequireSubscription() {
+  const renderCount = useRef(0);
+  renderCount.current += 1;
+  console.log('[GUARD/SUB] Render #', renderCount.current);
+
   const { profile, subscription, isReady } = useAuth();
   const [forceReady, setForceReady] = useState(false);
 
-  // Timeout de sécurité : forcer le passage après 5 secondes
+  console.log('[GUARD/SUB]', {
+    isReady,
+    forceReady,
+    hasProfile: !!profile,
+    hasSubscription: !!subscription,
+    willWait: !isReady && !forceReady
+  });
+
+  // Timeout de sécurité : forcer le passage après 10 secondes (au lieu de 5)
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (!isReady) {
         console.warn('[GUARD/SUB] ⚠️ Forcing ready after timeout');
         setForceReady(true);
       }
-    }, 5000);
+    }, 10000);
 
     return () => clearTimeout(timeout);
   }, [isReady]);
 
   // Attendre que le profil et l'abonnement soient complètement chargés
   if (!isReady && !forceReady) {
-    console.log('[GUARD/SUB] Waiting for data to load... (isReady = false)');
+    console.log('[GUARD/SUB] WAITING - showing loader...');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -72,44 +84,24 @@ export function RequireSubscription() {
   const todayMs = startOfDay(new Date());
   const hasValidTrial = trialEndMs !== null && trialEndMs > todayMs;
 
-  console.log('[GUARD/SUB] Subscription check:', {
-    profile: {
-      trial_end_date: profile?.trial_end_date,
-      trialEndMs,
-      todayMs,
-      hasValidTrial,
-    },
-    subscription: {
-      exists: !!subscription,
-      subscribed: subscription?.subscribed,
-      status: subscription?.subscription_status,
-      subStatus,
-      hasActiveSubscription,
-    },
-    result: {
-      hasActiveSubscription,
-      hasValidTrial,
-      willRedirectToPaywall: !hasActiveSubscription && !hasValidTrial,
-    }
-  });
-
   // MODE DEBUG: Toujours autoriser l'accès si VITE_DEBUG_SKIP_PAYWALL est défini
   if (import.meta.env.VITE_DEBUG_SKIP_PAYWALL === 'true') {
-    console.warn('[GUARD/SUB] 🔧 DEBUG MODE: Skipping paywall check');
     return <Outlet />;
   }
 
   // Si ni abonnement ni trial valide, rediriger vers le paywall
+  // MAIS seulement si on a bien récupéré les données (pas juste timeout)
   if (!hasActiveSubscription && !hasValidTrial) {
-    console.error('[GUARD/SUB] ❌ Access denied - Redirecting to paywall', {
-      reason: !hasActiveSubscription ? 'No active subscription' : 'Trial expired',
-      subscription,
-      profile,
-    });
+    // Si on a forcé le passage après timeout et qu'il n'y a pas de données du tout,
+    // ne pas rediriger car c'est peut-être juste un problème réseau temporaire
+    if (forceReady && !profile && !subscription) {
+      console.warn('[GUARD/SUB] Forced ready without data - allowing access to avoid false redirect');
+      return <Outlet />;
+    }
+
     return <Navigate to="/app/paywall" replace />;
   }
 
-  console.log('[GUARD/SUB] ✅ Access granted');
   // Accès valide, afficher les routes enfants
   return <Outlet />;
 }

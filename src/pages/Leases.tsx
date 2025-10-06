@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -25,6 +25,10 @@ import { useCreateUnit } from "@/hooks/useUnits"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function Leases() {
+  const renderCount = useRef(0);
+  renderCount.current += 1;
+  console.log('[PAGE/LEASES] Render #', renderCount.current);
+
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [selectedLease, setSelectedLease] = useState<LeaseWithDetails | null>(null)
@@ -57,6 +61,15 @@ export default function Leases() {
   const updateLease = useUpdateLease()
   const deleteLease = useDeleteLease()
   const createUnit = useCreateUnit()
+
+  console.log('[PAGE/LEASES]', {
+    isLoading,
+    hasError: !!error,
+    hasLeases: leases.length > 0,
+    leasesCount: leases.length,
+    hasProperties: properties.length > 0,
+    hasContacts: contacts.length > 0
+  })
 
   // Get units for selected property
   const selectedProperty = properties.find(p => p.id === selectedPropertyId)

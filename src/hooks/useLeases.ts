@@ -155,11 +155,22 @@ async function deleteLease(id: string): Promise<void> {
 
 // Hook to fetch all leases with details
 export function useLeasesWithDetails() {
-  return useQuery({
+  const query = useQuery({
     queryKey: ['leases', 'with-details'],
     queryFn: fetchLeasesWithDetails,
-    staleTime: 5 * 60 * 1000,
   });
+
+  console.log('[LEASES QUERY]', {
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    hasData: !!query.data,
+    dataLength: query.data?.length || 0,
+    status: query.status,
+    fetchStatus: query.fetchStatus,
+    error: query.error
+  });
+
+  return query;
 }
 
 // Hook to fetch a single lease

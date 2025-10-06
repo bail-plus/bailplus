@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useCallback, useRef } from "react"
 import {
   BarChart3,
   Calendar,
@@ -46,29 +46,29 @@ const items = [
 ]
 
 export function AppSidebar() {
+  const renderCount = useRef(0);
+  renderCount.current += 1;
+  console.log('[APP_SIDEBAR] Render #', renderCount.current);
+
   const { state } = useSidebar()
   const location = useLocation()
-  const { user, loading } = useAuth();
-  const signOut = useSignOut();
+  const { user } = useAuth();
+  const { mutate: signOut } = useSignOut();
   const currentPath = location.pathname
   const collapsed = state === "collapsed"
-  const navigate = useNavigate()
-  const isActive = (path: string) => {
+
+  const isActive = useCallback((path: string) => {
     if (path === "/app/dashboard") {
       return currentPath === "/app/dashboard" || currentPath === "/app"
     }
     return currentPath.startsWith(path)
-  }
+  }, [currentPath])
 
-  const getNavClassName = (path: string) => {
+  const getNavClassName = useCallback((path: string) => {
     return isActive(path)
       ? "bg-sidebar-accent text-sidebar-primary font-medium shadow-sm border-r-2 border-sidebar-primary"
       : "hover:bg-sidebar-accent/50 text-sidebar-foreground"
-  }
-
-  const handleSignOut = () => {
-    signOut.mutate()
-  }
+  }, [isActive])
   return (
     <Sidebar
       className={`
@@ -150,7 +150,7 @@ export function AppSidebar() {
 
             {/* Bouton déconnexion */}
             <button
-              onClick={handleSignOut}
+              onClick={() => signOut()}
               className={`
         inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm
         hover:bg-sidebar-accent/60 text-sidebar-foreground transition

@@ -1,4 +1,4 @@
-
+import { useRef, memo } from "react"
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { EntitySelector } from "@/components/entity-selector"
@@ -20,12 +20,26 @@ interface LayoutProps {
 }
 
 export function Layout({ children }: LayoutProps) {
-  const { user } = useAuth();
-  const signOut = useSignOut();
+  const renderCount = useRef(0);
+  renderCount.current += 1;
+  console.log('[LAYOUT] Render #', renderCount.current);
 
-  const handleSignOut = () => {
-    signOut.mutate();
-  };
+  const authResult = useAuth();
+  const { user } = authResult;
+  const { mutate: signOut } = useSignOut();
+
+  const authResultRef = useRef(authResult);
+  const userRef = useRef(user);
+
+  if (authResultRef.current !== authResult) {
+    console.log('[LAYOUT] ⚠️ authResult object CHANGED');
+    authResultRef.current = authResult;
+  }
+
+  if (userRef.current !== user) {
+    console.log('[LAYOUT] ⚠️ user object CHANGED');
+    userRef.current = user;
+  }
 
   return (
     <SidebarProvider>
@@ -73,7 +87,7 @@ export function Layout({ children }: LayoutProps) {
                       </div>
                     </div>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleSignOut} className="text-destructive focus:text-destructive">
+                    <DropdownMenuItem onClick={() => signOut()} className="text-destructive focus:text-destructive">
                       <LogOut className="w-4 h-4 mr-2" />
                       Déconnexion
                     </DropdownMenuItem>

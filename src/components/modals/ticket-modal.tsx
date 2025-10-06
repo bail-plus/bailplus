@@ -48,8 +48,6 @@ type ProfileRow = {
   id: string
   first_name: string | null
   last_name: string | null
-  full_name: string | null
-  kind?: string | null // si tu as ce champ pour distinguer TENANT
 }
 
 export function TicketModal({ open, onOpenChange, onSuccess }: TicketModalProps) {
@@ -80,7 +78,7 @@ export function TicketModal({ open, onOpenChange, onSuccess }: TicketModalProps)
           supabase.from("properties").select("id,name,address").returns<PropertyRow[]>().throwOnError(),
           supabase
             .from("profiles")
-            .select("id,first_name,last_name,full_name,kind")
+            .select("id,first_name,last_name")
             .returns<ProfileRow[]>()
             .throwOnError(),
         ])
@@ -109,11 +107,9 @@ export function TicketModal({ open, onOpenChange, onSuccess }: TicketModalProps)
   }, [units])
 
   const availableReporters = useMemo(() => {
-    const tenants = people.filter(p => (p.kind ?? "").toUpperCase() === "TENANT" || !p.kind)
-    const options = tenants.map(p => {
-      const full = (p.full_name ?? "").trim()
-      const basic = `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim()
-      return { value: String(p.id), label: (full || basic || `Personne ${p.id}`) + " (locataire)" }
+    const options = people.map(p => {
+      const name = `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim()
+      return { value: String(p.id), label: name || `Personne ${p.id}` }
     })
     return [{ value: "", label: "Signalement propriétaire" }, ...options]
   }, [people])
