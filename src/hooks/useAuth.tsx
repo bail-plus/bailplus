@@ -279,26 +279,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setInitialized(true);
       }
 
-      if (u?.id && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN')) {
-        try {
-          await upsertProfileFromUser(u);
-        } catch (e) {
-          console.error('auth hydrate error', e);
-        }
-      }
+      // if (u?.id && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN')) {
+      //   try {
+      //     await upsertProfileFromUser(u);
+      //   } catch (e) {
+      //     console.error('auth hydrate error', e);
+      //   }
+      // }
 
       // Invalider uniquement les queries liées à l'auth quand le token est rafraîchi
-      if (event === 'TOKEN_REFRESHED') {
-        const currentUserId = (session?.user?.id ?? u?.id) || undefined;
-        console.log('[AUTH] Token refreshed, invalidate auth-scoped queries', { currentUserId });
-        // Ne pas déclencher un refetch global qui peut bloquer l'UI
-        queryClient.invalidateQueries({ queryKey: ['profile'] });
-        queryClient.invalidateQueries({ queryKey: ['subscription'] });
-        if (currentUserId) {
-          queryClient.invalidateQueries({ queryKey: ['profile', currentUserId] });
-          queryClient.invalidateQueries({ queryKey: ['subscription', currentUserId] });
-        }
-      }
+      // if (event === 'TOKEN_REFRESHED') {
+      //   const currentUserId = (session?.user?.id ?? u?.id) || undefined;
+      //   console.log('[AUTH] Token refreshed, invalidate auth-scoped queries', { currentUserId });
+      //   // Ne pas déclencher un refetch global qui peut bloquer l'UI
+      //   queryClient.invalidateQueries({ queryKey: ['profile'] });
+      //   queryClient.invalidateQueries({ queryKey: ['subscription'] });
+      //   if (currentUserId) {
+      //     queryClient.invalidateQueries({ queryKey: ['profile', currentUserId] });
+      //     queryClient.invalidateQueries({ queryKey: ['subscription', currentUserId] });
+      //   }
+      // }
 
       if (event === 'SIGNED_OUT') {
         setLoading(false);
