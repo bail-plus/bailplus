@@ -45,9 +45,23 @@ import Imprint from "./pages/marketing/legal/Imprint";
 import NotFound from "./pages/NotFound";
 import { MarketingLayout } from "./components/marketing/marketing-layout";
 
-const queryClient = new QueryClient();
+// IMPORTANT: Créer le QueryClient EN DEHORS du composant pour éviter qu'il soit recréé à chaque render
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 2,
+      retryDelay: 1000,
+      staleTime: 5 * 60 * 1000, // 5 minutes - les données sont fraîches pendant 5 min
+      gcTime: 10 * 60 * 1000, // 10 minutes
+      refetchOnWindowFocus: false, // Ne pas refetch quand on revient sur l'onglet
+      refetchOnMount: true, // Refetch au mount SI les données sont stale
+      refetchOnReconnect: false,
+    },
+  },
+});
 
-const App = () => (
+function App() {
+  return (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <TooltipProvider>
@@ -104,6 +118,7 @@ const App = () => (
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
-);
+  );
+}
 
 export default App;

@@ -1,4 +1,4 @@
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect, useMemo, useRef, createContext, useContext } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { User, Session } from '@supabase/supabase-js';
 import { toast } from 'sonner';
@@ -74,28 +74,56 @@ const upsertProfileFromUser = async (u: User) => {
 /* =======================
    API Functions
    ======================= */
-async function fetchProfile(userId: string): Promise<Profile> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('user_id', userId)
-    .single();
+async function fetchProfile(userId: string): Promise<Profile | null> {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
 
-  if (error) throw error;
-  return data;
+    if (error) {
+      console.error('[FETCH/PROFILE] Error:', error);
+      return null;
+    }
+
+    // Sauvegarder en localStorage pour le cache
+    if (data) {
+      localStorage.setItem(`profile_${userId}`, JSON.stringify(data));
+    }
+
+    return data;
+  } catch (err) {
+    console.error('[FETCH/PROFILE] Exception:', err);
+    return null;
+  }
 }
 
 async function fetchSubscription(userId: string): Promise<Subscription | null> {
-  const { data, error } = await supabase
-    .from('subscriptions')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  try {
+    const { data, error } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  if (error) throw error;
-  return data;
+    if (error) {
+      console.error('[FETCH/SUBSCRIPTION] Error:', error);
+      return null;
+    }
+
+    // Sauvegarder en localStorage pour le cache
+    if (data) {
+      localStorage.setItem(`subscription_${userId}`, JSON.stringify(data));
+    }
+
+    return data;
+  } catch (err) {
+    console.error('[FETCH/SUBSCRIPTION] Exception:', err);
+    return null;
+  }
 }
 
 async function signUpUser(params: {
@@ -186,6 +214,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  const queryClient = useQueryClient();
+
+  // DEBUG: Compteur de renders
+  const renderCount = useRef(0);
+  renderCount.current += 1;
+  console.log('[AUTH/PROVIDER] Render #', renderCount.current);
+
+  // Utiliser des refs pour stabiliser les objets user/session
+  // Ne les mettre à jour que si l'ID change réellement
+  const userRef = useRef<User | null>(null);
+  const sessionRef = useRef<Session | null>(null);
+
+  // Comparer les IDs pour savoir si on doit changer l'objet
+  const userChanged = user?.id !== userRef.current?.id;
+  const sessionChanged = session?.access_token !== sessionRef.current?.access_token;
+
+  if (userChanged) {
+    console.log('[AUTH/PROVIDER] User changed:', { oldId: userRef.current?.id, newId: user?.id });
+    userRef.current = user;
+  }
+  if (sessionChanged) {
+    console.log('[AUTH/PROVIDER] Session changed:', { oldToken: sessionRef.current?.access_token?.slice(0, 10), newToken: session?.access_token?.slice(0, 10) });
+    sessionRef.current = session;
+  }
+
+  const stableUser = userRef.current;
+  const stableSession = sessionRef.current;
 
   useEffect(() => {
     let cancelled = false;
@@ -195,25 +250,65 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (cancelled) return;
 
-      setSession(session ?? null);
-      const u = session?.user ?? null;
-      setUser(u);
+      console.log('[AUTH] Event:', event, 'Session:', !!session);
+
+      const newSession = session ?? null;
+      const newUser = session?.user ?? null;
+
+      // Ne mettre à jour l'état QUE si l'ID a changé pour éviter les re-renders inutiles
+      setSession(prev => {
+        if (prev?.access_token === newSession?.access_token) {
+          console.log('[AUTH] Session unchanged, skip setState');
+          return prev;
+        }
+        console.log('[AUTH] Session CHANGED, updating state');
+        return newSession;
+      });
+
+      setUser(prev => {
+        if (prev?.id === newUser?.id) {
+          console.log('[AUTH] User unchanged, skip setState');
+          return prev;
+        }
+        console.log('[AUTH] User CHANGED, updating state');
+        return newUser;
+      });
 
       if (!hydrated) {
         hydrated = true;
         setInitialized(true);
       }
 
-      if (u?.id && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN')) {
-        try {
-          await upsertProfileFromUser(u);
-        } catch (e) {
-          console.error('auth hydrate error', e);
-        }
-      }
+      // if (u?.id && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN')) {
+      //   try {
+      //     await upsertProfileFromUser(u);
+      //   } catch (e) {
+      //     console.error('auth hydrate error', e);
+      //   }
+      // }
+
+      // Invalider uniquement les queries liées à l'auth quand le token est rafraîchi
+      // if (event === 'TOKEN_REFRESHED') {
+      //   const currentUserId = (session?.user?.id ?? u?.id) || undefined;
+      //   console.log('[AUTH] Token refreshed, invalidate auth-scoped queries', { currentUserId });
+      //   // Ne pas déclencher un refetch global qui peut bloquer l'UI
+      //   queryClient.invalidateQueries({ queryKey: ['profile'] });
+      //   queryClient.invalidateQueries({ queryKey: ['subscription'] });
+      //   if (currentUserId) {
+      //     queryClient.invalidateQueries({ queryKey: ['profile', currentUserId] });
+      //     queryClient.invalidateQueries({ queryKey: ['subscription', currentUserId] });
+      //   }
+      // }
 
       if (event === 'SIGNED_OUT') {
         setLoading(false);
+        queryClient.clear();
+        // Nettoyer le localStorage
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('profile_') || key.startsWith('subscription_')) {
+            localStorage.removeItem(key);
+          }
+        });
       }
     });
 
@@ -251,7 +346,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Safety timeout
     const t = setTimeout(() => {
       if (!hydrated) {
-        console.warn('[AUTH] force initialized=true after 2s safety');
         hydrated = true;
         setInitialized(true);
         setLoading(false);
@@ -263,10 +357,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       clearTimeout(t);
       subscription?.unsubscribe();
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // queryClient est stable et ne change jamais, pas besoin de le mettre en dépendance
+
+  // Mémoriser la valeur du contexte pour éviter les re-renders inutiles
+  const contextValue = useMemo(() => {
+    console.log('[AUTH/PROVIDER] Context value updated', {
+      hasUser: !!stableUser,
+      hasSession: !!stableSession,
+      loading,
+      initialized
+    });
+    return {
+      user: stableUser,
+      session: stableSession,
+      loading,
+      initialized
+    };
+  }, [stableUser, stableSession, loading, initialized]);
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, initialized }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
@@ -284,45 +395,77 @@ export function useAuthContext() {
 export function useProfile() {
   const { user } = useAuthContext();
 
-  return useQuery({
+  // Charger depuis localStorage UNE SEULE FOIS (pas à chaque render)
+  const cachedProfile = useMemo(() => {
+    if (!user?.id) return undefined;
+    try {
+      const cached = localStorage.getItem(`profile_${user.id}`);
+      return cached ? JSON.parse(cached) : undefined;
+    } catch {
+      return undefined;
+    }
+  }, [user?.id]);
+
+  const query = useQuery({
     queryKey: ['profile', user?.id],
-    queryFn: async () => {
-      console.log('[QUERY/PROFILE] Fetching profile for user:', user?.id);
-      try {
-        const data = await fetchProfile(user!.id);
-        console.log('[QUERY/PROFILE] ✅ Profile fetched successfully');
-        return data;
-      } catch (error) {
-        console.error('[QUERY/PROFILE] ❌ Error fetching profile:', error);
-        throw error;
-      }
-    },
+    queryFn: () => fetchProfile(user!.id),
     enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
-    retry: 1, // Limiter les retry à 1 tentative
+    initialData: cachedProfile, // Utiliser la valeur mémorisée
+    staleTime: Infinity, // JAMAIS considéré comme stale - évite les refetch infinis
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
+
+  console.log('[PROFILE QUERY]', {
+    userId: user?.id,
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    hasData: !!query.data,
+    hasCached: !!cachedProfile,
+    status: query.status,
+    fetchStatus: query.fetchStatus
+  });
+
+  return query;
 }
 
 export function useSubscription() {
   const { user } = useAuthContext();
 
-  return useQuery({
+  // Charger depuis localStorage UNE SEULE FOIS (pas à chaque render)
+  const cachedSubscription = useMemo(() => {
+    if (!user?.id) return undefined;
+    try {
+      const cached = localStorage.getItem(`subscription_${user.id}`);
+      return cached ? JSON.parse(cached) : undefined;
+    } catch {
+      return undefined;
+    }
+  }, [user?.id]);
+
+  const query = useQuery({
     queryKey: ['subscription', user?.id],
-    queryFn: async () => {
-      console.log('[QUERY/SUBSCRIPTION] Fetching subscription for user:', user?.id);
-      try {
-        const data = await fetchSubscription(user!.id);
-        console.log('[QUERY/SUBSCRIPTION] ✅ Subscription fetched successfully:', data ? 'exists' : 'null');
-        return data;
-      } catch (error) {
-        console.error('[QUERY/SUBSCRIPTION] ❌ Error fetching subscription:', error);
-        throw error;
-      }
-    },
+    queryFn: () => fetchSubscription(user!.id),
     enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
-    retry: 1, // Limiter les retry à 1 tentative
+    initialData: cachedSubscription, // Utiliser la valeur mémorisée
+    staleTime: Infinity, // JAMAIS considéré comme stale - évite les refetch infinis
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
+
+  console.log('[SUBSCRIPTION QUERY]', {
+    userId: user?.id,
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    hasData: !!query.data,
+    hasCached: !!cachedSubscription,
+    status: query.status,
+    fetchStatus: query.fetchStatus
+  });
+
+  return query;
 }
 
 export function useSignUp() {
@@ -362,6 +505,18 @@ export function useSignOut() {
     onSuccess: () => {
       toast.success('Déconnexion réussie');
       queryClient.clear();
+      // Nettoyer le localStorage
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('profile_') || key.startsWith('subscription_')) {
+          localStorage.removeItem(key);
+        }
+      });
+      // Forcer une redirection explicite pour éviter tout état bloqué de guard
+      try {
+        if (typeof window !== 'undefined') {
+          window.location.assign('/auth');
+        }
+      } catch {}
     },
     onError: (error: any) => {
       toast.error(error.message || 'Erreur lors de la déconnexion');
@@ -372,36 +527,42 @@ export function useSignOut() {
 // Hook principal qui combine tout
 export function useAuth() {
   const { user, session, loading, initialized } = useAuthContext();
-  const { data: profile, isLoading: profileLoading, error: profileError } = useProfile();
-  const { data: subscription, isLoading: subscriptionLoading, error: subscriptionError } = useSubscription();
+  const { data: profile, isLoading: profileLoading } = useProfile();
+  const { data: subscription, isLoading: subscriptionLoading } = useSubscription();
 
-  // Le système est prêt quand tout est chargé OU si une erreur est survenue (pour ne pas bloquer)
-  const isReady = initialized && !profileLoading && !subscriptionLoading;
+  // Mémoriser l'objet retourné pour éviter les re-renders en cascade
+  // IMPORTANT: Dépendre des valeurs primitives, pas des objets entiers
+  const userId = user?.id;
+  const sessionAccessToken = session?.access_token;
+  const profileId = profile?.id;
+  const subscriptionId = subscription?.id;
 
-  const result = {
-    user,
-    session,
-    profile: profile ?? null,
-    subscription: subscription ?? null,
-    loading,
-    initialized,
-    isReady, // Nouveau flag qui indique que TOUT est chargé
-  };
+  const result = useMemo(() => {
+    // isReady = auth initialisée ET (profile/subscription chargés OU user n'existe pas)
+    // Si pas de user, on est ready car pas besoin de charger profile/subscription
+    const isReady = initialized && (!user || (!profileLoading && !subscriptionLoading));
 
-  console.log('[HOOK/useAuth]', {
-    user: !!user,
-    loading,
-    initialized,
-    isReady,
-    profile: !!profile,
-    profileLoading,
-    profileError: profileError ? (profileError as any).message : null,
-    subscription: !!subscription,
-    subscriptionLoading,
-    subscriptionError: subscriptionError ? (subscriptionError as any).message : null,
-    trial_end_date: profile?.trial_end_date,
-    subscription_status: subscription?.subscription_status,
-  });
+    console.log('[USE_AUTH]', {
+      hasUser: !!user,
+      initialized,
+      profileLoading,
+      subscriptionLoading,
+      hasProfile: !!profile,
+      hasSubscription: !!subscription,
+      isReady,
+      timestamp: Date.now()
+    });
+
+    return {
+      user,
+      session,
+      profile: profile ?? null,
+      subscription: subscription ?? null,
+      loading,
+      initialized,
+      isReady,
+    };
+  }, [userId, sessionAccessToken, profileId, subscriptionId, loading, initialized, profileLoading, subscriptionLoading]);
 
   return result;
 }

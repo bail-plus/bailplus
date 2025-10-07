@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import { useAuth } from '@/hooks/useAuth';
 
 export type MaintenanceTicket = Tables<'maintenance_tickets'>;
 export type MaintenanceTicketInsert = TablesInsert<'maintenance_tickets'>;
@@ -34,15 +35,14 @@ export type MaintenanceTicketWithDetails = MaintenanceTicket & {
 };
 
 // Fetch all maintenance tickets with details
-async function fetchMaintenanceTicketsWithDetails(): Promise<MaintenanceTicketWithDetails[]> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Non authentifié');
+async function fetchMaintenanceTicketsWithDetails(userId: string): Promise<MaintenanceTicketWithDetails[]> {
+  if (!userId) return [];
 
   // Get tickets
   const { data: tickets, error: ticketsError } = await supabase
     .from('maintenance_tickets')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
   if (ticketsError) throw new Error(ticketsError.message);
@@ -216,9 +216,12 @@ async function deleteWorkOrder(id: string): Promise<void> {
 
 // Hook to fetch all maintenance tickets with details
 export function useMaintenanceTicketsWithDetails() {
+  const { user } = useAuth();
+  const userId = user?.id ?? '';
   return useQuery({
-    queryKey: ['maintenance-tickets', 'with-details'],
-    queryFn: fetchMaintenanceTicketsWithDetails,
+    queryKey: ['maintenance-tickets', 'with-details', userId],
+    queryFn: () => fetchMaintenanceTicketsWithDetails(userId),
+    enabled: !!userId,
     staleTime: 5 * 60 * 1000,
   });
 }

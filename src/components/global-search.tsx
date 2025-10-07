@@ -35,10 +35,10 @@ export function GlobalSearch() {
     try {
       setLoading(true)
       
-      // Load properties, tenants, and documents in parallel
-      const [propertiesResult, tenantsResult, documentsResult] = await Promise.all([
+      // Load properties, profiles, and documents in parallel
+      const [propertiesResult, profilesResult, documentsResult] = await Promise.all([
         supabase.from('properties').select('id, name, address'),
-        supabase.from('tenants').select('id, first_name, last_name'),
+        supabase.from('profiles').select('id, first_name, last_name'),
         supabase.from('documents').select('id, name, type')
       ])
 
@@ -57,14 +57,14 @@ export function GlobalSearch() {
         })
       }
 
-      // Tenants
-      if (tenantsResult.data && tenantsResult.data.length > 0) {
+      // Profiles
+      if (profilesResult.data && profilesResult.data.length > 0) {
         groups.push({
-          group: "Locataires",
-          items: tenantsResult.data.map(tenant => ({
-            id: tenant.id,
-            title: `${tenant.first_name} ${tenant.last_name}`,
-            type: "tenant",
+          group: "Contacts",
+          items: profilesResult.data.map(profile => ({
+            id: profile.id,
+            title: `${profile.first_name} ${profile.last_name}`,
+            type: "profile",
             icon: Users
           }))
         })

@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -6,13 +7,23 @@ import { useAuth } from '@/hooks/useAuth';
  * Si non connecté, redirige vers /auth
  */
 export function RequireAuth() {
-  const { user, loading, initialized } = useAuth();
+  const { user, initialized } = useAuth();
+  const [forceReady, setForceReady] = useState(false);
 
-  console.log('[GUARD/AUTH]', { user: !!user, loading, initialized });
+  // Timeout de sécurité : forcer le passage après 3 secondes
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (!initialized && !forceReady) {
+        console.warn('[GUARD/AUTH] ⚠️ Forcing ready after timeout');
+        setForceReady(true);
+      }
+    }, 3000);
+
+    return () => clearTimeout(timeout);
+  }, [initialized, forceReady]);
 
   // Attendre que l'initialisation soit terminée
-  if (!initialized || loading) {
-    console.log('[GUARD/AUTH] Waiting for initialization...');
+  if (!initialized && !forceReady) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -25,11 +36,9 @@ export function RequireAuth() {
 
   // Si pas d'utilisateur, rediriger vers /auth
   if (!user) {
-    console.log('[GUARD/AUTH] ❌ No user - Redirecting to /auth');
     return <Navigate to="/auth" replace />;
   }
 
-  console.log('[GUARD/AUTH] ✅ User authenticated');
   // Utilisateur authentifié, afficher les routes enfants
   return <Outlet />;
 }

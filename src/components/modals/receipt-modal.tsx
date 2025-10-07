@@ -49,7 +49,7 @@ type LeaseRow = {
   // champs éventuels : rent_hc, charges, start_date, etc.
 }
 type PropertyRow = { id: string; name: string | null; address: string | null }
-type ProfileRow = { id: string; first_name: string | null; last_name: string | null; full_name: string | null }
+type ProfileRow = { id: string; first_name: string | null; last_name: string | null }
 
 export function ReceiptModal({ open, onOpenChange, onSuccess }: ReceiptModalProps) {
   const [isLoading, setIsLoading] = useState(false)
@@ -80,7 +80,7 @@ export function ReceiptModal({ open, onOpenChange, onSuccess }: ReceiptModalProp
         const [leasesRes, propsRes, peopleRes] = await Promise.all([
           supabase.from("leases").select("id,unit_id,tenant_id").returns<LeaseRow[]>().throwOnError(),
           supabase.from("properties").select("id,name,address").returns<PropertyRow[]>().throwOnError(),
-          supabase.from("profiles").select("id,first_name,last_name,full_name").returns<ProfileRow[]>().throwOnError(),
+          supabase.from("profiles").select("id,first_name,last_name").returns<ProfileRow[]>().throwOnError(),
         ])
 
         if (cancelled) return
@@ -116,9 +116,8 @@ export function ReceiptModal({ open, onOpenChange, onSuccess }: ReceiptModalProp
   const peopleMap = useMemo(() => {
     const m = new Map<string, string>()
     for (const p of people) {
-      const full = (p.full_name ?? "").trim()
-      const basic = `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim()
-      m.set(String(p.id), full || basic || `Personne ${p.id}`)
+      const name = `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim()
+      m.set(String(p.id), name || `Personne ${p.id}`)
     }
     return m
   }, [people])
