@@ -217,7 +217,15 @@ export function useDeleteProperty() {
   return useMutation({
     mutationFn: deleteProperty,
     onSuccess: () => {
+      // Invalidate all related queries due to cascade delete
       queryClient.invalidateQueries({ queryKey: ['properties'] });
+      queryClient.invalidateQueries({ queryKey: ['units'] });
+      queryClient.invalidateQueries({ queryKey: ['leases'] });
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      queryClient.invalidateQueries({ queryKey: ['maintenance_tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      queryClient.invalidateQueries({ queryKey: ['rent_invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['deposits'] });
     },
   });
 }
