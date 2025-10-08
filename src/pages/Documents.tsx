@@ -10,6 +10,7 @@ import { FileText, Plus, Search, Download, Upload, Eye, File, Folder, Image, Loa
 import { supabase } from "@/integrations/supabase/client"
 import ReceiptGeneratorModal from "@/components/receipt-generator-modal"
 import LeaseGeneratorModal from "@/components/lease-generator-modal"
+import EDLGeneratorModal from "@/components/edl-generator-modal"
 
 interface Document {
   id: string
@@ -39,6 +40,7 @@ export default function Documents() {
   const [loading, setLoading] = useState(true)
   const [receiptModalOpen, setReceiptModalOpen] = useState(false)
   const [leaseModalOpen, setLeaseModalOpen] = useState(false)
+  const [edlModalOpen, setEdlModalOpen] = useState(false)
   const [downloading, setDownloading] = useState<string | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
@@ -152,8 +154,8 @@ export default function Documents() {
     if (!document.file_url) return null
 
     try {
-      // Check if it's a receipt (stored in PRIVATE bucket)
-      if (document.type === 'RECEIPT') {
+      // Check if it's a document stored in PRIVATE bucket (RECEIPT, LEASE, EDL)
+      if (document.type === 'RECEIPT' || document.type === 'LEASE' || document.type === 'EDL') {
         // Get signed URL for private file
         const { data, error } = await supabase.storage
           .from('PRIVATE')
@@ -336,7 +338,13 @@ export default function Documents() {
                     <File className="w-4 h-4" />
                     Quittance de loyer
                   </Button>
-                  <Button variant="outline" className="justify-start gap-2">
+                  <Button
+                    variant="outline"
+                    className="justify-start gap-2"
+                    onClick={() => {
+                      setEdlModalOpen(true)
+                    }}
+                  >
                     <Folder className="w-4 h-4" />
                     État des lieux
                   </Button>
@@ -674,6 +682,13 @@ export default function Documents() {
       <LeaseGeneratorModal
         open={leaseModalOpen}
         onOpenChange={setLeaseModalOpen}
+        onGenerate={loadDocuments}
+      />
+
+      {/* EDL Generator Modal */}
+      <EDLGeneratorModal
+        open={edlModalOpen}
+        onOpenChange={setEdlModalOpen}
         onGenerate={loadDocuments}
       />
     </div>
