@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { FileText, Plus, Search, Download, Upload, Eye, File, Folder, Image, Loader2 } from "lucide-react"
 import { supabase } from "@/integrations/supabase/client"
 import ReceiptGeneratorModal from "@/components/receipt-generator-modal"
+import LeaseGeneratorModal from "@/components/lease-generator-modal"
 
 interface Document {
   id: string
@@ -37,6 +38,7 @@ export default function Documents() {
   const [documents, setDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(true)
   const [receiptModalOpen, setReceiptModalOpen] = useState(false)
+  const [leaseModalOpen, setLeaseModalOpen] = useState(false)
   const [downloading, setDownloading] = useState<string | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
@@ -49,13 +51,41 @@ export default function Documents() {
 
   const loadDocuments = useCallback(async () => {
     try {
-      // Load documents from documents table
+      // Load all documents from documents table
       const { data: docsData, error: docsError } = await supabase
         .from('documents')
         .select('*')
         .order('created_at', { ascending: false })
 
       if (docsError) throw docsError
+
+      // For LEASE documents, enrich with tenant info
+      const transformedDocs = await Promise.all(
+        (docsData || []).map(async (doc) => {
+          if (doc.type === 'LEASE' && doc.lease_id) {
+            try {
+              // Load lease with tenant info
+              const { data: leaseData } = await supabase
+                .from('leases')
+                .select(`
+                  tenant:contacts(first_name, last_name)
+                `)
+                .eq('id', doc.lease_id)
+                .single()
+
+              if (leaseData?.tenant) {
+                return {
+                  ...doc,
+                  name: doc.name || `Bail - ${leaseData.tenant.first_name} ${leaseData.tenant.last_name}`
+                }
+              }
+            } catch (err) {
+              console.error('Error loading lease data:', err)
+            }
+          }
+          return doc
+        })
+      )
 
       // Load receipts from rent_invoices table
       const { data: receiptsData, error: receiptsError } = await supabase
@@ -97,7 +127,7 @@ export default function Documents() {
       }))
 
       // Combine both arrays
-      const allDocuments = [...transformedReceipts, ...(docsData || [])]
+      const allDocuments = [...transformedReceipts, ...transformedDocs]
       allDocuments.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
       setDocuments(allDocuments)
@@ -286,7 +316,13 @@ export default function Documents() {
               </DialogHeader>
               <div className="space-y-4 pt-4">
                 <div className="grid grid-cols-1 gap-3">
-                  <Button variant="outline" className="justify-start gap-2">
+                  <Button
+                    variant="outline"
+                    className="justify-start gap-2"
+                    onClick={() => {
+                      setLeaseModalOpen(true)
+                    }}
+                  >
                     <FileText className="w-4 h-4" />
                     Bail de location
                   </Button>
@@ -631,6 +667,13 @@ export default function Documents() {
       <ReceiptGeneratorModal
         open={receiptModalOpen}
         onOpenChange={setReceiptModalOpen}
+        onGenerate={loadDocuments}
+      />
+
+      {/* Lease Generator Modal */}
+      <LeaseGeneratorModal
+        open={leaseModalOpen}
+        onOpenChange={setLeaseModalOpen}
         onGenerate={loadDocuments}
       />
     </div>
