@@ -11,6 +11,7 @@ import { supabase } from "@/integrations/supabase/client"
 import ReceiptGeneratorModal from "@/components/receipt-generator-modal"
 import LeaseGeneratorModal from "@/components/lease-generator-modal"
 import EDLGeneratorModal from "@/components/edl-generator-modal"
+import LetterGeneratorModal from "@/components/letter-generator-modal"
 
 interface Document {
   id: string
@@ -41,6 +42,7 @@ export default function Documents() {
   const [receiptModalOpen, setReceiptModalOpen] = useState(false)
   const [leaseModalOpen, setLeaseModalOpen] = useState(false)
   const [edlModalOpen, setEdlModalOpen] = useState(false)
+  const [letterModalOpen, setLetterModalOpen] = useState(false)
   const [downloading, setDownloading] = useState<string | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
@@ -154,8 +156,8 @@ export default function Documents() {
     if (!document.file_url) return null
 
     try {
-      // Check if it's a document stored in PRIVATE bucket (RECEIPT, LEASE, EDL)
-      if (document.type === 'RECEIPT' || document.type === 'LEASE' || document.type === 'EDL') {
+      // Check if it's a document stored in PRIVATE bucket (RECEIPT, LEASE, EDL, LETTER)
+      if (document.type === 'RECEIPT' || document.type === 'LEASE' || document.type === 'EDL' || document.type === 'LETTER') {
         // Get signed URL for private file
         const { data, error } = await supabase.storage
           .from('PRIVATE')
@@ -348,7 +350,13 @@ export default function Documents() {
                     <Folder className="w-4 h-4" />
                     État des lieux
                   </Button>
-                  <Button variant="outline" className="justify-start gap-2">
+                  <Button
+                    variant="outline"
+                    className="justify-start gap-2"
+                    onClick={() => {
+                      setLetterModalOpen(true)
+                    }}
+                  >
                     <FileText className="w-4 h-4" />
                     Lettre de relance
                   </Button>
@@ -457,28 +465,40 @@ export default function Documents() {
                 </div>
               </div>
             </Button>
-            
-            <Button variant="outline" className="h-auto p-4 flex flex-col items-center gap-2">
+
+            <Button
+              variant="outline"
+              className="h-auto p-4 flex flex-col items-center gap-2"
+              onClick={() => setLeaseModalOpen(true)}
+            >
+              <FileText className="w-6 h-6" />
+              <div className="text-center">
+                <div className="font-medium">Bail de location</div>
+                <div className="text-xs text-muted-foreground">Nouveau contrat</div>
+              </div>
+            </Button>
+
+            <Button
+              variant="outline"
+              className="h-auto p-4 flex flex-col items-center gap-2"
+              onClick={() => setEdlModalOpen(true)}
+            >
               <Folder className="w-6 h-6" />
               <div className="text-center">
                 <div className="font-medium">État des lieux</div>
                 <div className="text-xs text-muted-foreground">Entrée/Sortie</div>
               </div>
             </Button>
-            
-            <Button variant="outline" className="h-auto p-4 flex flex-col items-center gap-2">
+
+            <Button
+              variant="outline"
+              className="h-auto p-4 flex flex-col items-center gap-2"
+              onClick={() => setLetterModalOpen(true)}
+            >
               <FileText className="w-6 h-6" />
               <div className="text-center">
                 <div className="font-medium">Lettres de relance</div>
                 <div className="text-xs text-muted-foreground">Impayés</div>
-              </div>
-            </Button>
-            
-            <Button variant="outline" className="h-auto p-4 flex flex-col items-center gap-2">
-              <File className="w-6 h-6" />
-              <div className="text-center">
-                <div className="font-medium">Modèles vides</div>
-                <div className="text-xs text-muted-foreground">À personnaliser</div>
               </div>
             </Button>
           </div>
@@ -689,6 +709,13 @@ export default function Documents() {
       <EDLGeneratorModal
         open={edlModalOpen}
         onOpenChange={setEdlModalOpen}
+        onGenerate={loadDocuments}
+      />
+
+      {/* Letter Generator Modal */}
+      <LetterGeneratorModal
+        open={letterModalOpen}
+        onOpenChange={setLetterModalOpen}
         onGenerate={loadDocuments}
       />
     </div>
