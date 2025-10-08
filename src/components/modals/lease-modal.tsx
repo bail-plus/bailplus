@@ -26,7 +26,8 @@ import { FileText } from "lucide-react"
 import { supabase } from "@/integrations/supabase/client"
 
 const leaseSchema = z.object({
-  unitId: z.string().min(1, "Veuillez sélectionner un bien"),
+  propertyId: z.string().min(1, "Veuillez sélectionner une propriété"),
+  unitId: z.string().min(1, "Veuillez sélectionner un logement"),
   tenantId: z.string().min(1, "Veuillez sélectionner un locataire"),
   startDate: z.string().min(1, "La date de début est requise"),
   rentHC: z.number().min(1, "Le loyer hors charges doit être supérieur à 0"),
@@ -46,18 +47,21 @@ type Option = { value: string; label: string }
 
 export function LeaseModal({ open, onOpenChange, onSuccess }: LeaseModalProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const [propertyOptions, setPropertyOptions] = useState<Option[]>([])
   const [unitOptions, setUnitOptions] = useState<Option[]>([])
   const [tenantOptions, setTenantOptions] = useState<Option[]>([])
 
+  // Load properties and tenants on mount
   useEffect(() => {
     let cancelled = false
       ; (async () => {
         try {
-          // Properties / Units
+          // Properties
           const { data: props, error: eProps } = await supabase
-            .from("properties") // adapte si ta table s'appelle autrement
+            .from("properties")
             .select("id,name")
-            .limit(500)
+            .order('name')
+
           if (eProps) throw eProps
 
           if (!cancelled) {
@@ -65,28 +69,28 @@ export function LeaseModal({ open, onOpenChange, onSuccess }: LeaseModalProps) {
               value: String(p.id),
               label: p.name ?? `Bien ${p.id}`,
             }))
-            setUnitOptions(opts)
+            setPropertyOptions(opts)
           }
 
           // Tenants
-          const { data: people, error: ePeople } = await supabase
-            .from("profiles") // adapte si ta table est "contacts"
+          const { data: contacts, error: eContacts } = await supabase
+            .from("contacts")
             .select("id,first_name,last_name")
             .limit(1000)
-          if (ePeople) throw ePeople
+          if (eContacts) throw eContacts
 
           if (!cancelled) {
-            const tenants: Option[] = (people ?? [])
-              .map((p: any) => ({
-                value: String(p.id),
-                label: `${p.first_name ?? ""} ${p.last_name ?? ""}`.trim() || `Personne ${p.id}`,
+            const tenants: Option[] = (contacts ?? [])
+              .map((c: any) => ({
+                value: String(c.id),
+                label: `${c.first_name ?? ""} ${c.last_name ?? ""}`.trim() || `Personne ${c.id}`,
               }))
             setTenantOptions(tenants)
           }
         } catch (err) {
           console.error("lease-modal options load error", err)
           if (!cancelled) {
-            setUnitOptions([])
+            setPropertyOptions([])
             setTenantOptions([])
           }
         }
@@ -94,9 +98,11 @@ export function LeaseModal({ open, onOpenChange, onSuccess }: LeaseModalProps) {
     return () => { cancelled = true }
   }, [])
 
+  // Load units when property changes
   const form = useForm<LeaseForm>({
     resolver: zodResolver(leaseSchema),
     defaultValues: {
+      propertyId: "",
       unitId: "",
       tenantId: "",
       startDate: "",
@@ -105,6 +111,38 @@ export function LeaseModal({ open, onOpenChange, onSuccess }: LeaseModalProps) {
       depositAmount: 800,
     },
   })
+
+  const selectedPropertyId = form.watch('propertyId')
+
+  useEffect(() => {
+    if (selectedPropertyId) {
+      loadUnits(selectedPropertyId)
+    } else {
+      setUnitOptions([])
+      form.setValue('unitId', '')
+    }
+  }, [selectedPropertyId])
+
+  const loadUnits = async (propertyId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('units')
+        .select('id, unit_number, type')
+        .eq('property_id', propertyId)
+        .order('unit_number')
+
+      if (error) throw error
+
+      const opts: Option[] = (data ?? []).map((u: any) => ({
+        value: String(u.id),
+        label: `${u.unit_number} - ${u.type ?? 'Type non spécifié'}`,
+      }))
+      setUnitOptions(opts)
+    } catch (error) {
+      console.error('Error loading units:', error)
+      setUnitOptions([])
+    }
+  }
 
   async function onSubmit(values: LeaseForm) {
     setIsLoading(true)
@@ -141,14 +179,39 @@ export function LeaseModal({ open, onOpenChange, onSuccess }: LeaseModalProps) {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField
               control={form.control}
-              name="unitId"
+              name="propertyId"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Bien à louer</FormLabel>
+                  <FormLabel>Propriété</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Sélectionnez un bien" />
+                        <SelectValue placeholder="Sélectionnez une propriété" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {propertyOptions.map((p) => (
+                        <SelectItem key={p.value} value={p.value}>
+                          {p.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="unitId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Logement</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={!selectedPropertyId}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder={selectedPropertyId ? "Sélectionnez un logement" : "Sélectionnez d'abord une propriété"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>

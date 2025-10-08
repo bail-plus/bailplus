@@ -24,7 +24,7 @@ export interface DashboardStats {
   // Activités récentes
   recentInvoices: Array<{
     id: string;
-    amount: number;
+    total_amount: number;
     status: string;
     period_month: number;
     period_year: number;
@@ -84,7 +84,8 @@ async function fetchDashboardData(): Promise<DashboardStats> {
     expensesResult,
     ticketsResult,
     upcomingResult,
-    bankTransactionsResult
+    bankTransactionsResult,
+    recentInvoicesResult
   ] = await Promise.all([
     // Properties
     supabase
@@ -111,7 +112,7 @@ async function fetchDashboardData(): Promise<DashboardStats> {
       .eq('user_id', user.id)
       .eq('status', 'active'),
 
-    // Invoices for current month
+    // Invoices for current month (for stats)
     supabase
       .from('rent_invoices')
       .select(`
@@ -154,7 +155,7 @@ async function fetchDashboardData(): Promise<DashboardStats> {
           name
         )
       `)
-      .eq('created_by', user.id)
+      .eq('user_id', user.id)
       .in('status', ['NOUVEAU', 'EN COURS'])
       .order('created_at', { ascending: false })
       .limit(5),
@@ -188,7 +189,28 @@ async function fetchDashboardData(): Promise<DashboardStats> {
       .eq('user_id', user.id)
       .gte('date', monthStart)
       .lte('date', monthEnd)
-      .gt('amount', 0) // Only positive amounts (income)
+      .gt('amount', 0), // Only positive amounts (income)
+
+    // Recent invoices (all, not just current month)
+    supabase
+      .from('rent_invoices')
+      .select(`
+        id,
+        total_amount,
+        status,
+        period_month,
+        period_year,
+        created_at,
+        lease:leases!rent_invoices_lease_id_fkey (
+          tenant:contacts!leases_tenant_id_fkey (
+            first_name,
+            last_name
+          )
+        )
+      `)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(10)
   ]);
 
   // Check for errors
@@ -199,6 +221,7 @@ async function fetchDashboardData(): Promise<DashboardStats> {
   if (expensesResult.error) console.error('[DASHBOARD] Error expenses:', expensesResult.error);
   if (ticketsResult.error) console.error('[DASHBOARD] Error tickets:', ticketsResult.error);
   if (bankTransactionsResult.error) console.error('[DASHBOARD] Error bank transactions:', bankTransactionsResult.error);
+  if (recentInvoicesResult.error) console.error('[DASHBOARD] Error recent invoices:', recentInvoicesResult.error);
 
   const properties = propertiesResult.data || [];
   const units = unitsResult.data || [];
@@ -208,6 +231,7 @@ async function fetchDashboardData(): Promise<DashboardStats> {
   const tickets = ticketsResult.data || [];
   const upcoming = upcomingResult.data || [];
   const bankTransactions = bankTransactionsResult.data || [];
+  const recentInvoices = recentInvoicesResult.data || [];
 
   // Calculate active leases (within date range)
   const activeLeases = leases.filter(lease => {
@@ -275,7 +299,7 @@ async function fetchDashboardData(): Promise<DashboardStats> {
     overdueAmount,
     overdueCount,
     maintenanceTicketsOpen: tickets.length,
-    recentInvoices: invoices.slice(0, 5) as any,
+    recentInvoices: recentInvoices.slice(0, 5) as any,
     recentTickets: tickets as any,
     upcomingDueDates: upcoming as any
   };

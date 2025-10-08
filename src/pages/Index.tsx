@@ -290,11 +290,11 @@ const Index = () => {
                         {invoice.lease?.tenant?.first_name} {invoice.lease?.tenant?.last_name}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {format(new Date(2025, invoice.period_month - 1), 'MMMM yyyy', { locale: fr })}
+                        {format(new Date(invoice.period_year, invoice.period_month - 1), 'MMMM yyyy', { locale: fr })}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-bold">{formatCurrency(invoice.amount)}</p>
+                      <p className="text-sm font-bold">{formatCurrency(invoice.total_amount)}</p>
                       <Badge
                         variant={
                           invoice.status === 'paid' ? 'default' :
@@ -312,7 +312,7 @@ const Index = () => {
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 <Euro className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p className="text-sm">Aucune facture ce mois</p>
+                <p className="text-sm">Aucune facture récente</p>
               </div>
             )}
           </CardContent>
