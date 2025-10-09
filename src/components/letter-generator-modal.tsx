@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client"
 import { FileText, Loader2, AlertTriangle } from "lucide-react"
 import { pdf } from '@react-pdf/renderer'
 import { LetterPDFTemplate } from "./letter-pdf-template"
+import { useEntity } from "@/contexts/EntityContext"
 
 interface Property {
   id: string
@@ -34,10 +35,10 @@ interface Lease {
 
 interface UnpaidInvoice {
   id: string
-  period_month: string
+  period_month: number
   period_year: number
   total_amount: number
-  payment_status: string
+  status: string
 }
 
 interface LetterGeneratorModalProps {
@@ -55,6 +56,7 @@ interface LandlordProfile {
 }
 
 export default function LetterGeneratorModal({ open, onOpenChange, onGenerate }: LetterGeneratorModalProps) {
+  const { selectedEntity, showAll } = useEntity()
   const [properties, setProperties] = useState<Property[]>([])
   const [units, setUnits] = useState<Unit[]>([])
   const [lease, setLease] = useState<Lease | null>(null)
@@ -71,7 +73,7 @@ export default function LetterGeneratorModal({ open, onOpenChange, onGenerate }:
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
 
-  // Load properties and landlord profile on mount
+  // Load properties and landlord profile on mount and when entity changes
   useEffect(() => {
     loadProperties()
     loadLandlordProfile()
@@ -80,7 +82,7 @@ export default function LetterGeneratorModal({ open, onOpenChange, onGenerate }:
     const defaultDueDate = new Date()
     defaultDueDate.setDate(defaultDueDate.getDate() + 7)
     setDueDate(defaultDueDate.toISOString().split('T')[0])
-  }, [])
+  }, [selectedEntity, showAll])
 
   // Load units when property changes
   useEffect(() => {
@@ -132,10 +134,16 @@ export default function LetterGeneratorModal({ open, onOpenChange, onGenerate }:
   const loadProperties = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('properties')
         .select('id, name, address')
-        .order('name')
+
+      // Filtrer par entité si une est sélectionnée
+      if (!showAll && selectedEntity) {
+        query = query.eq('entity_id', selectedEntity.id)
+      }
+
+      const { data, error } = await query.order('name')
 
       if (error) throw error
       setProperties(data || [])
@@ -212,9 +220,9 @@ export default function LetterGeneratorModal({ open, onOpenChange, onGenerate }:
     try {
       const { data, error } = await supabase
         .from('rent_invoices')
-        .select('id, period_month, period_year, total_amount, payment_status')
+        .select('id, period_month, period_year, total_amount, status')
         .eq('lease_id', leaseId)
-        .or('payment_status.eq.unpaid,payment_status.eq.partially_paid')
+        .or('status.eq.overdue,status.eq.pending')
         .order('period_year', { ascending: true })
         .order('period_month', { ascending: true })
 
@@ -258,7 +266,7 @@ export default function LetterGeneratorModal({ open, onOpenChange, onGenerate }:
         propertyAddress: selectedPropertyData.address,
         unitNumber: selectedUnitData.unit_number,
         unpaidPeriods: unpaidInvoices.map(inv => ({
-          month: inv.period_month,
+          month: String(inv.period_month),
           year: inv.period_year,
           amount: inv.total_amount
         })),

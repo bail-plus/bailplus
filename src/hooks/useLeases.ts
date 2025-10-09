@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import { useEntity } from '@/contexts/EntityContext';
 
 export type Lease = Tables<'leases'>;
 export type LeaseInsert = TablesInsert<'leases'>;
@@ -33,15 +34,50 @@ export type LeaseWithDetails = Lease & {
 };
 
 // Fetch all leases with details
-async function fetchLeasesWithDetails(): Promise<LeaseWithDetails[]> {
+async function fetchLeasesWithDetails(entityId?: string | null, showAll?: boolean): Promise<LeaseWithDetails[]> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Non authentifié');
 
+  // Si une entité est sélectionnée, filtrer via properties → units → leases
+  let unitIds: string[] = []
+  if (!showAll && entityId) {
+    // 1. Récupérer les properties de l'entité
+    const { data: properties } = await supabase
+      .from('properties')
+      .select('id')
+      .eq('entity_id', entityId)
+
+    const propertyIds = properties?.map(p => p.id) || []
+
+    if (propertyIds.length === 0) {
+      return [] // Aucune propriété pour cette entité
+    }
+
+    // 2. Récupérer les units de ces properties
+    const { data: units } = await supabase
+      .from('units')
+      .select('id')
+      .in('property_id', propertyIds)
+
+    unitIds = units?.map(u => u.id) || []
+
+    if (unitIds.length === 0) {
+      return [] // Aucun logement pour ces propriétés
+    }
+  }
+
   // Get leases
-  const { data: leases, error: leasesError } = await supabase
+  let leasesQuery = supabase
     .from('leases')
     .select('*')
     .eq('user_id', user.id)
+
+  // Filtrer par unit_ids si une entité est sélectionnée
+  if (!showAll && entityId && unitIds.length > 0) {
+    leasesQuery = leasesQuery.in('unit_id', unitIds)
+  }
+
+  const { data: leases, error: leasesError } = await leasesQuery
     .order('created_at', { ascending: false });
 
   if (leasesError) throw new Error(leasesError.message);
@@ -155,9 +191,11 @@ async function deleteLease(id: string): Promise<void> {
 
 // Hook to fetch all leases with details
 export function useLeasesWithDetails() {
+  const { selectedEntity, showAll } = useEntity();
+
   const query = useQuery({
-    queryKey: ['leases', 'with-details'],
-    queryFn: fetchLeasesWithDetails,
+    queryKey: ['leases', 'with-details', selectedEntity?.id, showAll],
+    queryFn: () => fetchLeasesWithDetails(selectedEntity?.id, showAll),
   });
 
   console.log('[LEASES QUERY]', {

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,27 +10,22 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import { Settings as SettingsIcon, Plus, Building, Users, CreditCard, FileText, Palette, Shield, Upload, Download } from "lucide-react"
+import { Settings as SettingsIcon, Plus, Building, Users, CreditCard, FileText, Palette, Shield, Upload, Download, Loader2, Trash2 } from "lucide-react"
 import SubscriptionPanel from "@/components/dashboard/settings/payment/SubscriptionPanel"
+import { supabase } from "@/integrations/supabase/client"
+import type { Database } from "@/integrations/supabase/types"
 
-const MOCK_ORGANIZATIONS = [
-  {
-    id: "1",
-    name: "Personnel",
-    type: "PERSONAL",
-    isDefault: true,
-    properties: 2,
-    activeLeases: 2
-  },
-  {
-    id: "2",
-    name: "SCI Demo",
-    type: "SCI",
-    isDefault: false,
-    properties: 2,
-    activeLeases: 1
-  }
-]
+type EntityType = Database["public"]["Enums"]["entity_type_enum"]
+
+interface Entity {
+  id: string
+  name: string
+  type: EntityType
+  description: string | null
+  is_default: boolean
+  properties_count: number
+  active_leases_count: number
+}
 
 const MOCK_USERS = [
   {
@@ -56,6 +51,171 @@ const MOCK_BANK_ACCOUNTS = [
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState("organizations")
+  const [entities, setEntities] = useState<Entity[]>([])
+  const [loadingEntities, setLoadingEntities] = useState(true)
+  const [newEntityOpen, setNewEntityOpen] = useState(false)
+  const [newEntityName, setNewEntityName] = useState("")
+  const [newEntityType, setNewEntityType] = useState<EntityType>("PERSONAL")
+  const [newEntityDescription, setNewEntityDescription] = useState("")
+  const [creating, setCreating] = useState(false)
+
+  const loadEntities = useCallback(async () => {
+    try {
+      setLoadingEntities(true)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: entitiesData, error } = await supabase
+        .from('entities')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('is_default', { ascending: false })
+        .order('name', { ascending: true })
+
+      if (error) throw error
+
+      // Pour chaque entité, compter les propriétés et baux actifs
+      const enrichedEntities = await Promise.all(
+        (entitiesData || []).map(async (entity) => {
+          const { count: propertiesCount } = await supabase
+            .from('properties')
+            .select('*', { count: 'exact', head: true })
+            .eq('entity_id', entity.id)
+
+          const { data: properties } = await supabase
+            .from('properties')
+            .select('id')
+            .eq('entity_id', entity.id)
+
+          let activeLeasesCount = 0
+          if (properties && properties.length > 0) {
+            for (const property of properties) {
+              const { data: units } = await supabase
+                .from('units')
+                .select('id')
+                .eq('property_id', property.id)
+
+              if (units && units.length > 0) {
+                for (const unit of units) {
+                  const { count } = await supabase
+                    .from('leases')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('unit_id', unit.id)
+                    .eq('status', 'active')
+
+                  activeLeasesCount += count || 0
+                }
+              }
+            }
+          }
+
+          return {
+            id: entity.id,
+            name: entity.name,
+            type: entity.type as EntityType,
+            description: entity.description,
+            is_default: entity.is_default || false,
+            properties_count: propertiesCount || 0,
+            active_leases_count: activeLeasesCount,
+          }
+        })
+      )
+
+      setEntities(enrichedEntities)
+    } catch (error) {
+      console.error('Error loading entities:', error)
+    } finally {
+      setLoadingEntities(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadEntities()
+  }, [loadEntities])
+
+  const handleCreateEntity = async () => {
+    if (!newEntityName.trim()) {
+      alert('Le nom de l\'entité est requis')
+      return
+    }
+
+    setCreating(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('User not authenticated')
+
+      const { error } = await supabase
+        .from('entities')
+        .insert({
+          name: newEntityName,
+          type: newEntityType,
+          description: newEntityDescription || null,
+          user_id: user.id,
+          is_default: entities.length === 0, // Première entité = par défaut
+        })
+
+      if (error) throw error
+
+      alert('Entité créée avec succès !')
+      setNewEntityOpen(false)
+      setNewEntityName('')
+      setNewEntityType('PERSONAL')
+      setNewEntityDescription('')
+      loadEntities()
+    } catch (error) {
+      console.error('Error creating entity:', error)
+      alert('Erreur lors de la création de l\'entité')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const handleSetDefault = async (entityId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('User not authenticated')
+
+      // Désactiver tous les is_default
+      await supabase
+        .from('entities')
+        .update({ is_default: false })
+        .eq('user_id', user.id)
+
+      // Activer celui sélectionné
+      const { error } = await supabase
+        .from('entities')
+        .update({ is_default: true })
+        .eq('id', entityId)
+
+      if (error) throw error
+
+      loadEntities()
+    } catch (error) {
+      console.error('Error setting default entity:', error)
+      alert('Erreur lors de la définition de l\'entité par défaut')
+    }
+  }
+
+  const handleDeleteEntity = async (entityId: string) => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette entité ? Toutes les propriétés associées seront également supprimées.')) {
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('entities')
+        .delete()
+        .eq('id', entityId)
+
+      if (error) throw error
+
+      alert('Entité supprimée')
+      loadEntities()
+    } catch (error) {
+      console.error('Error deleting entity:', error)
+      alert('Erreur lors de la suppression de l\'entité')
+    }
+  }
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('fr-FR')
@@ -113,7 +273,7 @@ export default function Settings() {
               </p>
             </div>
 
-            <Dialog>
+            <Dialog open={newEntityOpen} onOpenChange={setNewEntityOpen}>
               <DialogTrigger asChild>
                 <Button className="gap-2">
                   <Plus className="w-4 h-4" />
@@ -127,12 +287,17 @@ export default function Settings() {
                 <div className="space-y-4 pt-4">
                   <div className="space-y-2">
                     <Label htmlFor="entity-name">Nom de l'entité</Label>
-                    <Input id="entity-name" placeholder="Ex: SCI Investissement" />
+                    <Input
+                      id="entity-name"
+                      placeholder="Ex: SCI Investissement"
+                      value={newEntityName}
+                      onChange={(e) => setNewEntityName(e.target.value)}
+                    />
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="entity-type">Type</Label>
-                    <Select>
+                    <Select value={newEntityType} onValueChange={(value: EntityType) => setNewEntityType(value)}>
                       <SelectTrigger>
                         <SelectValue placeholder="Choisir le type" />
                       </SelectTrigger>
@@ -143,62 +308,99 @@ export default function Settings() {
                     </Select>
                   </div>
 
+                  <div className="space-y-2">
+                    <Label htmlFor="entity-description">Description (optionnel)</Label>
+                    <Input
+                      id="entity-description"
+                      placeholder="Ex: Biens personnels"
+                      value={newEntityDescription}
+                      onChange={(e) => setNewEntityDescription(e.target.value)}
+                    />
+                  </div>
+
                   <div className="flex gap-2 pt-4">
-                    <Button>Créer</Button>
-                    <Button variant="outline">Annuler</Button>
+                    <Button onClick={handleCreateEntity} disabled={creating}>
+                      {creating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                      {creating ? "Création..." : "Créer"}
+                    </Button>
+                    <Button variant="outline" onClick={() => setNewEntityOpen(false)}>
+                      Annuler
+                    </Button>
                   </div>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {MOCK_ORGANIZATIONS.map((org) => (
-              <Card key={org.id} className={org.isDefault ? "border-primary" : ""}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Building className="w-4 h-4" />
-                      {org.name}
-                    </CardTitle>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={org.type === "PERSONAL" ? "default" : "secondary"} className="text-xs">
-                        {org.type === "PERSONAL" ? "Personnel" : "SCI"}
-                      </Badge>
-                      {org.isDefault && (
-                        <Badge variant="outline" className="text-xs">
-                          Par défaut
+          {loadingEntities ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : entities.length === 0 ? (
+            <div className="text-center py-12 border-2 border-dashed rounded-lg">
+              <Building className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="font-semibold mb-2">Aucune entité</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Créez votre première entité pour commencer à gérer vos biens
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {entities.map((entity) => (
+                <Card key={entity.id} className={entity.is_default ? "border-primary" : ""}>
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Building className="w-4 h-4" />
+                        {entity.name}
+                      </CardTitle>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={entity.type === "PERSONAL" ? "default" : "secondary"} className="text-xs">
+                          {entity.type === "PERSONAL" ? "Personnel" : "SCI"}
                         </Badge>
-                      )}
+                        {entity.is_default && (
+                          <Badge variant="outline" className="text-xs">
+                            Par défaut
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span>Biens:</span>
-                      <span className="font-medium">{org.properties}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Baux actifs:</span>
-                      <span className="font-medium">{org.activeLeases}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 mt-4 pt-3 border-t">
-                    <Button size="sm" variant="outline">
-                      Modifier
-                    </Button>
-                    {!org.isDefault && (
-                      <Button size="sm" variant="outline">
-                        Définir par défaut
-                      </Button>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    {entity.description && (
+                      <p className="text-sm text-muted-foreground mb-3">{entity.description}</p>
                     )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span>Biens:</span>
+                        <span className="font-medium">{entity.properties_count}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Baux actifs:</span>
+                        <span className="font-medium">{entity.active_leases_count}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 mt-4 pt-3 border-t">
+                      {!entity.is_default && (
+                        <Button size="sm" variant="outline" onClick={() => handleSetDefault(entity.id)}>
+                          Définir par défaut
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => handleDeleteEntity(entity.id)}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </TabsContent>
 
         {/* Users Tab */}

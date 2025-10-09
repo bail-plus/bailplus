@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import { useEntity } from '@/contexts/EntityContext';
 
 export type Property = Tables<'properties'>;
 export type PropertyInsert = TablesInsert<'properties'>;
@@ -32,14 +33,21 @@ async function fetchProperties(): Promise<Property[]> {
 }
 
 // Fetch properties with units count
-async function fetchPropertiesWithUnits(): Promise<PropertyWithUnits[]> {
+async function fetchPropertiesWithUnits(entityId?: string | null, showAll?: boolean): Promise<PropertyWithUnits[]> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Non authentifié');
 
-  const { data: properties, error: propertiesError } = await supabase
+  let query = supabase
     .from('properties')
     .select('*')
     .eq('user_id', user.id)
+
+  // Filtre par entité si une est sélectionnée et qu'on n'est pas en mode "Tout"
+  if (!showAll && entityId) {
+    query = query.eq('entity_id', entityId)
+  }
+
+  const { data: properties, error: propertiesError } = await query
     .order('created_at', { ascending: false });
 
   if (propertiesError) throw new Error(propertiesError.message);
@@ -103,7 +111,7 @@ async function fetchPropertyWithUnits(id: string): Promise<PropertyWithUnits> {
 }
 
 // Create a new property
-async function createProperty(property: PropertyInsert): Promise<Property> {
+async function createProperty(property: PropertyInsert, entityId?: string | null): Promise<Property> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Non authentifié');
 
@@ -112,6 +120,7 @@ async function createProperty(property: PropertyInsert): Promise<Property> {
     .insert({
       ...property,
       user_id: user.id,
+      entity_id: property.entity_id || entityId || null, // Utilise entity_id du form, sinon celui sélectionné, sinon null
     })
     .select()
     .single();
@@ -158,9 +167,11 @@ export function useProperties() {
 
 // Hook to fetch properties with units count
 export function usePropertiesWithUnits() {
+  const { selectedEntity, showAll } = useEntity();
+
   return useQuery({
-    queryKey: ['properties', 'with-units'],
-    queryFn: fetchPropertiesWithUnits,
+    queryKey: ['properties', 'with-units', selectedEntity?.id, showAll],
+    queryFn: () => fetchPropertiesWithUnits(selectedEntity?.id, showAll),
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -188,9 +199,10 @@ export function usePropertyWithUnits(id: string | undefined) {
 // Hook to create a property
 export function useCreateProperty() {
   const queryClient = useQueryClient();
+  const { selectedEntity } = useEntity();
 
   return useMutation({
-    mutationFn: createProperty,
+    mutationFn: (property: PropertyInsert) => createProperty(property, selectedEntity?.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['properties'] });
     },

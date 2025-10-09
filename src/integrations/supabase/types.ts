@@ -310,21 +310,33 @@ export type Database = {
       entities: {
         Row: {
           created_at: string
+          description: string | null
           id: string
+          is_default: boolean | null
           name: string
+          type: Database["public"]["Enums"]["entity_type_enum"] | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
+          description?: string | null
           id?: string
+          is_default?: boolean | null
           name: string
+          type?: Database["public"]["Enums"]["entity_type_enum"] | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
+          description?: string | null
           id?: string
+          is_default?: boolean | null
           name?: string
+          type?: Database["public"]["Enums"]["entity_type_enum"] | null
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -781,6 +793,7 @@ export type Database = {
           address: string
           city: string | null
           created_at: string
+          entity_id: string | null
           id: string
           name: string
           postal_code: string | null
@@ -791,6 +804,7 @@ export type Database = {
           address: string
           city?: string | null
           created_at?: string
+          entity_id?: string | null
           id?: string
           name: string
           postal_code?: string | null
@@ -801,13 +815,22 @@ export type Database = {
           address?: string
           city?: string | null
           created_at?: string
+          entity_id?: string | null
           id?: string
           name?: string
           postal_code?: string | null
           updated_at?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "properties_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       rent_invoices: {
         Row: {
@@ -1015,6 +1038,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      entity_type_enum: "PERSONAL" | "SCI"
       gender_enum: "male" | "female" | "other"
       maintenance_tickets_priority_enum: "FAIBLE" | "MOYEN" | "ELEVE" | "URGENT"
       maintenance_tickets_status_enum:
@@ -1158,6 +1182,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      entity_type_enum: ["PERSONAL", "SCI"],
       gender_enum: ["male", "female", "other"],
       maintenance_tickets_priority_enum: ["FAIBLE", "MOYEN", "ELEVE", "URGENT"],
       maintenance_tickets_status_enum: [

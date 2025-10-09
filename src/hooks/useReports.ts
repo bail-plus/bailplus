@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfMonth, subMonths, format } from 'date-fns';
+import { useEntity } from '@/contexts/EntityContext';
 
 export interface MonthlyData {
   month: string;
@@ -26,7 +27,7 @@ export interface ReportData {
   expensesByCategory: { category: string; amount: number; }[];
 }
 
-async function fetchReportData(months: number = 6): Promise<ReportData> {
+async function fetchReportData(months: number = 6, entityId?: string | null, showAll?: boolean): Promise<ReportData> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Non authentifié');
 
@@ -35,32 +36,111 @@ async function fetchReportData(months: number = 6): Promise<ReportData> {
   const startMonth = startDate.getMonth() + 1; // 1-12
 
   console.log('[REPORTS] Fetching data from', format(startDate, 'yyyy-MM-dd'), 'for user', user.id);
-  console.log('[REPORTS] Period filter:', { startYear, startMonth });
+  console.log('[REPORTS] Period filter:', { startYear, startMonth }, 'entityId:', entityId, 'showAll:', showAll);
 
-  // Fetch all data in parallel
-  const [rentResult, expensesResult, propertiesResult, unitsResult, leasesResult] = await Promise.all([
-    supabase
-      .from('rent_invoices')
-      .select('total_amount, status, due_date, paid_date, period_month, period_year, lease_id')
-      .eq('user_id', user.id)
-      .or(`period_year.gt.${startYear},and(period_year.eq.${startYear},period_month.gte.${startMonth})`),
-    supabase
-      .from('expenses')
-      .select('amount, expense_date, category')
-      .eq('user_id', user.id)
-      .gte('expense_date', format(startDate, 'yyyy-MM-dd')),
-    supabase
+  // Si une entité est sélectionnée, récupérer les IDs à filtrer
+  let propertyIds: string[] = []
+  let unitIds: string[] = []
+  let leaseIds: string[] = []
+
+  if (!showAll && entityId) {
+    // 1. Récupérer les properties de l'entité
+    const { data: properties } = await supabase
       .from('properties')
       .select('id')
-      .eq('user_id', user.id),
-    supabase
+      .eq('entity_id', entityId)
+
+    propertyIds = properties?.map(p => p.id) || []
+
+    if (propertyIds.length === 0) {
+      // Aucune propriété pour cette entité - retourner données vides
+      return {
+        totalRent: 0,
+        totalExpenses: 0,
+        vacancyRate: 0,
+        overdueAmount: 0,
+        pendingAmount: 0,
+        propertiesCount: 0,
+        occupiedUnits: 0,
+        totalUnits: 0,
+        monthlyData: [],
+        expensesByCategory: []
+      }
+    }
+
+    // 2. Récupérer les units de ces properties
+    const { data: units } = await supabase
       .from('units')
-      .select('id, property_id, properties!inner(user_id)')
-      .eq('properties.user_id', user.id),
-    supabase
-      .from('leases')
-      .select('id, unit_id, status, start_date, end_date')
-      .eq('user_id', user.id)
+      .select('id')
+      .in('property_id', propertyIds)
+
+    unitIds = units?.map(u => u.id) || []
+
+    if (unitIds.length > 0) {
+      // 3. Récupérer les leases de ces units
+      const { data: leases } = await supabase
+        .from('leases')
+        .select('id')
+        .in('unit_id', unitIds)
+
+      leaseIds = leases?.map(l => l.id) || []
+    }
+  }
+
+  // Fetch all data in parallel avec filtres optionnels
+  let rentQuery = supabase
+    .from('rent_invoices')
+    .select('total_amount, status, due_date, paid_date, period_month, period_year, lease_id')
+    .eq('user_id', user.id)
+    .or(`period_year.gt.${startYear},and(period_year.eq.${startYear},period_month.gte.${startMonth})`)
+
+  if (!showAll && entityId && leaseIds.length > 0) {
+    rentQuery = rentQuery.in('lease_id', leaseIds)
+  }
+
+  let expensesQuery = supabase
+    .from('expenses')
+    .select('amount, expense_date, category')
+    .eq('user_id', user.id)
+    .gte('expense_date', format(startDate, 'yyyy-MM-dd'))
+
+  if (!showAll && entityId && propertyIds.length > 0) {
+    expensesQuery = expensesQuery.in('property_id', propertyIds)
+  }
+
+  let propertiesQuery = supabase
+    .from('properties')
+    .select('id')
+    .eq('user_id', user.id)
+
+  if (!showAll && entityId) {
+    propertiesQuery = propertiesQuery.eq('entity_id', entityId)
+  }
+
+  let unitsQuery = supabase
+    .from('units')
+    .select('id, property_id, properties!inner(user_id)')
+    .eq('properties.user_id', user.id)
+
+  if (!showAll && entityId && propertyIds.length > 0) {
+    unitsQuery = unitsQuery.in('property_id', propertyIds)
+  }
+
+  let leasesQuery = supabase
+    .from('leases')
+    .select('id, unit_id, status, start_date, end_date')
+    .eq('user_id', user.id)
+
+  if (!showAll && entityId && unitIds.length > 0) {
+    leasesQuery = leasesQuery.in('unit_id', unitIds)
+  }
+
+  const [rentResult, expensesResult, propertiesResult, unitsResult, leasesResult] = await Promise.all([
+    rentQuery,
+    expensesQuery,
+    propertiesQuery,
+    unitsQuery,
+    leasesQuery
   ]);
 
   // Check for errors
@@ -222,9 +302,11 @@ async function fetchReportData(months: number = 6): Promise<ReportData> {
 }
 
 export function useReports(months: number = 6) {
+  const { selectedEntity, showAll } = useEntity();
+
   return useQuery({
-    queryKey: ['reports', months],
-    queryFn: () => fetchReportData(months),
+    queryKey: ['reports', months, selectedEntity?.id, showAll],
+    queryFn: () => fetchReportData(months, selectedEntity?.id, showAll),
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 }

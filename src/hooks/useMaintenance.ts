@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { useAuth } from '@/hooks/useAuth';
+import { useEntity } from '@/contexts/EntityContext';
 
 export type MaintenanceTicket = Tables<'maintenance_tickets'>;
 export type MaintenanceTicketInsert = TablesInsert<'maintenance_tickets'>;
@@ -35,14 +36,36 @@ export type MaintenanceTicketWithDetails = MaintenanceTicket & {
 };
 
 // Fetch all maintenance tickets with details
-async function fetchMaintenanceTicketsWithDetails(userId: string): Promise<MaintenanceTicketWithDetails[]> {
+async function fetchMaintenanceTicketsWithDetails(userId: string, entityId?: string | null, showAll?: boolean): Promise<MaintenanceTicketWithDetails[]> {
   if (!userId) return [];
 
+  // Si une entité est sélectionnée, récupérer les property_ids de cette entité
+  let propertyIds: string[] = []
+  if (!showAll && entityId) {
+    const { data: properties } = await supabase
+      .from('properties')
+      .select('id')
+      .eq('entity_id', entityId)
+
+    propertyIds = properties?.map(p => p.id) || []
+
+    if (propertyIds.length === 0) {
+      return [] // Aucune propriété pour cette entité
+    }
+  }
+
   // Get tickets
-  const { data: tickets, error: ticketsError } = await supabase
+  let ticketsQuery = supabase
     .from('maintenance_tickets')
     .select('*')
     .eq('user_id', userId)
+
+  // Filtrer par property_id si une entité est sélectionnée
+  if (!showAll && entityId && propertyIds.length > 0) {
+    ticketsQuery = ticketsQuery.in('property_id', propertyIds)
+  }
+
+  const { data: tickets, error: ticketsError } = await ticketsQuery
     .order('created_at', { ascending: false });
 
   if (ticketsError) throw new Error(ticketsError.message);
@@ -217,10 +240,12 @@ async function deleteWorkOrder(id: string): Promise<void> {
 // Hook to fetch all maintenance tickets with details
 export function useMaintenanceTicketsWithDetails() {
   const { user } = useAuth();
+  const { selectedEntity, showAll } = useEntity();
   const userId = user?.id ?? '';
+
   return useQuery({
-    queryKey: ['maintenance-tickets', 'with-details', userId],
-    queryFn: () => fetchMaintenanceTicketsWithDetails(userId),
+    queryKey: ['maintenance-tickets', 'with-details', userId, selectedEntity?.id, showAll],
+    queryFn: () => fetchMaintenanceTicketsWithDetails(userId, selectedEntity?.id, showAll),
     enabled: !!userId,
     staleTime: 5 * 60 * 1000,
   });
