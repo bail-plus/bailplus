@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { supabase } from "@/integrations/supabase/client"
+import { useEntity } from "@/contexts/EntityContext"
 
 interface Event {
   id: string
@@ -22,17 +23,41 @@ const eventTypes = {
 }
 
 const Calendar = () => {
+  const { selectedEntity, showAll } = useEntity()
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
 
   const loadEvents = useCallback(async () => {
     try {
-      const { data, error } = await supabase
+      // Si une entité est sélectionnée, récupérer les property_ids de cette entité
+      let propertyIds: string[] = []
+      if (!showAll && selectedEntity) {
+        const { data: properties } = await supabase
+          .from('properties')
+          .select('id')
+          .eq('entity_id', selectedEntity.id)
+
+        propertyIds = properties?.map(p => p.id) || []
+
+        if (propertyIds.length === 0) {
+          setEvents([])
+          setLoading(false)
+          return
+        }
+      }
+
+      let eventsQuery = supabase
         .from('events')
         .select('*')
         .eq('start_date', new Date().toISOString().split('T')[0])
-        .order('start_time')
-      
+
+      // Filtrer par property_id si une entité est sélectionnée
+      if (!showAll && selectedEntity && propertyIds.length > 0) {
+        eventsQuery = eventsQuery.in('property_id', propertyIds)
+      }
+
+      const { data, error } = await eventsQuery.order('start_time')
+
       if (error) throw error
       setEvents(data || [])
     } catch (error) {
@@ -41,7 +66,7 @@ const Calendar = () => {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [selectedEntity, showAll])
 
   useEffect(() => {
     loadEvents()

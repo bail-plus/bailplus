@@ -12,6 +12,7 @@ import ReceiptGeneratorModal from "@/components/receipt-generator-modal"
 import LeaseGeneratorModal from "@/components/lease-generator-modal"
 import EDLGeneratorModal from "@/components/edl-generator-modal"
 import LetterGeneratorModal from "@/components/letter-generator-modal"
+import { useEntity } from "@/contexts/EntityContext"
 
 interface Document {
   id: string
@@ -34,6 +35,7 @@ const DOCUMENT_CATEGORIES = [
 ]
 
 export default function Documents() {
+  const { selectedEntity, showAll } = useEntity()
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
@@ -55,10 +57,35 @@ export default function Documents() {
 
   const loadDocuments = useCallback(async () => {
     try {
-      // Load all documents from documents table
-      const { data: docsData, error: docsError } = await supabase
+      // Si une entité est sélectionnée, récupérer d'abord les property_ids de cette entité
+      let propertyIds: string[] = []
+      if (!showAll && selectedEntity) {
+        const { data: properties } = await supabase
+          .from('properties')
+          .select('id')
+          .eq('entity_id', selectedEntity.id)
+
+        propertyIds = properties?.map(p => p.id) || []
+
+        // Si aucune propriété n'appartient à cette entité, retourner tableau vide
+        if (propertyIds.length === 0) {
+          setDocuments([])
+          setLoading(false)
+          return
+        }
+      }
+
+      // Load documents from documents table
+      let docsQuery = supabase
         .from('documents')
         .select('*')
+
+      // Filtrer par property_id si une entité est sélectionnée
+      if (!showAll && selectedEntity && propertyIds.length > 0) {
+        docsQuery = docsQuery.in('property_id', propertyIds)
+      }
+
+      const { data: docsData, error: docsError } = await docsQuery
         .order('created_at', { ascending: false })
 
       if (docsError) throw docsError
@@ -140,7 +167,7 @@ export default function Documents() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [selectedEntity, showAll])
 
   useEffect(() => {
     loadDocuments()

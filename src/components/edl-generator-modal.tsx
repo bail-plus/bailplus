@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client"
 import { Folder, Loader2 } from "lucide-react"
 import { pdf } from '@react-pdf/renderer'
 import { EDLPDFTemplate } from "./edl-pdf-template"
+import { useEntity } from "@/contexts/EntityContext"
 
 interface Property {
   id: string
@@ -47,6 +48,7 @@ interface LandlordProfile {
 }
 
 export default function EDLGeneratorModal({ open, onOpenChange, onGenerate }: EDLGeneratorModalProps) {
+  const { selectedEntity, showAll } = useEntity()
   const [properties, setProperties] = useState<Property[]>([])
   const [units, setUnits] = useState<Unit[]>([])
   const [lease, setLease] = useState<Lease | null>(null)
@@ -61,11 +63,11 @@ export default function EDLGeneratorModal({ open, onOpenChange, onGenerate }: ED
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
 
-  // Load properties and landlord profile on mount
+  // Load properties and landlord profile on mount and when entity changes
   useEffect(() => {
     loadProperties()
     loadLandlordProfile()
-  }, [])
+  }, [selectedEntity, showAll])
 
   // Load units when property changes
   useEffect(() => {
@@ -115,10 +117,16 @@ export default function EDLGeneratorModal({ open, onOpenChange, onGenerate }: ED
   const loadProperties = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('properties')
         .select('id, name, address')
-        .order('name')
+
+      // Filtrer par entité si une est sélectionnée
+      if (!showAll && selectedEntity) {
+        query = query.eq('entity_id', selectedEntity.id)
+      }
+
+      const { data, error } = await query.order('name')
 
       if (error) throw error
       setProperties(data || [])

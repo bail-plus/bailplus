@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import { useEntity } from '@/contexts/EntityContext';
 
 export type Expense = Tables<'expenses'>;
 export type ExpenseInsert = TablesInsert<'expenses'>;
@@ -57,14 +58,36 @@ export type BankTransactionWithDetails = BankTransaction & {
    EXPENSES
    ======================= */
 
-async function fetchExpenses(): Promise<ExpenseWithDetails[]> {
+async function fetchExpenses(entityId?: string | null, showAll?: boolean): Promise<ExpenseWithDetails[]> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Non authentifié');
 
-  const { data: expenses, error } = await supabase
+  // Si une entité est sélectionnée, récupérer les property_ids de cette entité
+  let propertyIds: string[] = []
+  if (!showAll && entityId) {
+    const { data: properties } = await supabase
+      .from('properties')
+      .select('id')
+      .eq('entity_id', entityId)
+
+    propertyIds = properties?.map(p => p.id) || []
+
+    if (propertyIds.length === 0) {
+      return [] // Aucune propriété pour cette entité
+    }
+  }
+
+  let expensesQuery = supabase
     .from('expenses')
     .select('*')
     .eq('user_id', user.id)
+
+  // Filtrer par property_id si une entité est sélectionnée
+  if (!showAll && entityId && propertyIds.length > 0) {
+    expensesQuery = expensesQuery.in('property_id', propertyIds)
+  }
+
+  const { data: expenses, error } = await expensesQuery
     .order('expense_date', { ascending: false });
 
   if (error) throw new Error(error.message);
@@ -147,15 +170,50 @@ async function deleteExpense(id: string): Promise<void> {
    RENT INVOICES
    ======================= */
 
-async function fetchRentInvoices(): Promise<RentInvoiceWithDetails[]> {
+async function fetchRentInvoices(entityId?: string | null, showAll?: boolean): Promise<RentInvoiceWithDetails[]> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Non authentifié');
 
-  // Get all leases for the user
-  const { data: leases, error: leasesError } = await supabase
+  // Si une entité est sélectionnée, filtrer via properties → units → leases
+  let unitIds: string[] = []
+  if (!showAll && entityId) {
+    // 1. Récupérer les properties de l'entité
+    const { data: properties } = await supabase
+      .from('properties')
+      .select('id')
+      .eq('entity_id', entityId)
+
+    const propertyIds = properties?.map(p => p.id) || []
+
+    if (propertyIds.length === 0) {
+      return [] // Aucune propriété pour cette entité
+    }
+
+    // 2. Récupérer les units de ces properties
+    const { data: units } = await supabase
+      .from('units')
+      .select('id')
+      .in('property_id', propertyIds)
+
+    unitIds = units?.map(u => u.id) || []
+
+    if (unitIds.length === 0) {
+      return [] // Aucun logement pour ces propriétés
+    }
+  }
+
+  // Get all leases for the user (avec filtre optionnel)
+  let leasesQuery = supabase
     .from('leases')
     .select('id')
-    .eq('user_id', user.id);
+    .eq('user_id', user.id)
+
+  // Filtrer par unit_ids si une entité est sélectionnée
+  if (!showAll && entityId && unitIds.length > 0) {
+    leasesQuery = leasesQuery.in('unit_id', unitIds)
+  }
+
+  const { data: leases, error: leasesError } = await leasesQuery
 
   if (leasesError) throw new Error(leasesError.message);
   if (!leases || leases.length === 0) return [];
@@ -312,9 +370,11 @@ async function deleteBankTransaction(id: string): Promise<void> {
 
 // Expenses
 export function useExpenses() {
+  const { selectedEntity, showAll } = useEntity();
+
   return useQuery({
-    queryKey: ['expenses'],
-    queryFn: fetchExpenses,
+    queryKey: ['expenses', selectedEntity?.id, showAll],
+    queryFn: () => fetchExpenses(selectedEntity?.id, showAll),
     staleTime: 5 * 60 * 1000,
   });
 }
@@ -354,14 +414,16 @@ export function useDeleteExpense() {
 
 // Rent Invoices
 export function useRentInvoices() {
+  const { selectedEntity, showAll } = useEntity();
+
   return useQuery({
-    queryKey: ['rent-invoices'],
-    queryFn: fetchRentInvoices,
+    queryKey: ['rent-invoices', selectedEntity?.id, showAll],
+    queryFn: () => fetchRentInvoices(selectedEntity?.id, showAll),
     staleTime: 5 * 60 * 1000,
   });
 }
 
-// Bank Transactions
+// Bank Transactions (pas de filtre d'entité car non liées directement aux propriétés)
 export function useBankTransactions() {
   return useQuery({
     queryKey: ['bank-transactions'],
