@@ -1,6 +1,6 @@
 // src/pages/Auth.tsx
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -117,7 +117,15 @@ export default function Auth() {
                   <Input id="signin-email" name="email" type="email" required placeholder="vous@exemple.com" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signin-password">Mot de passe</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="signin-password">Mot de passe</Label>
+                    <Link
+                      to="/forgot-password"
+                      className="text-sm text-primary hover:underline"
+                    >
+                      Mot de passe oublié ?
+                    </Link>
+                  </div>
                   <Input id="signin-password" name="password" type="password" required placeholder="••••••••" />
                 </div>
 
@@ -150,9 +158,7 @@ export default function Auth() {
                   Continuer avec Google
                 </Button>
 
-                <div className="text-xs text-muted-foreground">
-                  useAuth.loading = {String(loading)}
-                </div>
+                
               </form>
             </TabsContent>
 

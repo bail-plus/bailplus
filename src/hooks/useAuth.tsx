@@ -225,6 +225,22 @@ async function signOutUser() {
   if (error) throw error;
 }
 
+async function resetPasswordRequest(email: string) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/reset-password`,
+  });
+  if (error) throw error;
+  return { success: true };
+}
+
+async function updatePassword(newPassword: string) {
+  const { error } = await supabase.auth.updateUser({
+    password: newPassword,
+  });
+  if (error) throw error;
+  return { success: true };
+}
+
 /* =======================
    Context
    ======================= */
@@ -458,6 +474,30 @@ export function useSignOut() {
     },
     onError: (error: any) => {
       toast.error(error.message || 'Erreur lors de la déconnexion');
+    },
+  });
+}
+
+export function useResetPasswordRequest() {
+  return useMutation({
+    mutationFn: resetPasswordRequest,
+    onSuccess: () => {
+      toast.success('Un email de réinitialisation a été envoyé !');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Erreur lors de l\'envoi de l\'email');
+    },
+  });
+}
+
+export function useUpdatePassword() {
+  return useMutation({
+    mutationFn: updatePassword,
+    onSuccess: () => {
+      toast.success('Mot de passe mis à jour avec succès !');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Erreur lors de la mise à jour du mot de passe');
     },
   });
 }

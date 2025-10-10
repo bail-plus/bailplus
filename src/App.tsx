@@ -27,6 +27,8 @@ import TrialPaywall from "./pages/TrialPaywall";
 // Auth pages
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Offers from "./pages/marketing/Offers";
 import Auth from "./pages/Auth";
 
@@ -85,6 +87,8 @@ function App() {
             <Route path="/auth" element={<Auth />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
             {/* Protected app routes */}
             <Route element={<RequireAuth />}>
