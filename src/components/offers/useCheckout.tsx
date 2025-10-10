@@ -16,7 +16,7 @@ export function useCheckout() {
     setErrorMsg(null);
     try {
       if (!user) {
-        navigate("/login", { replace: true });
+        navigate("/auth", { replace: true });
         return;
       }
 

@@ -1,6 +1,6 @@
 // src/pages/Auth.tsx
 import { useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,21 +30,14 @@ export default function Auth() {
       const email = String(fd.get('email') ?? '').trim();
       const password = String(fd.get('password') ?? '');
 
-      console.log('[AUTH/UI] submit signIn', { email, hasPassword: password.length > 0, loadingFromCtx: loading });
-
       signIn.mutate({ email, password }, {
-        onSuccess: () => {
-          console.log('[AUTH/UI] signIn OK');
-        },
         onError: (error) => {
-          console.warn('[AUTH/UI] signIn error', error);
+          console.error('❌ Erreur connexion:', error);
         },
-        onSettled: () => {
-          setIsLoading(false);
-        }
+        onSettled: () => setIsLoading(false)
       });
     } catch (err) {
-      console.error('[AUTH/UI] handleSignIn exception', err);
+      console.error('❌ Exception connexion:', err);
       setIsLoading(false);
     }
   };
@@ -77,8 +70,6 @@ export default function Auth() {
       trial.setDate(trial.getDate() + 8);
       const trial_end_date = trial.toISOString().slice(0, 10); // "YYYY-MM-DD"
 
-      console.log('[AUTH/UI] submit signUp', { email, hasPassword: password.length > 0, role, gender, birthdate, phone_number, adress, city, postal_code, trial_end_date });
-
       signUp.mutate({
         email,
         password,
@@ -93,18 +84,13 @@ export default function Auth() {
         city,
         postal_code
       }, {
-        onSuccess: () => {
-          console.log('[AUTH/UI] signUp OK');
-        },
         onError: (error) => {
-          console.warn('[AUTH/UI] signUp error', error);
+          console.error('❌ Erreur inscription:', error);
         },
-        onSettled: () => {
-          setIsLoading(false);
-        }
+        onSettled: () => setIsLoading(false)
       });
     } catch (err) {
-      console.error('[AUTH/UI] handleSignUp exception', err);
+      console.error('❌ Exception inscription:', err);
       setIsLoading(false);
     }
   };
@@ -131,7 +117,15 @@ export default function Auth() {
                   <Input id="signin-email" name="email" type="email" required placeholder="vous@exemple.com" />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signin-password">Mot de passe</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="signin-password">Mot de passe</Label>
+                    <Link
+                      to="/forgot-password"
+                      className="text-sm text-primary hover:underline"
+                    >
+                      Mot de passe oublié ?
+                    </Link>
+                  </div>
                   <Input id="signin-password" name="password" type="password" required placeholder="••••••••" />
                 </div>
 
@@ -163,11 +157,16 @@ export default function Auth() {
                   </svg>
                   Continuer avec Google
                 </Button>
-
-                <div className="text-xs text-muted-foreground">
-                  useAuth.loading = {String(loading)}
-                </div>
               </form>
+
+              <div className="mt-4 text-center">
+                <p className="text-xs text-muted-foreground">
+                  Vous n'avez plus accès à votre adresse email ?{' '}
+                  <Link to="/lost-email-access" className="text-primary hover:underline">
+                    Contactez le support
+                  </Link>
+                </p>
+              </div>
             </TabsContent>
 
             {/* ---- Inscription ---- */}
