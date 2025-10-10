@@ -48,7 +48,7 @@ export function PublicNavbar() {
             ) : (
               <>
                 <Button variant="ghost" asChild>
-                  <Link to="/login">
+                  <Link to="/auth">
                     Se connecter
                   </Link>
                 </Button>

@@ -157,9 +157,16 @@ export default function Auth() {
                   </svg>
                   Continuer avec Google
                 </Button>
-
-                
               </form>
+
+              <div className="mt-4 text-center">
+                <p className="text-xs text-muted-foreground">
+                  Vous n'avez plus accès à votre adresse email ?{' '}
+                  <Link to="/lost-email-access" className="text-primary hover:underline">
+                    Contactez le support
+                  </Link>
+                </p>
+              </div>
             </TabsContent>
 
             {/* ---- Inscription ---- */}

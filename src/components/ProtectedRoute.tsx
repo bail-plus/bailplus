@@ -48,8 +48,8 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!user) {
-    // pas connecté → login, en mémorisant la destination
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    // pas connecté → auth, en mémorisant la destination
+    return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
   // Si l'utilisateur est encore en TRIAL mais que l'essai est expiré → offres/paywall

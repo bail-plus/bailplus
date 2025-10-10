@@ -50,7 +50,7 @@ export default function ForgotPassword() {
                 Si vous ne recevez pas l'email dans quelques minutes, vérifiez votre dossier de spam.
               </p>
               <Button
-                onClick={() => navigate('/login')}
+                onClick={() => navigate('/auth')}
                 className="w-full"
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />
@@ -111,14 +111,20 @@ export default function ForgotPassword() {
               </Button>
             </form>
 
-            <div className="mt-6 text-center">
+            <div className="mt-6 text-center space-y-2">
               <Link
-                to="/login"
+                to="/auth"
                 className="text-sm text-primary hover:underline inline-flex items-center"
               >
                 <ArrowLeft className="mr-1 h-3 w-3" />
                 Retour à la connexion
               </Link>
+              <p className="text-xs text-muted-foreground">
+                Vous n'avez plus accès à votre email ?{' '}
+                <Link to="/lost-email-access" className="text-primary hover:underline">
+                  Contactez le support
+                </Link>
+              </p>
             </div>
           </CardContent>
         </Card>

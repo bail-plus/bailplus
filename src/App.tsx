@@ -25,10 +25,11 @@ import TRISimulator from "./pages/TRISimulator";
 import TrialPaywall from "./pages/TrialPaywall";
 
 // Auth pages
-import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import ChangeEmail from "./pages/ChangeEmail";
+import LostEmailAccess from "./pages/LostEmailAccess";
 import Offers from "./pages/marketing/Offers";
 import Auth from "./pages/Auth";
 
@@ -85,10 +86,11 @@ function App() {
 
             {/* Auth routes (public) */}
             <Route path="/auth" element={<Auth />} />
-            <Route path="/login" element={<Login />} />
+            <Route path="/login" element={<Navigate to="/auth" replace />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/lost-email-access" element={<LostEmailAccess />} />
 
             {/* Protected app routes */}
             <Route element={<RequireAuth />}>
@@ -96,6 +98,9 @@ function App() {
 
               {/* Paywall accessible pour les utilisateurs authentifiés sans abonnement */}
               <Route path="/app/paywall" element={<Layout><TrialPaywall /></Layout>} />
+
+              {/* Change email - accessible pour tous les utilisateurs authentifiés */}
+              <Route path="/app/change-email" element={<ChangeEmail />} />
 
               {/* Routes protégées par l'abonnement */}
               <Route element={<RequireSubscription />}>

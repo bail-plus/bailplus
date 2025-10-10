@@ -33,7 +33,7 @@ export default function ResetPassword() {
       onSuccess: () => {
         setPasswordUpdated(true);
         setTimeout(() => {
-          navigate('/login');
+          navigate('/auth');
         }, 3000);
       }
     });

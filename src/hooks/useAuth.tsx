@@ -241,6 +241,14 @@ async function updatePassword(newPassword: string) {
   return { success: true };
 }
 
+async function updateEmail(newEmail: string) {
+  const { error } = await supabase.auth.updateUser({
+    email: newEmail,
+  });
+  if (error) throw error;
+  return { success: true };
+}
+
 /* =======================
    Context
    ======================= */
@@ -498,6 +506,21 @@ export function useUpdatePassword() {
     },
     onError: (error: any) => {
       toast.error(error.message || 'Erreur lors de la mise à jour du mot de passe');
+    },
+  });
+}
+
+export function useUpdateEmail() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: updateEmail,
+    onSuccess: () => {
+      toast.success('Un email de confirmation a été envoyé à votre nouvelle adresse !');
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Erreur lors de la mise à jour de l\'email');
     },
   });
 }

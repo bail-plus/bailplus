@@ -154,7 +154,7 @@ export default function Signup() {
               <p className="text-sm text-muted-foreground">
                 Vous avez déjà un compte ?{' '}
                 <Link
-                  to={`/login${window.location.search}`}
+                  to={`/auth${window.location.search}`}
                   className="text-primary hover:underline"
                 >
                   Connectez-vous
