@@ -31,26 +31,14 @@ const parseDateOnly = (s?: string | null): number | null => {
  * Si pas d'accès, redirige vers /app/paywall
  */
 export function RequireSubscription() {
-  const renderCount = useRef(0);
-  renderCount.current += 1;
-  console.log('[GUARD/SUB] Render #', renderCount.current);
-
   const { profile, subscription, isReady } = useAuth();
   const [forceReady, setForceReady] = useState(false);
 
-  console.log('[GUARD/SUB]', {
-    isReady,
-    forceReady,
-    hasProfile: !!profile,
-    hasSubscription: !!subscription,
-    willWait: !isReady && !forceReady
-  });
-
-  // Timeout de sécurité : forcer le passage après 10 secondes (au lieu de 5)
+  // Timeout de sécurité : forcer le passage après 10 secondes
   useEffect(() => {
     const timeout = setTimeout(() => {
       if (!isReady) {
-        console.warn('[GUARD/SUB] ⚠️ Forcing ready after timeout');
+        console.warn('⚠️ Timeout: Forçage du passage après 10s');
         setForceReady(true);
       }
     }, 10000);
@@ -60,7 +48,6 @@ export function RequireSubscription() {
 
   // Attendre que le profil et l'abonnement soient complètement chargés
   if (!isReady && !forceReady) {
-    console.log('[GUARD/SUB] WAITING - showing loader...');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -90,12 +77,10 @@ export function RequireSubscription() {
   }
 
   // Si ni abonnement ni trial valide, rediriger vers le paywall
-  // MAIS seulement si on a bien récupéré les données (pas juste timeout)
   if (!hasActiveSubscription && !hasValidTrial) {
-    // Si on a forcé le passage après timeout et qu'il n'y a pas de données du tout,
-    // ne pas rediriger car c'est peut-être juste un problème réseau temporaire
+    // Si timeout sans données, autoriser l'accès (problème réseau temporaire)
     if (forceReady && !profile && !subscription) {
-      console.warn('[GUARD/SUB] Forced ready without data - allowing access to avoid false redirect');
+      console.warn('⚠️ Accès autorisé malgré timeout (pas de données)');
       return <Outlet />;
     }
 

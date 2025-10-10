@@ -56,20 +56,14 @@ export default function Documents() {
   const currentYear = currentDate.getFullYear()
 
   const loadDocuments = useCallback(async () => {
-    console.log('[DOCUMENTS] 🔄 Chargement des documents...')
-    console.log('[DOCUMENTS] showAll:', showAll, 'selectedEntity:', selectedEntity?.name || 'null')
-
     try {
       // Récupérer le user_id du user connecté
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
-        console.log('[DOCUMENTS] ❌ Pas de user connecté')
         setDocuments([])
         setLoading(false)
         return
       }
-
-      console.log('[DOCUMENTS] 👤 User ID:', user.id)
 
       // 1. Charger les documents depuis la table documents FILTRÉS PAR USER
       let docsQuery = supabase
@@ -101,33 +95,16 @@ export default function Documents() {
 
       if (docsError) throw docsError
 
-      console.log('[DOCUMENTS] 📄 Documents récupérés (user):', docsData?.length || 0)
-      console.log('[DOCUMENTS] Documents détails:', docsData?.map(d => ({
-        name: d.name,
-        type: d.type,
-        user_id: d.user_id,
-        uploaded_by: d.uploaded_by,
-        property_entity: d.property?.entity_id
-      })))
-
       // Filtrer les documents par entité si nécessaire
       let filteredDocs = docsData || []
       if (!showAll && selectedEntity) {
-        console.log('[DOCUMENTS] 🔍 Filtrage documents par entité:', selectedEntity.id)
         filteredDocs = docsData?.filter(doc => {
           const propertyEntityId = doc.property?.entity_id
           const leasePropertyEntityId = doc.lease?.unit?.property?.entity_id
           const entityId = propertyEntityId || leasePropertyEntityId
-          const match = entityId === selectedEntity.id
-          if (!match) {
-            console.log('[DOCUMENTS] ❌ Document exclu:', doc.name, 'entity:', entityId)
-          }
-          return match
+          return entityId === selectedEntity.id
         }) || []
-        console.log('[DOCUMENTS] ✅ Documents après filtrage:', filteredDocs.length)
       }
-
-      console.log('[DOCUMENTS] 📄 Documents finaux (table):', filteredDocs.length)
 
       // 2. Charger les quittances depuis rent_invoices FILTRÉES PAR USER
       const { data: receiptsData, error: receiptsError } = await supabase
@@ -166,31 +143,13 @@ export default function Documents() {
 
       if (receiptsError) throw receiptsError
 
-      console.log('[DOCUMENTS] 🧾 Quittances récupérées (user):', receiptsData?.length || 0)
-      console.log('[DOCUMENTS] Quittances détails:', receiptsData?.map(r => ({
-        id: r.id,
-        period: `${r.period_month}/${r.period_year}`,
-        user_id: r.user_id,
-        lease_id: r.lease_id,
-        property_id: r.leases?.units?.properties?.id,
-        property_name: r.leases?.units?.properties?.name,
-        entity_id: r.leases?.units?.properties?.entity_id,
-        tenant: `${r.leases?.contacts?.first_name} ${r.leases?.contacts?.last_name}`
-      })))
-
       // 3. Filtrer les quittances par entité si nécessaire
       let filteredReceipts = receiptsData || []
       if (!showAll && selectedEntity) {
-        console.log('[DOCUMENTS] 🔍 Filtrage par entité:', selectedEntity.id)
         filteredReceipts = receiptsData?.filter(receipt => {
           const entityId = receipt.leases?.units?.properties?.entity_id
-          const match = entityId === selectedEntity.id
-          if (!match) {
-            console.log('[DOCUMENTS] ❌ Quittance exclue:', receipt.period_month + '/' + receipt.period_year, 'entity:', entityId)
-          }
-          return match
+          return entityId === selectedEntity.id
         }) || []
-        console.log('[DOCUMENTS] ✅ Quittances après filtrage:', filteredReceipts.length)
       }
 
       // 4. Transformer les quittances en format Document
@@ -204,18 +163,13 @@ export default function Documents() {
         file_url: receipt.pdf_url || ''
       }))
 
-      console.log('[DOCUMENTS] 📋 Quittances transformées:', transformedReceipts.map(r => r.name))
-
       // 5. Combiner tous les documents (utiliser filteredDocs au lieu de docsData)
       const allDocuments = [...filteredDocs, ...transformedReceipts]
       allDocuments.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
-      console.log('[DOCUMENTS] ✨ Total documents finaux:', allDocuments.length)
-      console.log('[DOCUMENTS] Liste finale:', allDocuments.map(d => ({ name: d.name, type: d.type })))
-
       setDocuments(allDocuments)
     } catch (error) {
-      console.error('[DOCUMENTS] ❌ Erreur:', error)
+      console.error('❌ Erreur chargement documents:', error)
     } finally {
       setLoading(false)
     }

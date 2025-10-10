@@ -30,21 +30,14 @@ export default function Auth() {
       const email = String(fd.get('email') ?? '').trim();
       const password = String(fd.get('password') ?? '');
 
-      console.log('[AUTH/UI] submit signIn', { email, hasPassword: password.length > 0, loadingFromCtx: loading });
-
       signIn.mutate({ email, password }, {
-        onSuccess: () => {
-          console.log('[AUTH/UI] signIn OK');
-        },
         onError: (error) => {
-          console.warn('[AUTH/UI] signIn error', error);
+          console.error('❌ Erreur connexion:', error);
         },
-        onSettled: () => {
-          setIsLoading(false);
-        }
+        onSettled: () => setIsLoading(false)
       });
     } catch (err) {
-      console.error('[AUTH/UI] handleSignIn exception', err);
+      console.error('❌ Exception connexion:', err);
       setIsLoading(false);
     }
   };
@@ -77,8 +70,6 @@ export default function Auth() {
       trial.setDate(trial.getDate() + 8);
       const trial_end_date = trial.toISOString().slice(0, 10); // "YYYY-MM-DD"
 
-      console.log('[AUTH/UI] submit signUp', { email, hasPassword: password.length > 0, role, gender, birthdate, phone_number, adress, city, postal_code, trial_end_date });
-
       signUp.mutate({
         email,
         password,
@@ -93,18 +84,13 @@ export default function Auth() {
         city,
         postal_code
       }, {
-        onSuccess: () => {
-          console.log('[AUTH/UI] signUp OK');
-        },
         onError: (error) => {
-          console.warn('[AUTH/UI] signUp error', error);
+          console.error('❌ Erreur inscription:', error);
         },
-        onSettled: () => {
-          setIsLoading(false);
-        }
+        onSettled: () => setIsLoading(false)
       });
     } catch (err) {
-      console.error('[AUTH/UI] handleSignUp exception', err);
+      console.error('❌ Exception inscription:', err);
       setIsLoading(false);
     }
   };

@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react"
+import { useCallback } from "react"
 import {
   BarChart3,
   Calendar,
@@ -46,10 +46,6 @@ const items = [
 ]
 
 export function AppSidebar() {
-  const renderCount = useRef(0);
-  renderCount.current += 1;
-  console.log('[APP_SIDEBAR] Render #', renderCount.current);
-
   const { state } = useSidebar()
   const location = useLocation()
   const { user } = useAuth();
