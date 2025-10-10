@@ -41,21 +41,48 @@ const toDateOnly = (v: any): string | null => {
 const upsertProfileFromUser = async (u: User) => {
   const md = (u.user_metadata ?? {}) as any;
 
+  // Extraire first_name et last_name depuis Google (full_name) ou formulaire classique
+  let firstName = md.first_name ?? null;
+  let lastName = md.last_name ?? null;
+
+  // Si Google OAuth, extraire depuis full_name
+  if (md.full_name && !firstName && !lastName) {
+    const parts = md.full_name.split(' ');
+    firstName = parts[0] || null;
+    lastName = parts.slice(1).join(' ') || null;
+  }
+
+  // Convertir postal_code en number ou null
+  let postalCodeNumber: number | null = null;
+  if (md.postal_code) {
+    const parsed = parseInt(String(md.postal_code), 10);
+    if (!isNaN(parsed)) {
+      postalCodeNumber = parsed;
+    }
+  }
+
+  // Calculer trial_end_date si pas déjà défini (7 jours)
+  const trialEndDate = md.trial_end_date
+    ? toDateOnly(md.trial_end_date)
+    : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
   const payload = {
     user_id: u.id,
     email: u.email ?? null,
-    first_name: md.first_name ?? null,
-    last_name: md.last_name ?? null,
+    first_name: firstName,
+    last_name: lastName,
     role: md.role ?? 'trial',
-    trial_end_date: toDateOnly(md.trial_end_date),
+    trial_end_date: trialEndDate,
     gender: md.gender ?? null,
     birthdate: toDateOnly(md.birthdate),
     phone_number: md.phone_number ?? null,
     adress: md.adress ?? null,
     city: md.city ?? null,
-    postal_code: String(md.postal_code ?? '') || null,
+    postal_code: postalCodeNumber,
     updated_at: new Date().toISOString(),
   };
+
+  console.log('[upsertProfileFromUser] Payload:', payload);
 
   const { data, error } = await supabase
     .from('profiles')
@@ -64,10 +91,11 @@ const upsertProfileFromUser = async (u: User) => {
     .single();
 
   if (error) {
-    console.error('upsertProfileFromUser error', error);
+    console.error('[upsertProfileFromUser] Error:', error);
     throw error;
   }
 
+  console.log('[upsertProfileFromUser] Success:', data);
   return data;
 };
 
@@ -155,8 +183,8 @@ async function signUpUser(params: {
     postal_code = ''
   } = params;
 
-  // Calculer la date de fin d'essai (30 jours à partir d'aujourd'hui)
-  const trialEndDate = trial_end_date || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  // Calculer la date de fin d'essai (7 jours à partir d'aujourd'hui)
+  const trialEndDate = trial_end_date || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
   const { error } = await supabase.auth.signUp({
     email,
@@ -191,6 +219,17 @@ async function signInUser(email: string, password: string) {
     await upsertProfileFromUser(u);
   }
 
+  return data;
+}
+
+async function signInWithGoogle() {
+  const { error, data } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${window.location.origin}/app`,
+    }
+  });
+  if (error) throw error;
   return data;
 }
 
@@ -279,13 +318,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setInitialized(true);
       }
 
-      // if (u?.id && (event === 'INITIAL_SESSION' || event === 'SIGNED_IN')) {
-      //   try {
-      //     await upsertProfileFromUser(u);
-      //   } catch (e) {
-      //     console.error('auth hydrate error', e);
-      //   }
-      // }
+      // Créer le profil automatiquement lors de la connexion OAuth
+      if (newUser?.id && (event === 'SIGNED_IN')) {
+        try {
+          console.log('[AUTH] Creating profile for OAuth user');
+          await upsertProfileFromUser(newUser);
+        } catch (e) {
+          console.error('[AUTH] Error creating profile:', e);
+        }
+      }
 
       // Invalider uniquement les queries liées à l'auth quand le token est rafraîchi
       // if (event === 'TOKEN_REFRESHED') {
@@ -493,6 +534,21 @@ export function useSignIn() {
     },
     onError: (error: any) => {
       toast.error(error.message || 'Erreur de connexion');
+    },
+  });
+}
+
+export function useSignInWithGoogle() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: signInWithGoogle,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      queryClient.invalidateQueries({ queryKey: ['subscription'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Erreur de connexion avec Google');
     },
   });
 }
