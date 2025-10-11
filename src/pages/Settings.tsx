@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Settings as SettingsIcon, Plus, Building, Users, CreditCard, FileText, Palette, Shield, Upload, Download, Loader2, Trash2 } from "lucide-react"
 import SubscriptionPanel from "@/components/dashboard/settings/payment/SubscriptionPanel"
+import { InvitationManager } from "@/components/settings/InvitationManager"
 import { supabase } from "@/integrations/supabase/client"
 import type { Database } from "@/integrations/supabase/types"
 
@@ -26,17 +27,6 @@ interface Entity {
   properties_count: number
   active_leases_count: number
 }
-
-const MOCK_USERS = [
-  {
-    id: "1",
-    name: "Propriétaire Principal",
-    email: "proprietaire@example.com",
-    role: "OWNER",
-    status: "active",
-    lastLogin: "2024-01-15"
-  }
-]
 
 const MOCK_BANK_ACCOUNTS = [
   {
@@ -221,24 +211,6 @@ export default function Settings() {
     return new Date(dateString).toLocaleDateString('fr-FR')
   }
 
-  const getRoleBadge = (role: string) => {
-    const roles = {
-      OWNER: { label: "Propriétaire", variant: "default" as const },
-      MANAGER: { label: "Gestionnaire", variant: "secondary" as const },
-      VIEWER: { label: "Consultant", variant: "outline" as const }
-    }
-    return roles[role as keyof typeof roles] || { label: role, variant: "secondary" as const }
-  }
-
-  const getStatusBadge = (status: string) => {
-    const statuses = {
-      active: { label: "Actif", variant: "default" as const },
-      inactive: { label: "Inactif", variant: "secondary" as const },
-      pending: { label: "En attente", variant: "outline" as const }
-    }
-    return statuses[status as keyof typeof statuses] || { label: status, variant: "secondary" as const }
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -405,77 +377,7 @@ export default function Settings() {
 
         {/* Users Tab */}
         <TabsContent value="users" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold">Utilisateurs et rôles</h3>
-              <p className="text-sm text-muted-foreground">
-                Gérez les accès et permissions
-              </p>
-            </div>
-
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button className="gap-2">
-                  <Plus className="w-4 h-4" />
-                  Inviter utilisateur
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Inviter un utilisateur</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 pt-4">
-                  <p className="text-sm text-muted-foreground">
-                    Fonctionnalité en cours de développement
-                  </p>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          <Card>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Utilisateur</TableHead>
-                    <TableHead>Rôle</TableHead>
-                    <TableHead>Statut</TableHead>
-                    <TableHead>Dernière connexion</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {MOCK_USERS.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">{user.name}</div>
-                          <div className="text-sm text-muted-foreground">{user.email}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge {...getRoleBadge(user.role)} className="text-xs">
-                          {getRoleBadge(user.role).label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge {...getStatusBadge(user.status)} className="text-xs">
-                          {getStatusBadge(user.status).label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{formatDate(user.lastLogin)}</TableCell>
-                      <TableCell>
-                        <Button size="sm" variant="ghost">
-                          Modifier
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <InvitationManager />
         </TabsContent>
 
         {/* Banking Tab */}

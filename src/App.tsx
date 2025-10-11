@@ -30,6 +30,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import ChangeEmail from "./pages/ChangeEmail";
 import LostEmailAccess from "./pages/LostEmailAccess";
+import AcceptInvitation from "./pages/AcceptInvitation";
 import Offers from "./pages/marketing/Offers";
 import Auth from "./pages/Auth";
 
@@ -91,6 +92,7 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/lost-email-access" element={<LostEmailAccess />} />
+            <Route path="/accept-invitation" element={<AcceptInvitation />} />
 
             {/* Protected app routes */}
             <Route element={<RequireAuth />}>
