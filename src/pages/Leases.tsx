@@ -21,6 +21,7 @@ import {
 } from "@/hooks/useLeases"
 import { usePropertiesWithUnits, useCreateProperty } from "@/hooks/useProperties"
 import { useContactsWithLeaseInfo } from "@/hooks/useContacts"
+import { useTenants } from "@/hooks/useUsers"
 import { useCreateUnit } from "@/hooks/useUnits"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
@@ -41,6 +42,7 @@ export default function Leases() {
   const [newUnitSurface, setNewUnitSurface] = useState<number | "">("")
   const [newUnitFurnished, setNewUnitFurnished] = useState(false)
   const [selectedGuarantors, setSelectedGuarantors] = useState<string[]>([])
+  const [selectedCoTenants, setSelectedCoTenants] = useState<string[]>([])
   const [formData, setFormData] = useState<LeaseInsert>({
     unit_id: "",
     tenant_id: "",
@@ -56,7 +58,8 @@ export default function Leases() {
   const { toast } = useToast()
   const { data: leases = [], isLoading, error } = useLeasesWithDetails()
   const { data: properties = [] } = usePropertiesWithUnits()
-  const { data: contacts = [] } = useContactsWithLeaseInfo()
+  const { data: tenants = [] } = useTenants()
+  const { data: guarantors = [] } = useContactsWithLeaseInfo()
   const createLease = useCreateLease()
   const updateLease = useUpdateLease()
   const deleteLease = useDeleteLease()
@@ -68,7 +71,8 @@ export default function Leases() {
     hasLeases: leases.length > 0,
     leasesCount: leases.length,
     hasProperties: properties.length > 0,
-    hasContacts: contacts.length > 0
+    hasTenants: tenants.length > 0,
+    hasGuarantors: guarantors.length > 0
   })
 
   // Get units for selected property
@@ -130,6 +134,7 @@ export default function Leases() {
     setSelectedLease(null)
     setSelectedPropertyId("")
     setSelectedGuarantors([])
+    setSelectedCoTenants([])
   }
 
   const handleOpenDialog = () => {
@@ -179,16 +184,31 @@ export default function Leases() {
       } else {
         const newLease = await createLease.mutateAsync(formData)
 
-        // Créer les garanties si des garants ont été sélectionnés
-        if (selectedGuarantors.length > 0 && newLease) {
+        if (newLease) {
           const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
+          if (!user) throw new Error('Non authentifié');
+
+          // Créer les colocataires si sélectionnés
+          if (selectedCoTenants.length > 0) {
+            await Promise.all(
+              selectedCoTenants.map(coTenantUserId =>
+                supabase.from('lease_tenants').insert({
+                  lease_id: newLease.id,
+                  user_id: coTenantUserId,
+                  role: 'co-tenant',
+                })
+              )
+            )
+          }
+
+          // Créer les garanties si des garants ont été sélectionnés
+          if (selectedGuarantors.length > 0) {
             await Promise.all(
               selectedGuarantors.map(guarantorId =>
                 supabase.from('lease_guarantors').insert({
                   lease_id: newLease.id,
                   guarantor_contact_id: guarantorId,
-                  tenant_contact_id: formData.tenant_id,
+                  tenant_contact_id: null, // On ne lie plus le garant à un contact locataire
                   user_id: user.id,
                 })
               )
@@ -442,42 +462,82 @@ export default function Leases() {
                     <SelectValue placeholder="Sélectionner un locataire" />
                   </SelectTrigger>
                   <SelectContent>
-                    {contacts.map((contact) => (
-                      <SelectItem key={contact.id} value={contact.id}>
-                        {contact.first_name} {contact.last_name}
-                      </SelectItem>
-                    ))}
+                    {tenants.length === 0 ? (
+                      <div className="p-2 text-sm text-muted-foreground text-center">
+                        Aucun locataire invité. Allez dans Paramètres → Utilisateurs pour inviter des locataires.
+                      </div>
+                    ) : (
+                      tenants.map((tenant) => (
+                        <SelectItem key={tenant.user_id} value={tenant.user_id}>
+                          {tenant.first_name} {tenant.last_name} {tenant.email && `(${tenant.email})`}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
+              </div>
+
+              {/* Co-Tenants Selection */}
+              <div className="space-y-2">
+                <Label>Colocataires (optionnel)</Label>
+                <div className="border rounded-lg p-3 space-y-2 max-h-40 overflow-y-auto">
+                  {tenants.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Aucun locataire disponible</p>
+                  ) : (
+                    tenants
+                      .filter(tenant => tenant.user_id !== formData.tenant_id)
+                      .map((tenant) => (
+                        <div key={tenant.user_id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`cotenant-${tenant.user_id}`}
+                            checked={selectedCoTenants.includes(tenant.user_id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedCoTenants([...selectedCoTenants, tenant.user_id])
+                              } else {
+                                setSelectedCoTenants(selectedCoTenants.filter(id => id !== tenant.user_id))
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`cotenant-${tenant.user_id}`} className="cursor-pointer text-sm">
+                            {tenant.first_name} {tenant.last_name} {tenant.email && `(${tenant.email})`}
+                          </Label>
+                        </div>
+                      ))
+                  )}
+                </div>
+                {selectedCoTenants.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {selectedCoTenants.length} colocataire(s) sélectionné(s)
+                  </p>
+                )}
               </div>
 
               {/* Guarantors Selection */}
               <div className="space-y-2">
                 <Label>Garants (optionnel)</Label>
                 <div className="border rounded-lg p-3 space-y-2 max-h-40 overflow-y-auto">
-                  {contacts.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Aucun contact disponible</p>
+                  {guarantors.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Aucun garant disponible. Allez dans Garants pour en créer.</p>
                   ) : (
-                    contacts
-                      .filter(contact => contact.id !== formData.tenant_id)
-                      .map((contact) => (
-                        <div key={contact.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`guarantor-${contact.id}`}
-                            checked={selectedGuarantors.includes(contact.id)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedGuarantors([...selectedGuarantors, contact.id])
-                              } else {
-                                setSelectedGuarantors(selectedGuarantors.filter(id => id !== contact.id))
-                              }
-                            }}
-                          />
-                          <Label htmlFor={`guarantor-${contact.id}`} className="cursor-pointer text-sm">
-                            {contact.first_name} {contact.last_name}
-                          </Label>
-                        </div>
-                      ))
+                    guarantors.map((guarantor) => (
+                      <div key={guarantor.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`guarantor-${guarantor.id}`}
+                          checked={selectedGuarantors.includes(guarantor.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedGuarantors([...selectedGuarantors, guarantor.id])
+                            } else {
+                              setSelectedGuarantors(selectedGuarantors.filter(id => id !== guarantor.id))
+                            }
+                          }}
+                        />
+                        <Label htmlFor={`guarantor-${guarantor.id}`} className="cursor-pointer text-sm">
+                          {guarantor.first_name} {guarantor.last_name}
+                        </Label>
+                      </div>
+                    ))
                   )}
                 </div>
                 {selectedGuarantors.length > 0 && (

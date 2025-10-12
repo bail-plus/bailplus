@@ -9,8 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useInvitations, type Invitation } from '@/hooks/useInvitations';
 import { generateInvitationUrl } from '@/lib/invitation-token';
-import { Plus, Copy, RefreshCw, X, Loader2, CheckCircle2, Clock, XCircle, AlertCircle, Users, Trash2 } from 'lucide-react';
+import { Plus, Copy, RefreshCw, X, Loader2, CheckCircle2, Clock, XCircle, AlertCircle, Users, Trash2, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 export function InvitationManager() {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
@@ -18,11 +19,19 @@ export function InvitationManager() {
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [invitationLinkDialogOpen, setInvitationLinkDialogOpen] = useState(false);
   const [createdInvitationUrl, setCreatedInvitationUrl] = useState('');
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingInvitation, setEditingInvitation] = useState<Invitation | null>(null);
 
   // Form state
   const [email, setEmail] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [role, setRole] = useState<'TENANT' | 'SERVICE_PROVIDER'>('TENANT');
   const [customMessage, setCustomMessage] = useState('');
+
+  // Edit form state
+  const [editFirstName, setEditFirstName] = useState('');
+  const [editLastName, setEditLastName] = useState('');
 
   const {
     loading,
@@ -68,12 +77,23 @@ export function InvitationManager() {
       return;
     }
 
+    if (!firstName || !lastName) {
+      toast({
+        title: 'Erreur',
+        description: 'Le prénom et le nom sont requis',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     try {
       const invitation = await createInvitation({
         email,
         role,
         invitation_context: 'manual',
         custom_message: customMessage || undefined,
+        first_name: firstName,
+        last_name: lastName,
       });
 
       // Générer l'URL d'invitation
@@ -91,6 +111,8 @@ export function InvitationManager() {
 
       // Reset form
       setEmail('');
+      setFirstName('');
+      setLastName('');
       setRole('TENANT');
       setCustomMessage('');
       setInviteDialogOpen(false);
@@ -162,6 +184,72 @@ export function InvitationManager() {
       toast({
         title: 'Erreur',
         description: 'Impossible de supprimer l\'utilisateur',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const openEditDialog = (invitation: Invitation) => {
+    setEditingInvitation(invitation);
+    setEditFirstName(invitation.first_name || '');
+    setEditLastName(invitation.last_name || '');
+    setEditDialogOpen(true);
+  };
+
+  const handleUpdateUser = async () => {
+    if (!editingInvitation || !editingInvitation.user_id) {
+      toast({
+        title: 'Erreur',
+        description: 'Aucun utilisateur sélectionné',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!editFirstName || !editLastName) {
+      toast({
+        title: 'Erreur',
+        description: 'Le prénom et le nom sont requis',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      // Mettre à jour le profil
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          first_name: editFirstName,
+          last_name: editLastName,
+        })
+        .eq('user_id', editingInvitation.user_id);
+
+      if (profileError) throw profileError;
+
+      // Mettre à jour aussi l'invitation pour garder les données synchronisées
+      const { error: invitationError } = await supabase
+        .from('user_invitations')
+        .update({
+          first_name: editFirstName,
+          last_name: editLastName,
+        })
+        .eq('id', editingInvitation.id);
+
+      if (invitationError) throw invitationError;
+
+      toast({
+        title: 'Utilisateur mis à jour',
+        description: 'Les informations ont été mises à jour avec succès',
+      });
+
+      setEditDialogOpen(false);
+      setEditingInvitation(null);
+      loadInvitations();
+    } catch (err) {
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de mettre à jour l\'utilisateur',
         variant: 'destructive',
       });
     }
@@ -270,6 +358,28 @@ export function InvitationManager() {
                 />
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">Prénom *</Label>
+                  <Input
+                    id="firstName"
+                    placeholder="Prénom"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Nom *</Label>
+                  <Input
+                    id="lastName"
+                    placeholder="Nom"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="role">Rôle *</Label>
                 <Select value={role} onValueChange={(value: 'TENANT' | 'SERVICE_PROVIDER') => setRole(value)}>
@@ -363,15 +473,25 @@ export function InvitationManager() {
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
                       {invitation.status === 'accepted' ? (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => handleDeleteUser(invitation)}
-                          title="Supprimer l'utilisateur"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => openEditDialog(invitation)}
+                            title="Modifier"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteUser(invitation)}
+                            title="Supprimer l'utilisateur"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </>
                       ) : canResendOrCancel(invitation) ? (
                         <>
                           <Button
@@ -468,6 +588,66 @@ export function InvitationManager() {
           <DialogFooter>
             <Button onClick={() => setInvitationLinkDialogOpen(false)}>
               Fermer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal pour modifier un utilisateur */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Modifier l'utilisateur</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input
+                value={editingInvitation?.email || ''}
+                disabled
+                className="bg-muted"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="editFirstName">Prénom *</Label>
+                <Input
+                  id="editFirstName"
+                  placeholder="Prénom"
+                  value={editFirstName}
+                  onChange={(e) => setEditFirstName(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="editLastName">Nom *</Label>
+                <Input
+                  id="editLastName"
+                  placeholder="Nom"
+                  value={editLastName}
+                  onChange={(e) => setEditLastName(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Rôle</Label>
+              <Input
+                value={editingInvitation?.role === 'TENANT' ? 'Locataire' : 'Prestataire de services'}
+                disabled
+                className="bg-muted"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              Annuler
+            </Button>
+            <Button onClick={handleUpdateUser} disabled={loading}>
+              {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {loading ? 'Mise à jour...' : 'Enregistrer'}
             </Button>
           </DialogFooter>
         </DialogContent>

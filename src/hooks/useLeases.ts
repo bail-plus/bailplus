@@ -97,21 +97,32 @@ async function fetchLeasesWithDetails(entityId?: string | null, showAll?: boolea
         .eq('id', lease.unit_id)
         .single();
 
-      // Get tenant
+      // Get tenant from profiles (invited users)
       const { data: tenant } = await supabase
-        .from('contacts')
-        .select('first_name, last_name, email, phone')
-        .eq('id', lease.tenant_id)
+        .from('profiles')
+        .select('first_name, last_name, email, phone_number')
+        .eq('user_id', lease.tenant_id)
         .single();
 
-      // Get co-tenants
+      // Get co-tenants from lease_tenants -> profiles
       const { data: leaseTenants } = await supabase
         .from('lease_tenants')
-        .select(`
-          contact:contacts(first_name, last_name)
-        `)
+        .select('user_id')
         .eq('lease_id', lease.id)
         .eq('role', 'co-tenant');
+
+      // Fetch co-tenant details from profiles
+      let coTenants: any[] = [];
+      if (leaseTenants && leaseTenants.length > 0) {
+        const coTenantIds = leaseTenants.map(lt => lt.user_id).filter(id => id !== null);
+        if (coTenantIds.length > 0) {
+          const { data: coTenantsData } = await supabase
+            .from('profiles')
+            .select('first_name, last_name')
+            .in('user_id', coTenantIds);
+          coTenants = coTenantsData || [];
+        }
+      }
 
       // Get guarantors count
       const { count: guarantorsCount } = await supabase
@@ -123,7 +134,7 @@ async function fetchLeasesWithDetails(entityId?: string | null, showAll?: boolea
         ...lease,
         unit: unit as any,
         tenant: tenant as any,
-        coTenants: leaseTenants?.map((lt: any) => lt.contact) ?? [],
+        coTenants: coTenants,
         guarantorsCount: guarantorsCount ?? 0,
       };
     })

@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { AlertTriangle, Clock, CheckCircle, Wrench, Plus, Search, Edit, Trash2, DollarSign } from "lucide-react"
+import { AlertTriangle, Clock, CheckCircle, Wrench, Plus, Search, Edit, Trash2, DollarSign, User } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import {
   useMaintenanceTicketsWithDetails,
@@ -26,6 +26,10 @@ import {
 } from "@/hooks/useMaintenance"
 import { usePropertiesWithUnits } from "@/hooks/useProperties"
 import { useContactsWithLeaseInfo } from "@/hooks/useContacts"
+import { FileUpload } from "@/components/FileUpload"
+import { useFileUpload } from "@/hooks/useFileUpload"
+import { useServiceProviders, addServiceProviderToTicket } from "@/hooks/useTicketParticipants"
+import { notifyProviderAssignment } from "@/hooks/useNotifications"
 
 const KANBAN_COLUMNS = [
   { id: "NOUVEAU", title: "Nouveau", color: "bg-red-50", icon: AlertTriangle },
@@ -53,6 +57,8 @@ export default function Maintenance() {
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null)
   const [draggedTicket, setDraggedTicket] = useState<MaintenanceTicketWithDetails | null>(null)
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [selectedProviderId, setSelectedProviderId] = useState<string>("")
 
   const [ticketFormData, setTicketFormData] = useState<MaintenanceTicketInsert>({
     title: "",
@@ -78,16 +84,32 @@ export default function Maintenance() {
   const { data: tickets = [], isLoading, error } = useMaintenanceTicketsWithDetails()
   const { data: properties = [] } = usePropertiesWithUnits()
   const { data: contacts = [] } = useContactsWithLeaseInfo()
+  const { data: serviceProviders = [] } = useServiceProviders()
   const createTicket = useCreateMaintenanceTicket()
   const updateTicket = useUpdateMaintenanceTicket()
   const deleteTicket = useDeleteMaintenanceTicket()
   const createWorkOrder = useCreateWorkOrder()
   const updateWorkOrder = useUpdateWorkOrder()
   const deleteWorkOrder = useDeleteWorkOrder()
+  const { uploadFiles, isUploading } = useFileUpload()
+
+  // Debug: log service providers
+  console.log('[MAINTENANCE] Service Providers:', serviceProviders)
+  console.log('[MAINTENANCE] Tickets:', tickets)
 
   // Get units for selected property
   const selectedProperty = properties.find(p => p.id === ticketFormData.property_id)
   const availableUnits = selectedProperty?.units ?? []
+
+  // Get tenants for selected unit (from contacts with active leases)
+  const availableTenants = contacts.filter(contact => {
+    if (!ticketFormData.unit_id || ticketFormData.unit_id === "none") return false
+    // Check if contact has an active lease for the selected unit
+    return contact.leases?.some(lease =>
+      lease.unit_id === ticketFormData.unit_id &&
+      lease.status === 'ACTIF'
+    )
+  })
 
   const resetTicketForm = () => {
     setTicketFormData({
@@ -100,6 +122,7 @@ export default function Maintenance() {
     })
     setIsEditMode(false)
     setSelectedTicket(null)
+    setSelectedFiles([])
   }
 
   const resetWorkOrderForm = () => {
@@ -155,16 +178,36 @@ export default function Maintenance() {
           unit_id: ticketFormData.unit_id === "none" ? null : ticketFormData.unit_id,
           description: ticketFormData.description || null,
         })
+
+        // Upload files if any
+        if (selectedFiles.length > 0) {
+          await uploadFiles(selectedFiles, {
+            ticketId: selectedTicket.id,
+            propertyId: ticketFormData.property_id,
+            category: 'maintenance'
+          })
+        }
+
         toast({
           title: "Succès",
           description: "Ticket modifié avec succès",
         })
       } else {
-        await createTicket.mutateAsync({
+        const newTicket = await createTicket.mutateAsync({
           ...ticketFormData,
           unit_id: ticketFormData.unit_id === "none" ? null : ticketFormData.unit_id,
           description: ticketFormData.description || null,
         })
+
+        // Upload files if any
+        if (selectedFiles.length > 0 && newTicket) {
+          await uploadFiles(selectedFiles, {
+            ticketId: newTicket.id,
+            propertyId: ticketFormData.property_id,
+            category: 'maintenance'
+          })
+        }
+
         toast({
           title: "Succès",
           description: "Ticket créé avec succès",
@@ -294,6 +337,50 @@ export default function Maintenance() {
     }
   }
 
+  const handleAssignServiceProvider = async (ticketId: string, providerId: string) => {
+    try {
+      // Get ticket details for notification
+      const ticket = tickets.find(t => t.id === ticketId)
+      if (!ticket) {
+        throw new Error("Ticket non trouvé")
+      }
+
+      // Add provider to ticket participants
+      await addServiceProviderToTicket(ticketId, providerId)
+
+      // Update the ticket to set assigned_to
+      await updateTicket.mutateAsync({
+        id: ticketId,
+        assigned_to: providerId,
+      })
+
+      // Send notification to the service provider
+      try {
+        await notifyProviderAssignment(
+          ticketId,
+          providerId,
+          ticket.title,
+          ticket.property?.name || 'Propriété'
+        )
+      } catch (notifError) {
+        console.error('Error sending notification:', notifError)
+        // Don't fail the assignment if notification fails
+      }
+
+      toast({
+        title: "Succès",
+        description: "Prestataire assigné avec succès",
+      })
+      setSelectedProviderId("")
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible d'assigner le prestataire",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleDragStart = (ticket: MaintenanceTicketWithDetails) => {
     setDraggedTicket(ticket)
   }
@@ -313,7 +400,7 @@ export default function Maintenance() {
     try {
       await updateTicket.mutateAsync({
         id: draggedTicket.id,
-        status: newStatus,
+        status: newStatus as any,
       })
       toast({
         title: "Succès",
@@ -515,12 +602,36 @@ export default function Maintenance() {
                   </div>
                 </div>
 
+                {/* Tenant Selection */}
+                {ticketFormData.unit_id && ticketFormData.unit_id !== "none" && availableTenants.length > 0 && (
+                  <div className="space-y-2">
+                    <Label htmlFor="tenant_id">Locataire concerné</Label>
+                    <Select
+                      value={ticketFormData.tenant_id || "none"}
+                      onValueChange={(value) => setTicketFormData({ ...ticketFormData, tenant_id: value === "none" ? undefined : value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner un locataire" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Aucun locataire spécifique</SelectItem>
+                        {availableTenants.map((tenant) => (
+                          <SelectItem key={tenant.id} value={tenant.id}>
+                            {tenant.first_name} {tenant.last_name}
+                            {tenant.email && ` (${tenant.email})`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="priority">Priorité</Label>
                     <Select
                       value={ticketFormData.priority ?? "MOYEN"}
-                      onValueChange={(value) => setTicketFormData({ ...ticketFormData, priority: value })}
+                      onValueChange={(value) => setTicketFormData({ ...ticketFormData, priority: value as any })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Priorité" />
@@ -538,7 +649,7 @@ export default function Maintenance() {
                     <Label htmlFor="status">Statut</Label>
                     <Select
                       value={ticketFormData.status ?? "NOUVEAU"}
-                      onValueChange={(value) => setTicketFormData({ ...ticketFormData, status: value })}
+                      onValueChange={(value) => setTicketFormData({ ...ticketFormData, status: value as any })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Statut" />
@@ -553,8 +664,23 @@ export default function Maintenance() {
                   </div>
                 </div>
 
+                {/* File Upload */}
+                <div className="space-y-2">
+                  <Label>Photos et documents</Label>
+                  <FileUpload
+                    onFilesChange={(files) => setSelectedFiles(files.map(f => f.file))}
+                    maxFiles={5}
+                    maxSize={10 * 1024 * 1024}
+                    acceptedTypes={['image/*', 'application/pdf']}
+                  />
+                </div>
+
                 <div className="flex gap-2 pt-4">
-                  <Button type="submit" className="flex-1" disabled={createTicket.isPending || updateTicket.isPending}>
+                  <Button
+                    type="submit"
+                    className="flex-1"
+                    disabled={createTicket.isPending || updateTicket.isPending || isUploading}
+                  >
                     {isEditMode ? "Modifier" : "Créer"}
                   </Button>
                   <Button type="button" variant="outline" onClick={() => setIsTicketDialogOpen(false)}>
@@ -809,6 +935,7 @@ export default function Maintenance() {
             <Tabs defaultValue="summary" className="mt-4">
               <TabsList>
                 <TabsTrigger value="summary">Résumé</TabsTrigger>
+                <TabsTrigger value="provider">Prestataire</TabsTrigger>
                 <TabsTrigger value="workorders">
                   Ordres de travail ({selectedTicket.work_orders?.length || 0})
                 </TabsTrigger>
@@ -850,6 +977,86 @@ export default function Maintenance() {
                   )}
                   <div>
                     <span className="font-medium">Créé le:</span> {formatDate(selectedTicket.created_at)}
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="provider" className="space-y-4">
+                <div className="space-y-4">
+                  {selectedTicket.assigned_contact ? (
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                              <User className="w-5 h-5 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-medium">
+                                {selectedTicket.assigned_contact.first_name} {selectedTicket.assigned_contact.last_name}
+                              </p>
+                              {selectedTicket.assigned_contact.phone && (
+                                <p className="text-sm text-muted-foreground">
+                                  {selectedTicket.assigned_contact.phone}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <Badge variant="outline">Assigné</Badge>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="text-center py-6 text-muted-foreground">
+                      <User className="w-12 h-12 mx-auto mb-2 text-muted-foreground" />
+                      <p>Aucun prestataire assigné</p>
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    <Label htmlFor="service_provider">Assigner un prestataire</Label>
+                    <div className="flex gap-2">
+                      <Select
+                        value={selectedProviderId}
+                        onValueChange={setSelectedProviderId}
+                      >
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Sélectionner un prestataire" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {serviceProviders.length === 0 ? (
+                            <SelectItem value="none" disabled>
+                              Aucun prestataire disponible
+                            </SelectItem>
+                          ) : (
+                            serviceProviders.map((provider) => {
+                              // Afficher nom/prénom ou company_name si pas de nom
+                              const displayName = provider.first_name && provider.last_name
+                                ? `${provider.first_name} ${provider.last_name}`
+                                : provider.company_name;
+
+                              return (
+                                <SelectItem key={provider.id} value={provider.id}>
+                                  {displayName}
+                                  {provider.specialty && ` - ${provider.specialty}`}
+                                </SelectItem>
+                              );
+                            })
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        onClick={() => handleAssignServiceProvider(selectedTicket.id, selectedProviderId)}
+                        disabled={!selectedProviderId || updateTicket.isPending}
+                      >
+                        Assigner
+                      </Button>
+                    </div>
+                    {serviceProviders.length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        Vous n'avez pas encore ajouté de prestataires.
+                      </p>
+                    )}
                   </div>
                 </div>
               </TabsContent>
@@ -1013,7 +1220,7 @@ export default function Maintenance() {
               <Label htmlFor="wo_status">Statut</Label>
               <Select
                 value={workOrderFormData.status ?? "EN ATTENTE"}
-                onValueChange={(value) => setWorkOrderFormData({ ...workOrderFormData, status: value })}
+                onValueChange={(value) => setWorkOrderFormData({ ...workOrderFormData, status: value as any })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Statut" />

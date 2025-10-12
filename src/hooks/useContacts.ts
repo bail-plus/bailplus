@@ -10,6 +10,13 @@ export type ContactUpdate = TablesUpdate<'contacts'>;
 export type ContactWithLeaseInfo = Contact & {
   role?: 'tenant' | 'guarantor' | 'both';
   activeLeases?: number;
+  leases?: Array<{
+    id: string;
+    unit_id: string;
+    status: string | null;
+    start_date: string;
+    end_date: string | null;
+  }>;
 };
 
 // Fetch all contacts
@@ -53,6 +60,12 @@ async function fetchContactsWithLeaseInfo(): Promise<ContactWithLeaseInfo[]> {
     .select('guarantor_contact_id, lease_id')
     .eq('user_id', user.id);
 
+  // Get all leases
+  const { data: allLeases } = await supabase
+    .from('leases')
+    .select('id, unit_id, status, start_date, end_date, tenant_id')
+    .eq('user_id', user.id);
+
   // Enrich contacts with role information
   const enrichedContacts = contacts.map(contact => {
     const isTenant = leaseTenants?.some(lt => lt.contact_id === contact.id);
@@ -65,10 +78,20 @@ async function fetchContactsWithLeaseInfo(): Promise<ContactWithLeaseInfo[]> {
 
     const activeLeases = leaseTenants?.filter(lt => lt.contact_id === contact.id).length ?? 0;
 
+    // Get leases for this contact
+    const contactLeases = allLeases?.filter(lease => lease.tenant_id === contact.id) ?? [];
+
     return {
       ...contact,
       role,
       activeLeases,
+      leases: contactLeases.map(lease => ({
+        id: lease.id,
+        unit_id: lease.unit_id,
+        status: lease.status,
+        start_date: lease.start_date,
+        end_date: lease.end_date,
+      })),
     };
   });
 

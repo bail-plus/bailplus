@@ -630,8 +630,8 @@ export type Database = {
             foreignKeyName: "leases_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
-            referencedColumns: ["id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "leases_unit_id_fkey"
@@ -1376,9 +1376,11 @@ export type Database = {
           custom_message: string | null
           email: string
           expires_at: string
+          first_name: string | null
           id: string
           invitation_context: Database["public"]["Enums"]["invitation_context_enum"]
           invited_by: string
+          last_name: string | null
           lease_id: string | null
           property_id: string | null
           role: Database["public"]["Enums"]["user_type_enum"]
@@ -1393,9 +1395,11 @@ export type Database = {
           custom_message?: string | null
           email: string
           expires_at: string
+          first_name?: string | null
           id?: string
           invitation_context: Database["public"]["Enums"]["invitation_context_enum"]
           invited_by: string
+          last_name?: string | null
           lease_id?: string | null
           property_id?: string | null
           role: Database["public"]["Enums"]["user_type_enum"]
@@ -1410,9 +1414,11 @@ export type Database = {
           custom_message?: string | null
           email?: string
           expires_at?: string
+          first_name?: string | null
           id?: string
           invitation_context?: Database["public"]["Enums"]["invitation_context_enum"]
           invited_by?: string
+          last_name?: string | null
           lease_id?: string | null
           property_id?: string | null
           role?: Database["public"]["Enums"]["user_type_enum"]

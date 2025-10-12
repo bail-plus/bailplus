@@ -21,6 +21,8 @@ export interface Invitation {
   accepted_at: string | null;
   user_id: string | null;
   custom_message: string | null;
+  first_name: string | null;
+  last_name: string | null;
   created_at: string;
 }
 
@@ -31,6 +33,8 @@ export interface CreateInvitationParams {
   lease_id?: string;
   property_id?: string;
   custom_message?: string;
+  first_name?: string;
+  last_name?: string;
 }
 
 export function useInvitations() {
@@ -111,6 +115,8 @@ export function useInvitations() {
           expires_at: expiresAt,
           status: 'pending',
           custom_message: params.custom_message || null,
+          first_name: params.first_name || null,
+          last_name: params.last_name || null,
         })
         .select()
         .single();
@@ -351,6 +357,8 @@ export function useInvitations() {
             linked_to_landlord: invitation.invited_by,
             is_invited_user: true,
             invitation_accepted_at: new Date().toISOString(),
+            first_name: invitation.first_name || null,
+            last_name: invitation.last_name || null,
           });
 
         if (insertError) {
@@ -367,6 +375,8 @@ export function useInvitations() {
             linked_to_landlord: invitation.invited_by,
             is_invited_user: true,
             invitation_accepted_at: new Date().toISOString(),
+            first_name: invitation.first_name || null,
+            last_name: invitation.last_name || null,
           })
           .eq('user_id', authData.user.id);
 

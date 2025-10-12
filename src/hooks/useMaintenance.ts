@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useEntity } from '@/contexts/EntityContext';
+import { autoCreateTicketParticipants } from '@/hooks/useTicketParticipants';
 
 export type MaintenanceTicket = Tables<'maintenance_tickets'>;
 export type MaintenanceTicketInsert = TablesInsert<'maintenance_tickets'>;
@@ -92,26 +93,79 @@ async function fetchMaintenanceTicketsWithDetails(userId: string, entityId?: str
         unit = unitData;
       }
 
-      // Get assigned contact if specified
+      // Get assigned service provider if specified (from profiles, not contacts)
       let assigned_contact = null;
       if (ticket.assigned_to) {
-        const { data: contactData } = await supabase
-          .from('contacts')
-          .select('first_name, last_name, email, phone')
-          .eq('id', ticket.assigned_to)
-          .single();
-        assigned_contact = contactData;
+        console.log('[useMaintenance] Fetching provider for:', ticket.assigned_to);
+        const { data: providerData, error: providerError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', ticket.assigned_to)
+          .maybeSingle();
+
+        if (providerError) {
+          console.error('[useMaintenance] Error fetching provider:', providerError);
+        }
+
+        console.log('[useMaintenance] Provider data:', providerData);
+
+        if (providerData) {
+          // Use fallbacks: first_name+last_name > company_name > 'Prestataire'
+          let displayFirstName = '';
+          let displayLastName = '';
+
+          if (providerData.first_name && providerData.last_name) {
+            // Si on a prénom et nom, on les utilise
+            displayFirstName = providerData.first_name;
+            displayLastName = providerData.last_name;
+          } else if (providerData.company_name) {
+            // Sinon si on a un nom d'entreprise, on l'utilise comme prénom
+            displayFirstName = providerData.company_name;
+            displayLastName = '';
+          } else {
+            // Sinon on affiche "Prestataire"
+            displayFirstName = 'Prestataire';
+            displayLastName = '';
+          }
+
+          assigned_contact = {
+            first_name: displayFirstName,
+            last_name: displayLastName,
+            email: providerData.email || '',
+            phone: providerData.phone_number || '',
+          };
+        }
       }
 
-      // Get created by contact if specified
+      // Get created by user if specified (from profiles)
       let created_by_contact = null;
       if (ticket.created_by) {
-        const { data: contactData } = await supabase
-          .from('contacts')
-          .select('first_name, last_name')
-          .eq('id', ticket.created_by)
-          .single();
-        created_by_contact = contactData;
+        const { data: creatorData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', ticket.created_by)
+          .maybeSingle();
+
+        if (creatorData) {
+          let displayFirstName = '';
+          let displayLastName = '';
+
+          if (creatorData.first_name && creatorData.last_name) {
+            displayFirstName = creatorData.first_name;
+            displayLastName = creatorData.last_name;
+          } else if (creatorData.company_name) {
+            displayFirstName = creatorData.company_name;
+            displayLastName = '';
+          } else {
+            displayFirstName = 'Utilisateur';
+            displayLastName = '';
+          }
+
+          created_by_contact = {
+            first_name: displayFirstName,
+            last_name: displayLastName,
+          };
+        }
       }
 
       // Get work orders
@@ -152,11 +206,22 @@ async function createMaintenanceTicket(ticket: MaintenanceTicketInsert): Promise
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Non authentifié');
 
+  // Get user's role from profile
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('user_type')
+    .eq('user_id', user.id)
+    .single();
+
+  const userRole = profile?.user_type || 'LANDLORD';
+
   const { data, error } = await supabase
     .from('maintenance_tickets')
     .insert({
       ...ticket,
       user_id: user.id,
+      created_by: user.id,
+      created_by_role: userRole,
     })
     .select()
     .single();
@@ -164,6 +229,18 @@ async function createMaintenanceTicket(ticket: MaintenanceTicketInsert): Promise
   if (error) {
     console.error('Error creating maintenance ticket:', error);
     throw new Error(error.message);
+  }
+
+  // Auto-create participants (landlord + tenant if applicable)
+  try {
+    await autoCreateTicketParticipants(
+      data.id,
+      user.id, // landlord
+      ticket.tenant_id || null // tenant if provided
+    );
+  } catch (participantError) {
+    console.error('Error creating participants:', participantError);
+    // Don't fail the ticket creation if participant creation fails
   }
 
   return data;

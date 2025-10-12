@@ -20,7 +20,6 @@ import {
 
 export default function People() {
   const [searchTerm, setSearchTerm] = useState("")
-  const [typeFilter, setTypeFilter] = useState<"all" | "tenant" | "guarantor">("all")
   const [selectedPerson, setSelectedPerson] = useState<ContactWithLeaseInfo | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
@@ -126,21 +125,15 @@ export default function People() {
     }
   }
 
+  // Ne filtrer que par recherche (tous les contacts sont des garants potentiels)
   const filteredPeople = contacts.filter(person => {
     const matchesSearch =
       person.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       person.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       person.email?.toLowerCase().includes(searchTerm.toLowerCase())
 
-    const matchesType = typeFilter === "all" || person.role === typeFilter ||
-      (typeFilter === "tenant" && person.role === "both") ||
-      (typeFilter === "guarantor" && person.role === "both")
-
-    return matchesSearch && matchesType
+    return matchesSearch
   })
-
-  const tenantsCount = contacts.filter(p => p.role === "tenant" || p.role === "both").length
-  const guarantorsCount = contacts.filter(p => p.role === "guarantor" || p.role === "both").length
 
   if (error) {
     return (
@@ -167,25 +160,14 @@ export default function People() {
     )
   }
 
-  const getRoleBadge = (role?: 'tenant' | 'guarantor' | 'both') => {
-    if (!role) return null
-
-    const badges = {
-      tenant: { label: "Locataire", icon: User, variant: "default" as const },
-      guarantor: { label: "Garant", icon: ShieldCheck, variant: "secondary" as const },
-      both: { label: "Locataire & Garant", icon: User, variant: "outline" as const }
-    }
-    return badges[role]
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Personnes</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Garants</h1>
           <p className="text-muted-foreground mt-1">
-            Locataires, garants et prestataires
+            Gestion des garants pour vos locataires
           </p>
         </div>
         
@@ -193,13 +175,13 @@ export default function People() {
           <DialogTrigger asChild>
             <Button className="gap-2" onClick={handleOpenDialog}>
               <Plus className="w-4 h-4" />
-              Nouvelle personne
+              Nouveau garant
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>
-                {isEditMode ? "Modifier la personne" : "Ajouter une personne"}
+                {isEditMode ? "Modifier le garant" : "Ajouter un garant"}
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4 pt-4">
@@ -271,91 +253,57 @@ export default function People() {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
-            placeholder="Rechercher une personne..."
+            placeholder="Rechercher un garant..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-9"
           />
         </div>
-        
-        <Select value={typeFilter} onValueChange={(value: any) => setTypeFilter(value)}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tous</SelectItem>
-            <SelectItem value="tenant">Locataires</SelectItem>
-            <SelectItem value="guarantor">Garants</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Total</span>
-            </div>
-            <div className="text-2xl font-bold">{contacts.length}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Locataires</span>
-            </div>
-            <div className="text-2xl font-bold">{tenantsCount}</div>
-          </CardContent>
-        </Card>
-
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Garants</span>
+              <span className="text-sm font-medium">Total Garants</span>
             </div>
-            <div className="text-2xl font-bold">{guarantorsCount}</div>
+            <div className="text-2xl font-bold">{contacts.length}</div>
           </CardContent>
         </Card>
       </div>
 
-      {/* People List */}
+      {/* Guarantors List */}
       <Card>
         <CardHeader>
-          <CardTitle>Liste des personnes</CardTitle>
+          <CardTitle>Liste des garants</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Nom</TableHead>
-                <TableHead>Type</TableHead>
                 <TableHead>Contact</TableHead>
-                <TableHead>Baux actifs</TableHead>
+                <TableHead>Adresse</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredPeople.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8">
+                  <TableCell colSpan={4} className="text-center py-8">
                     <div className="text-center">
-                      <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">Aucune personne trouvée</h3>
+                      <ShieldCheck className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold mb-2">Aucun garant trouvé</h3>
                       <p className="text-muted-foreground">
-                        Vous n'avez pas encore ajouté de locataires ou garants.
+                        Vous n'avez pas encore ajouté de garants.
                       </p>
                     </div>
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredPeople.map((person) => {
-                  const roleBadge = getRoleBadge(person.role);
-
                   return (
                     <TableRow key={person.id} className="hover:bg-muted/50">
                       <TableCell>
@@ -363,44 +311,34 @@ export default function People() {
                           <div className="font-medium">
                             {person.first_name} {person.last_name}
                           </div>
-                          {person.email && (
-                            <div className="text-sm text-muted-foreground flex items-center gap-1">
-                              <Mail className="w-3 h-3" />
-                              {person.email}
-                            </div>
-                          )}
                         </div>
                       </TableCell>
 
                       <TableCell>
-                        {roleBadge && (
-                          <Badge variant={roleBadge.variant} className="gap-1">
-                            <roleBadge.icon className="w-3 h-3" />
-                            {roleBadge.label}
-                          </Badge>
-                        )}
-                      </TableCell>
-
-                      <TableCell>
-                        <div className="text-sm">
+                        <div className="text-sm space-y-1">
+                          {person.email && (
+                            <div className="flex items-center gap-1">
+                              <Mail className="w-3 h-3" />
+                              {person.email}
+                            </div>
+                          )}
                           {person.phone && (
                             <div className="flex items-center gap-1">
                               <Phone className="w-3 h-3" />
                               {person.phone}
                             </div>
                           )}
-                          {person.address && (
-                            <div className="flex items-center gap-1 text-muted-foreground mt-1">
-                              <MapPin className="w-3 h-3" />
-                              {person.address}
-                            </div>
-                          )}
                         </div>
                       </TableCell>
 
                       <TableCell>
                         <div className="text-sm">
-                          {person.activeLeases ?? 0}
+                          {person.address && (
+                            <div className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3" />
+                              {person.address}
+                            </div>
+                          )}
                         </div>
                       </TableCell>
 
