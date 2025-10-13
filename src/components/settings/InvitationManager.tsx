@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useInvitations, type Invitation } from '@/hooks/useInvitations';
 import { generateInvitationUrl } from '@/lib/invitation-token';
-import { Plus, Copy, RefreshCw, X, Loader2, CheckCircle2, Clock, XCircle, AlertCircle, Users, Trash2, Edit } from 'lucide-react';
+import { Plus, Copy, RefreshCw, X, Loader2, CheckCircle2, Clock, XCircle, AlertCircle, Users, Trash2, Edit, Search, ChevronLeft, ChevronRight, UserCheck, UserCog } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -32,6 +33,13 @@ export function InvitationManager() {
   // Edit form state
   const [editFirstName, setEditFirstName] = useState('');
   const [editLastName, setEditLastName] = useState('');
+
+  // Filter and pagination state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'accepted' | 'expired' | 'cancelled'>('all');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'TENANT' | 'SERVICE_PROVIDER'>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const {
     loading,
@@ -325,6 +333,51 @@ export function InvitationManager() {
     return invitation.status === 'pending' && expiresAt > now;
   };
 
+  // Filter invitations
+  const filteredInvitations = invitations.filter((invitation) => {
+    const now = new Date();
+    const expiresAt = new Date(invitation.expires_at);
+    const isExpired = invitation.status === 'pending' && expiresAt < now;
+    const actualStatus = isExpired ? 'expired' : invitation.status;
+
+    // Search filter
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = !searchTerm ||
+      invitation.email.toLowerCase().includes(searchLower) ||
+      (invitation.first_name && invitation.first_name.toLowerCase().includes(searchLower)) ||
+      (invitation.last_name && invitation.last_name.toLowerCase().includes(searchLower));
+
+    // Status filter
+    const matchesStatus = statusFilter === 'all' || actualStatus === statusFilter;
+
+    // Role filter
+    const matchesRole = roleFilter === 'all' || invitation.role === roleFilter;
+
+    return matchesSearch && matchesStatus && matchesRole;
+  });
+
+  // Pagination
+  const totalPages = Math.ceil(filteredInvitations.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedInvitations = filteredInvitations.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, roleFilter]);
+
+  // Calculate stats
+  const totalUsers = invitations.length;
+  const acceptedInvitations = invitations.filter(inv => inv.status === 'accepted');
+  const totalTenants = acceptedInvitations.filter(inv => inv.role === 'TENANT').length;
+  const totalProviders = acceptedInvitations.filter(inv => inv.role === 'SERVICE_PROVIDER').length;
+  const pendingInvitations = invitations.filter(inv => {
+    const now = new Date();
+    const expiresAt = new Date(inv.expires_at);
+    return inv.status === 'pending' && expiresAt > now;
+  }).length;
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -427,6 +480,147 @@ export function InvitationManager() {
         </Dialog>
       </div>
 
+      {/* Stats Cards */}
+      {!loadingInvitations && invitations.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Total</p>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-2xl font-bold">{totalUsers}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Utilisateurs</p>
+                </div>
+                <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                  <Users className="w-5 h-5 text-primary" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Locataires</p>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-2xl font-bold">{totalTenants}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Actifs</p>
+                </div>
+                <div className="w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center">
+                  <UserCheck className="w-5 h-5 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Prestataires</p>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-2xl font-bold">{totalProviders}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Actifs</p>
+                </div>
+                <div className="w-10 h-10 bg-orange-500/10 rounded-full flex items-center justify-center">
+                  <UserCog className="w-5 h-5 text-orange-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">En attente</p>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="text-2xl font-bold">{pendingInvitations}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Invitations</p>
+                </div>
+                <div className="w-10 h-10 bg-yellow-500/10 rounded-full flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-yellow-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        {/* Search bar */}
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+          <Input
+            placeholder="Rechercher par nom ou email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
+        {/* Status filter */}
+        <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+          <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectValue placeholder="Statut" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les statuts</SelectItem>
+            <SelectItem value="pending">En attente</SelectItem>
+            <SelectItem value="accepted">Acceptés</SelectItem>
+            <SelectItem value="expired">Expirés</SelectItem>
+            <SelectItem value="cancelled">Annulés</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Role filter */}
+        <Select value={roleFilter} onValueChange={(value: any) => setRoleFilter(value)}>
+          <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectValue placeholder="Rôle" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les rôles</SelectItem>
+            <SelectItem value="TENANT">Locataires</SelectItem>
+            <SelectItem value="SERVICE_PROVIDER">Prestataires</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Stats summary */}
+      {!loadingInvitations && invitations.length > 0 && (
+        <div className="flex gap-4 text-sm text-muted-foreground">
+          <span>
+            Total: <strong className="text-foreground">{invitations.length}</strong>
+          </span>
+          <span>•</span>
+          <span>
+            Affichés: <strong className="text-foreground">{filteredInvitations.length}</strong>
+          </span>
+          {filteredInvitations.length !== invitations.length && (
+            <>
+              <span>•</span>
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setStatusFilter('all');
+                  setRoleFilter('all');
+                }}
+                className="text-primary hover:underline"
+              >
+                Réinitialiser les filtres
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       {loadingInvitations ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -438,6 +632,24 @@ export function InvitationManager() {
           <p className="text-sm text-muted-foreground mb-4">
             Commencez par inviter vos locataires et prestataires
           </p>
+        </div>
+      ) : filteredInvitations.length === 0 ? (
+        <div className="text-center py-12 border-2 border-dashed rounded-lg">
+          <Search className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+          <h3 className="font-semibold mb-2">Aucun résultat</h3>
+          <p className="text-sm text-muted-foreground mb-4">
+            Aucune invitation ne correspond à vos critères de recherche
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setSearchTerm('');
+              setStatusFilter('all');
+              setRoleFilter('all');
+            }}
+          >
+            Réinitialiser les filtres
+          </Button>
         </div>
       ) : (
         <div className="border rounded-lg">
@@ -453,7 +665,7 @@ export function InvitationManager() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {invitations.map((invitation) => (
+              {paginatedInvitations.map((invitation) => (
                 <TableRow key={invitation.id}>
                   <TableCell className="font-medium">{invitation.email}</TableCell>
                   <TableCell>{getRoleBadge(invitation.role)}</TableCell>
@@ -546,6 +758,35 @@ export function InvitationManager() {
               ))}
             </TableBody>
           </Table>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t">
+              <div className="text-sm text-muted-foreground">
+                Page {currentPage} sur {totalPages} • {filteredInvitations.length} résultat{filteredInvitations.length > 1 ? 's' : ''}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Précédent
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                >
+                  Suivant
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

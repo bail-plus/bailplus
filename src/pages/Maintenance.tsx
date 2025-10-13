@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { AlertTriangle, Clock, CheckCircle, Wrench, Plus, Search, Edit, Trash2, DollarSign, User } from "lucide-react"
+import { AlertTriangle, Clock, CheckCircle, Wrench, Plus, Search, Edit, Trash2, DollarSign, User, Star } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import {
   useMaintenanceTicketsWithDetails,
@@ -28,9 +28,12 @@ import { usePropertiesWithUnits } from "@/hooks/useProperties"
 import { useContactsWithLeaseInfo } from "@/hooks/useContacts"
 import { FileUpload } from "@/components/FileUpload"
 import { useFileUpload } from "@/hooks/useFileUpload"
-import { useServiceProviders, addServiceProviderToTicket } from "@/hooks/useTicketParticipants"
+import { addServiceProviderToTicket } from "@/hooks/useTicketParticipants"
+import { useServiceProviders } from "@/hooks/useServiceProviders"
 import { notifyProviderAssignment } from "@/hooks/useNotifications"
 import { useAuth } from "@/hooks/useAuth"
+import { RatingDialog } from "@/components/provider/RatingDialog"
+import { useCheckUserRating } from "@/hooks/useProviderRatings"
 
 const KANBAN_COLUMNS = [
   { id: "NOUVEAU", title: "Nouveau", color: "bg-red-50", icon: AlertTriangle },
@@ -47,6 +50,103 @@ const WORK_ORDER_STATUSES = [
   { value: "ANNULE", label: "Annulé" }
 ]
 
+// Component to handle provider rating section
+function ProviderRatingSection({
+  selectedTicket,
+  serviceProviders,
+  onRateProvider
+}: {
+  selectedTicket: MaintenanceTicketWithDetails
+  serviceProviders: any[]
+  onRateProvider: (providerId: string, providerName: string) => void
+}) {
+  // Trouver le service_provider correspondant au user_id assigné
+  const provider = serviceProviders.find(p => p.user_id === selectedTicket.assigned_to)
+
+  // Vérifier si l'utilisateur a déjà noté ce prestataire pour ce ticket
+  const { data: existingRating } = useCheckUserRating(
+    provider?.user_id || provider?.id || '',
+    selectedTicket.id
+  )
+
+  if (!selectedTicket.assigned_contact) {
+    return (
+      <div className="space-y-4">
+        <div className="text-center py-6 text-muted-foreground">
+          <User className="w-12 h-12 mx-auto mb-2 text-muted-foreground" />
+          <p>Aucun prestataire assigné</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                <User className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium">
+                  {selectedTicket.assigned_contact.first_name} {selectedTicket.assigned_contact.last_name}
+                </p>
+                {selectedTicket.assigned_contact.phone && (
+                  <p className="text-sm text-muted-foreground">
+                    {selectedTicket.assigned_contact.phone}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline">Assigné</Badge>
+
+              {/* Bouton noter si ticket terminé ET pas encore noté */}
+              {selectedTicket.status === "TERMINE" && provider && (
+                existingRating ? (
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1 text-sm">
+                      <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                      <span className="font-medium">{existingRating.rating}/5</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      Vous avez déjà noté ce prestataire pour ce ticket
+                    </span>
+                  </div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      onRateProvider(
+                        provider.user_id || provider.id,
+                        `${selectedTicket.assigned_contact?.first_name} ${selectedTicket.assigned_contact?.last_name}`
+                      )
+                    }}
+                    className="gap-2"
+                  >
+                    <Star className="w-4 h-4" />
+                    Noter
+                  </Button>
+                )
+              )}
+
+              {/* Message si ticket pas encore terminé */}
+              {selectedTicket.status !== "TERMINE" && (
+                <p className="text-xs text-muted-foreground">
+                  Disponible une fois terminé
+                </p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 export default function Maintenance() {
   const [viewMode, setViewMode] = useState<"list" | "kanban">("kanban")
   const [searchTerm, setSearchTerm] = useState("")
@@ -60,6 +160,8 @@ export default function Maintenance() {
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [selectedProviderId, setSelectedProviderId] = useState<string>("")
+  const [isRatingDialogOpen, setIsRatingDialogOpen] = useState(false)
+  const [providerToRate, setProviderToRate] = useState<{ id: string; name: string } | null>(null)
 
   const [ticketFormData, setTicketFormData] = useState<MaintenanceTicketInsert>({
     title: "",
@@ -1001,36 +1103,14 @@ export default function Maintenance() {
               </TabsContent>
 
               <TabsContent value="provider" className="space-y-4">
-                <div className="space-y-4">
-                  {selectedTicket.assigned_contact ? (
-                    <Card>
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                              <User className="w-5 h-5 text-primary" />
-                            </div>
-                            <div>
-                              <p className="font-medium">
-                                {selectedTicket.assigned_contact.first_name} {selectedTicket.assigned_contact.last_name}
-                              </p>
-                              {selectedTicket.assigned_contact.phone && (
-                                <p className="text-sm text-muted-foreground">
-                                  {selectedTicket.assigned_contact.phone}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                          <Badge variant="outline">Assigné</Badge>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <div className="text-center py-6 text-muted-foreground">
-                      <User className="w-12 h-12 mx-auto mb-2 text-muted-foreground" />
-                      <p>Aucun prestataire assigné</p>
-                    </div>
-                  )}
+                <ProviderRatingSection
+                  selectedTicket={selectedTicket}
+                  serviceProviders={serviceProviders}
+                  onRateProvider={(providerId, providerName) => {
+                    setProviderToRate({ id: providerId, name: providerName })
+                    setIsRatingDialogOpen(true)
+                  }}
+                />
 
                   <div className="space-y-3">
                     <Label htmlFor="service_provider">Assigner un prestataire</Label>
@@ -1050,8 +1130,8 @@ export default function Maintenance() {
                           ) : (
                             serviceProviders.map((provider) => {
                               // Afficher nom/prénom ou company_name si pas de nom
-                              const displayName = provider.first_name && provider.last_name
-                                ? `${provider.first_name} ${provider.last_name}`
+                              const displayName = provider.user?.first_name && provider.user?.last_name
+                                ? `${provider.user.first_name} ${provider.user.last_name}`
                                 : provider.company_name;
 
                               return (
@@ -1077,7 +1157,6 @@ export default function Maintenance() {
                       </p>
                     )}
                   </div>
-                </div>
               </TabsContent>
 
               <TabsContent value="workorders" className="space-y-4">
@@ -1163,6 +1242,17 @@ export default function Maintenance() {
             )}
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Rating Dialog */}
+      {providerToRate && (
+        <RatingDialog
+          open={isRatingDialogOpen}
+          onOpenChange={setIsRatingDialogOpen}
+          providerId={providerToRate.id}
+          providerName={providerToRate.name}
+          ticketId={selectedTicket?.id}
+        />
       )}
 
       {/* Work Order Dialog */}

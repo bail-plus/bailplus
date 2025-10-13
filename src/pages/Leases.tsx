@@ -24,6 +24,7 @@ import { useContactsWithLeaseInfo } from "@/hooks/useContacts"
 import { useTenants } from "@/hooks/useUsers"
 import { useCreateUnit } from "@/hooks/useUnits"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useInvitations } from "@/hooks/useInvitations"
 
 export default function Leases() {
   const renderCount = useRef(0);
@@ -43,6 +44,11 @@ export default function Leases() {
   const [newUnitFurnished, setNewUnitFurnished] = useState(false)
   const [selectedGuarantors, setSelectedGuarantors] = useState<string[]>([])
   const [selectedCoTenants, setSelectedCoTenants] = useState<string[]>([])
+  const [isInviteTenantDialogOpen, setIsInviteTenantDialogOpen] = useState(false)
+  const [inviteTenantEmail, setInviteTenantEmail] = useState("")
+  const [inviteTenantFirstName, setInviteTenantFirstName] = useState("")
+  const [inviteTenantLastName, setInviteTenantLastName] = useState("")
+  const [pendingInvitationId, setPendingInvitationId] = useState<string | null>(null)
   const [formData, setFormData] = useState<LeaseInsert>({
     unit_id: "",
     tenant_id: "",
@@ -64,6 +70,7 @@ export default function Leases() {
   const updateLease = useUpdateLease()
   const deleteLease = useDeleteLease()
   const createUnit = useCreateUnit()
+  const { createInvitation } = useInvitations()
 
   console.log('[PAGE/LEASES]', {
     isLoading,
@@ -118,6 +125,44 @@ export default function Leases() {
     }
   }
 
+  const handleInviteTenant = async () => {
+    if (!inviteTenantEmail) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez renseigner l'email du locataire",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const invitation = await createInvitation({
+        email: inviteTenantEmail,
+        role: "TENANT",
+        invitation_context: "lease",
+        first_name: inviteTenantFirstName || undefined,
+        last_name: inviteTenantLastName || undefined,
+      })
+
+      setPendingInvitationId(invitation.id)
+      setIsInviteTenantDialogOpen(false)
+      setInviteTenantEmail("")
+      setInviteTenantFirstName("")
+      setInviteTenantLastName("")
+
+      toast({
+        title: "Succès",
+        description: "Invitation envoyée avec succès. Le locataire pourra accepter l'invitation pour créer son compte.",
+      })
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Erreur lors de l'envoi de l'invitation",
+        variant: "destructive",
+      })
+    }
+  }
+
   const resetForm = () => {
     setFormData({
       unit_id: "",
@@ -135,6 +180,7 @@ export default function Leases() {
     setSelectedPropertyId("")
     setSelectedGuarantors([])
     setSelectedCoTenants([])
+    setPendingInvitationId(null)
   }
 
   const handleOpenDialog = () => {
@@ -162,10 +208,11 @@ export default function Leases() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.unit_id || !formData.tenant_id || !formData.start_date || !formData.rent_amount) {
+    // Vérifier que soit un tenant_id soit une invitation en attente est fourni
+    if (!formData.unit_id || (!formData.tenant_id && !pendingInvitationId) || !formData.start_date || !formData.rent_amount) {
       toast({
         title: "Erreur",
-        description: "Veuillez remplir tous les champs requis",
+        description: "Veuillez remplir tous les champs requis (logement, locataire ou invitation, date de début, loyer)",
         variant: "destructive",
       })
       return
@@ -182,11 +229,30 @@ export default function Leases() {
           description: "Bail modifié avec succès",
         })
       } else {
-        const newLease = await createLease.mutateAsync(formData)
+        // Si une invitation est en attente et qu'aucun tenant n'est sélectionné, utiliser l'ID du propriétaire temporairement
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Non authentifié');
+
+        const leaseData = {
+          ...formData,
+          // Si pas de tenant_id mais une invitation en attente, on met l'id du propriétaire temporairement
+          // Le tenant sera mis à jour quand il acceptera l'invitation
+          tenant_id: formData.tenant_id || (pendingInvitationId ? user.id : ""),
+        };
+
+        const newLease = await createLease.mutateAsync(leaseData)
 
         if (newLease) {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) throw new Error('Non authentifié');
+          // Si une invitation en attente existe, la lier au bail
+          if (pendingInvitationId) {
+            await supabase
+              .from('user_invitations')
+              .update({
+                lease_id: newLease.id,
+                property_id: selectedPropertyId || null
+              })
+              .eq('id', pendingInvitationId);
+          }
 
           // Créer les colocataires si sélectionnés
           if (selectedCoTenants.length > 0) {
@@ -475,6 +541,83 @@ export default function Leases() {
                     )}
                   </SelectContent>
                 </Select>
+
+                {/* Invitation Dialog */}
+                <Dialog open={isInviteTenantDialogOpen} onOpenChange={setIsInviteTenantDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button type="button" variant="link" className="h-auto p-0 text-xs text-muted-foreground hover:text-primary">
+                      Aucun locataire ? Inviter un nouveau locataire
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Inviter un nouveau locataire</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="invite_tenant_email">Email *</Label>
+                        <Input
+                          id="invite_tenant_email"
+                          type="email"
+                          placeholder="locataire@example.com"
+                          value={inviteTenantEmail}
+                          onChange={(e) => setInviteTenantEmail(e.target.value)}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="invite_tenant_first_name">Prénom</Label>
+                          <Input
+                            id="invite_tenant_first_name"
+                            placeholder="Jean"
+                            value={inviteTenantFirstName}
+                            onChange={(e) => setInviteTenantFirstName(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="invite_tenant_last_name">Nom</Label>
+                          <Input
+                            id="invite_tenant_last_name"
+                            placeholder="Dupont"
+                            value={inviteTenantLastName}
+                            onChange={(e) => setInviteTenantLastName(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <Alert>
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription className="text-xs">
+                          Une invitation sera envoyée à cette adresse email. Le locataire pourra créer son compte et sera automatiquement lié à ce bail une fois l'invitation acceptée.
+                        </AlertDescription>
+                      </Alert>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          className="flex-1"
+                          onClick={handleInviteTenant}
+                        >
+                          Envoyer l'invitation
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setIsInviteTenantDialogOpen(false)}
+                        >
+                          Annuler
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
+                {pendingInvitationId && (
+                  <Alert className="mt-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      Une invitation a été envoyée. Le locataire sera automatiquement lié à ce bail une fois qu'il aura accepté l'invitation.
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
 
               {/* Co-Tenants Selection */}

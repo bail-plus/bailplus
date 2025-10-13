@@ -407,6 +407,21 @@ export function useInvitations() {
         if (providerError) throw providerError;
       }
 
+      // Si c'est un locataire et qu'il y a un lease_id, mettre à jour le bail
+      if (invitation.role === 'TENANT' && invitation.lease_id) {
+        const { error: leaseError } = await supabase
+          .from('leases')
+          .update({
+            tenant_id: authData.user.id,
+          })
+          .eq('id', invitation.lease_id);
+
+        if (leaseError) {
+          console.error('Failed to update lease with tenant:', leaseError);
+          // On ne fait pas échouer l'acceptation de l'invitation si la mise à jour du bail échoue
+        }
+      }
+
       return authData.user;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to accept invitation';

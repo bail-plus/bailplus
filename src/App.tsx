@@ -15,6 +15,8 @@ import Properties from "./pages/Properties";
 import Leases from "./pages/Leases";
 import LeaseDetail from "./pages/LeaseDetail";
 import People from "./pages/People";
+import Providers from "./pages/Providers";
+import ProviderProfile from "./pages/ProviderProfile";
 import Maintenance from "./pages/Maintenance";
 import Accounting from "./pages/Accounting";
 import Documents from "./pages/Documents";
@@ -112,6 +114,8 @@ function App() {
                 <Route path="/app/leases" element={<Layout><Leases /></Layout>} />
                 <Route path="/app/leases/:id" element={<Layout><LeaseDetail /></Layout>} />
                 <Route path="/app/people" element={<Layout><People /></Layout>} />
+                <Route path="/app/providers" element={<Layout><Providers /></Layout>} />
+                <Route path="/app/provider-profile" element={<Layout><ProviderProfile /></Layout>} />
                 <Route path="/app/maintenance" element={<Layout><Maintenance /></Layout>} />
                 <Route path="/app/accounting" element={<Layout><Accounting /></Layout>} />
                 <Route path="/app/documents" element={<Layout><Documents /></Layout>} />

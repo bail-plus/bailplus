@@ -1,10 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Wrench, Calendar, FileText, TrendingUp, CheckCircle2, Clock, AlertCircle, DollarSign, MapPin } from "lucide-react"
+import { Wrench, Calendar, FileText, TrendingUp, CheckCircle2, Clock, AlertCircle, DollarSign, MapPin, Star } from "lucide-react"
 import { useAuth } from "@/hooks/useAuth"
 import { useMaintenanceTicketsWithDetails } from "@/hooks/useMaintenance"
 import { useProviderData } from "@/hooks/useProviderData"
+import { useProviderRatings } from "@/hooks/useProviderRatings"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 import { useNavigate } from "react-router-dom"
@@ -13,6 +14,7 @@ const ProviderDashboard = () => {
   const { profile } = useAuth()
   const { data: tickets = [], isLoading: ticketsLoading } = useMaintenanceTicketsWithDetails()
   const { data: providerData, isLoading: providerDataLoading } = useProviderData()
+  const { data: ratings = [], isLoading: ratingsLoading } = useProviderRatings(providerData?.providerInfo?.id || '')
   const navigate = useNavigate()
 
   // Pour un prestataire, on filtre uniquement les tickets qui lui sont assignés
@@ -153,6 +155,54 @@ const ProviderDashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Ratings Section */}
+      {ratings && ratings.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Star className="w-5 h-5" />
+              Mes avis clients ({ratings.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {ratings.slice(0, 3).map((rating) => (
+                <div key={rating.id} className="flex gap-3 p-3 rounded-lg border bg-card">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="flex">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            className={`w-4 h-4 ${
+                              star <= (rating.rating || 0)
+                                ? 'fill-yellow-400 text-yellow-400'
+                                : 'text-gray-300'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-sm font-medium">{rating.rating}/5</span>
+                    </div>
+                    {rating.comment && (
+                      <p className="text-sm text-muted-foreground">{rating.comment}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {format(new Date(rating.created_at), 'dd MMMM yyyy', { locale: fr })}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              {ratings.length > 3 && (
+                <Button variant="outline" className="w-full" size="sm">
+                  Voir tous les avis ({ratings.length})
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main Content Grid */}
       <div className="grid gap-6 lg:grid-cols-2">

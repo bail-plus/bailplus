@@ -1002,6 +1002,58 @@ export type Database = {
           },
         ]
       }
+      provider_ratings: {
+        Row: {
+          comment: string | null
+          created_at: string
+          id: string
+          provider_id: string | null
+          rated_by: string | null
+          rating: number | null
+          ticket_id: string | null
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          provider_id?: string | null
+          rated_by?: string | null
+          rating?: number | null
+          ticket_id?: string | null
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          provider_id?: string | null
+          rated_by?: string | null
+          rating?: number | null
+          ticket_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_ratings_rated_by_fkey"
+            columns: ["rated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "provider_ratings_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "service_providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_ratings_ticket_id_fkey1"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rent_invoices: {
         Row: {
           charges_amount: number | null
