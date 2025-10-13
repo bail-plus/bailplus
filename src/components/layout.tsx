@@ -20,8 +20,16 @@ interface LayoutProps {
 }
 
 export function Layout({ children }: LayoutProps) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { mutate: signOut } = useSignOut();
+
+  // Déterminer si l'utilisateur est un propriétaire (LANDLORD)
+  const isLandlord = profile?.user_type === 'LANDLORD'
+
+  // Debug log
+  console.log('[LAYOUT] Profile:', profile);
+  console.log('[LAYOUT] user_type:', profile?.user_type);
+  console.log('[LAYOUT] isLandlord:', isLandlord);
 
   return (
     <EntityProvider>
@@ -35,12 +43,18 @@ export function Layout({ children }: LayoutProps) {
               <div className="flex items-center justify-between h-full px-6">
                 <div className="flex items-center gap-4">
                   <SidebarTrigger className="text-muted-foreground hover:text-foreground" />
-                  <EntitySelector />
+                  {/* EntitySelector uniquement pour les propriétaires */}
+                  {isLandlord && <EntitySelector />}
                 </div>
 
                 <div className="flex items-center gap-4">
-                  <GlobalSearch />
-                  <CreateButton />
+                  {/* GlobalSearch et CreateButton uniquement pour les propriétaires */}
+                  {isLandlord && (
+                    <>
+                      <GlobalSearch />
+                      <CreateButton />
+                    </>
+                  )}
 
                   {/* User Menu */}
                   <DropdownMenu>

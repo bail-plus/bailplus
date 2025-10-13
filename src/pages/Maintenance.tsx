@@ -30,6 +30,7 @@ import { FileUpload } from "@/components/FileUpload"
 import { useFileUpload } from "@/hooks/useFileUpload"
 import { useServiceProviders, addServiceProviderToTicket } from "@/hooks/useTicketParticipants"
 import { notifyProviderAssignment } from "@/hooks/useNotifications"
+import { useAuth } from "@/hooks/useAuth"
 
 const KANBAN_COLUMNS = [
   { id: "NOUVEAU", title: "Nouveau", color: "bg-red-50", icon: AlertTriangle },
@@ -81,6 +82,7 @@ export default function Maintenance() {
   })
 
   const { toast } = useToast()
+  const { profile } = useAuth()
   const { data: tickets = [], isLoading, error } = useMaintenanceTicketsWithDetails()
   const { data: properties = [] } = usePropertiesWithUnits()
   const { data: contacts = [] } = useContactsWithLeaseInfo()
@@ -93,7 +95,14 @@ export default function Maintenance() {
   const deleteWorkOrder = useDeleteWorkOrder()
   const { uploadFiles, isUploading } = useFileUpload()
 
+  // Determine user permissions
+  const userType = profile?.user_type || 'LANDLORD'
+  const isLandlord = userType === 'LANDLORD'
+  const isTenant = userType === 'TENANT'
+  const isProvider = userType === 'SERVICE_PROVIDER'
+
   // Debug: log service providers
+  console.log('[MAINTENANCE] User type:', userType)
   console.log('[MAINTENANCE] Service Providers:', serviceProviders)
   console.log('[MAINTENANCE] Tickets:', tickets)
 
@@ -524,13 +533,15 @@ export default function Maintenance() {
             </Button>
           </div>
 
-          <Dialog open={isTicketDialogOpen} onOpenChange={setIsTicketDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2" onClick={handleOpenTicketDialog}>
-                <Plus className="w-4 h-4" />
-                Nouveau ticket
-              </Button>
-            </DialogTrigger>
+          {/* Prestataires ne peuvent pas créer de tickets */}
+          {!isProvider && (
+            <Dialog open={isTicketDialogOpen} onOpenChange={setIsTicketDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2" onClick={handleOpenTicketDialog}>
+                  <Plus className="w-4 h-4" />
+                  Nouveau ticket
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
@@ -690,6 +701,7 @@ export default function Maintenance() {
               </form>
             </DialogContent>
           </Dialog>
+          )}
         </div>
       </div>
 
@@ -775,9 +787,9 @@ export default function Maintenance() {
                   ) : columnTickets.map(ticket => (
                     <Card
                       key={ticket.id}
-                      draggable
-                      onDragStart={() => handleDragStart(ticket)}
-                      className={`cursor-move transition-all hover:shadow-md ${column.color} ${
+                      draggable={isLandlord} // Seuls les propriétaires peuvent déplacer les tickets
+                      onDragStart={() => isLandlord && handleDragStart(ticket)}
+                      className={`${isLandlord ? 'cursor-move' : 'cursor-pointer'} transition-all hover:shadow-md ${column.color} ${
                         draggedTicket?.id === ticket.id ? 'opacity-50' : ''
                       }`}
                       onClick={() => setSelectedTicket(ticket)}
@@ -889,28 +901,32 @@ export default function Maintenance() {
                       </TableCell>
 
                       <TableCell>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleEditTicket(ticket)
-                            }}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDeleteTicket(ticket.id)
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
+                        {/* Seuls les propriétaires peuvent modifier/supprimer */}
+                        {isLandlord && (
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleEditTicket(ticket)
+                              }}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteTicket(ticket.id)
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        )}
+                        {!isLandlord && <span className="text-xs text-muted-foreground">-</span>}
                       </TableCell>
                     </TableRow>
                   ))
@@ -935,10 +951,13 @@ export default function Maintenance() {
             <Tabs defaultValue="summary" className="mt-4">
               <TabsList>
                 <TabsTrigger value="summary">Résumé</TabsTrigger>
-                <TabsTrigger value="provider">Prestataire</TabsTrigger>
-                <TabsTrigger value="workorders">
-                  Ordres de travail ({selectedTicket.work_orders?.length || 0})
-                </TabsTrigger>
+                {/* Seuls les propriétaires peuvent gérer les prestataires et ordres de travail */}
+                {isLandlord && <TabsTrigger value="provider">Prestataire</TabsTrigger>}
+                {isLandlord && (
+                  <TabsTrigger value="workorders">
+                    Ordres de travail ({selectedTicket.work_orders?.length || 0})
+                  </TabsTrigger>
+                )}
               </TabsList>
 
               <TabsContent value="summary" className="space-y-4">
@@ -1123,22 +1142,25 @@ export default function Maintenance() {
               </TabsContent>
             </Tabs>
 
-            <div className="flex gap-2 pt-4 border-t">
-              <Button variant="outline" size="sm" onClick={() => handleEditTicket(selectedTicket)}>
-                <Edit className="w-4 h-4 mr-1" />
-                Modifier
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  handleDeleteTicket(selectedTicket.id)
-                }}
-              >
-                <Trash2 className="w-4 h-4 mr-1" />
-                Supprimer
-              </Button>
-            </div>
+            {/* Seuls les propriétaires peuvent modifier/supprimer */}
+            {isLandlord && (
+              <div className="flex gap-2 pt-4 border-t">
+                <Button variant="outline" size="sm" onClick={() => handleEditTicket(selectedTicket)}>
+                  <Edit className="w-4 h-4 mr-1" />
+                  Modifier
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    handleDeleteTicket(selectedTicket.id)
+                  }}
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Supprimer
+                </Button>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
       )}

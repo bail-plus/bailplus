@@ -40,36 +40,84 @@ export type MaintenanceTicketWithDetails = MaintenanceTicket & {
 async function fetchMaintenanceTicketsWithDetails(userId: string, entityId?: string | null, showAll?: boolean): Promise<MaintenanceTicketWithDetails[]> {
   if (!userId) return [];
 
-  // Si une entité est sélectionnée, récupérer les property_ids de cette entité
-  let propertyIds: string[] = []
-  if (!showAll && entityId) {
-    const { data: properties } = await supabase
-      .from('properties')
-      .select('id')
-      .eq('entity_id', entityId)
+  console.log('[useMaintenance] Fetching tickets for user', userId);
 
-    propertyIds = properties?.map(p => p.id) || []
+  // Get user profile to determine role
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('user_type')
+    .eq('user_id', userId)
+    .single();
 
-    if (propertyIds.length === 0) {
-      return [] // Aucune propriété pour cette entité
-    }
-  }
+  const userType = profile?.user_type || 'LANDLORD';
+  console.log('[useMaintenance] User type:', userType);
 
-  // Get tickets
+  // Build query based on user type
   let ticketsQuery = supabase
     .from('maintenance_tickets')
-    .select('*')
-    .eq('user_id', userId)
+    .select('*');
 
-  // Filtrer par property_id si une entité est sélectionnée
-  if (!showAll && entityId && propertyIds.length > 0) {
-    ticketsQuery = ticketsQuery.in('property_id', propertyIds)
+  if (userType === 'LANDLORD') {
+    // Propriétaires : voir tous leurs tickets
+    ticketsQuery = ticketsQuery.eq('user_id', userId);
+
+    // Si une entité est sélectionnée, filtrer par property_ids de cette entité
+    if (!showAll && entityId) {
+      const { data: properties } = await supabase
+        .from('properties')
+        .select('id')
+        .eq('entity_id', entityId);
+
+      const propertyIds = properties?.map(p => p.id) || [];
+
+      if (propertyIds.length === 0) {
+        return []; // Aucune propriété pour cette entité
+      }
+
+      ticketsQuery = ticketsQuery.in('property_id', propertyIds);
+    }
+  } else if (userType === 'TENANT') {
+    // Locataires : voir les tickets de leur logement
+    // D'abord récupérer le bail actif du locataire
+    const { data: activeLease, error: leaseError } = await supabase
+      .from('leases')
+      .select('unit_id')
+      .eq('tenant_id', userId)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (leaseError) {
+      console.error('[useMaintenance] Error fetching lease:', leaseError);
+    }
+
+    console.log('[useMaintenance] Active lease for tenant:', activeLease);
+
+    if (!activeLease) {
+      console.log('[useMaintenance] No active lease found for tenant');
+      return []; // Pas de bail actif, pas de tickets à afficher
+    }
+
+    // Filtrer par unit_id ou tenant_id
+    ticketsQuery = ticketsQuery.or(`unit_id.eq.${activeLease.unit_id},tenant_id.eq.${userId}`);
+  } else if (userType === 'SERVICE_PROVIDER') {
+    // Prestataires : voir uniquement les tickets qui leur sont assignés
+    ticketsQuery = ticketsQuery.eq('assigned_to', userId);
+    console.log('[useMaintenance] Filtering tickets by assigned_to:', userId);
+  } else {
+    // Type inconnu, ne rien afficher
+    console.warn('[useMaintenance] Unknown user type:', userType);
+    return [];
   }
 
   const { data: tickets, error: ticketsError } = await ticketsQuery
     .order('created_at', { ascending: false });
 
-  if (ticketsError) throw new Error(ticketsError.message);
+  console.log('[useMaintenance] Tickets found:', tickets?.length || 0);
+
+  if (ticketsError) {
+    console.error('[useMaintenance] Error fetching tickets:', ticketsError);
+    throw new Error(ticketsError.message);
+  }
   if (!tickets) return [];
 
   // Enrich each ticket with related data

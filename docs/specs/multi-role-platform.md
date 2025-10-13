@@ -357,7 +357,7 @@ CREATE INDEX idx_status_history_ticket ON ticket_status_history(ticket_id);
 - [ ] Marquage de lecture (read receipts)
 - [ ] Système de notifications en temps réel (Supabase Realtime)
 
-### Phase 3 : Role-Specific Dashboards (Semaines 5-6)
+### Phase 3 : Role-Specific Dashboards (Semaines 5-6) lA 
 **Objectif :** Créer les 3 interfaces utilisateur distinctes
 
 #### Sprint 3.1 - Landlord Dashboard
