@@ -6,6 +6,7 @@ import { CreateButton } from "@/components/create-button"
 import { Button } from "@/components/ui/button"
 import { LogOut, User } from "lucide-react"
 import { useAuth, useSignOut } from "@/hooks/useAuth"
+import { NotificationBell } from "@/components/notifications/NotificationBell"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,6 +56,9 @@ export function Layout({ children }: LayoutProps) {
                       <CreateButton />
                     </>
                   )}
+
+                  {/* In-App Notifications */}
+                  <NotificationBell />
 
                   {/* User Menu */}
                   <DropdownMenu>

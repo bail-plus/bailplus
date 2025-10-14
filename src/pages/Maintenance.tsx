@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -34,6 +34,7 @@ import { notifyProviderAssignment } from "@/hooks/useNotifications"
 import { useAuth } from "@/hooks/useAuth"
 import { RatingDialog } from "@/components/provider/RatingDialog"
 import { useCheckUserRating } from "@/hooks/useProviderRatings"
+import { useSearchParams } from "react-router-dom"
 
 const KANBAN_COLUMNS = [
   { id: "NOUVEAU", title: "Nouveau", color: "bg-red-50", icon: AlertTriangle },
@@ -148,6 +149,7 @@ function ProviderRatingSection({
 }
 
 export default function Maintenance() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [viewMode, setViewMode] = useState<"list" | "kanban">("kanban")
   const [searchTerm, setSearchTerm] = useState("")
   const [priorityFilter, setPriorityFilter] = useState("all")
@@ -207,6 +209,21 @@ export default function Maintenance() {
   console.log('[MAINTENANCE] User type:', userType)
   console.log('[MAINTENANCE] Service Providers:', serviceProviders)
   console.log('[MAINTENANCE] Tickets:', tickets)
+
+  // Open ticket dialog directly via URL param ?openTicket=<id>
+  useEffect(() => {
+    const openId = searchParams.get('openTicket')
+    if (!openId) return
+    if (tickets.length === 0) return
+    const t = tickets.find(t => t.id === openId)
+    if (t) {
+      // Ouvrir uniquement la modale de consultation du ticket, pas la création
+      setSelectedTicket(t)
+      const sp = new URLSearchParams(searchParams)
+      sp.delete('openTicket')
+      setSearchParams(sp, { replace: true })
+    }
+  }, [tickets, searchParams, setSearchParams])
 
   // Get units for selected property
   const selectedProperty = properties.find(p => p.id === ticketFormData.property_id)

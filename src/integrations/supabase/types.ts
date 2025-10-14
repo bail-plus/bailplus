@@ -71,6 +71,69 @@ export type Database = {
           },
         ]
       }
+      branding_settings: {
+        Row: {
+          brand_name: string | null
+          created_at: string
+          entity_id: string
+          footer_text: string | null
+          from_email: string | null
+          from_name: string | null
+          id: string
+          logo_url: string | null
+          primary_color: string | null
+          reply_to_email: string | null
+          secondary_color: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          brand_name?: string | null
+          created_at?: string
+          entity_id: string
+          footer_text?: string | null
+          from_email?: string | null
+          from_name?: string | null
+          id?: string
+          logo_url?: string | null
+          primary_color?: string | null
+          reply_to_email?: string | null
+          secondary_color?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          brand_name?: string | null
+          created_at?: string
+          entity_id?: string
+          footer_text?: string | null
+          from_email?: string | null
+          from_name?: string | null
+          id?: string
+          logo_url?: string | null
+          primary_color?: string | null
+          reply_to_email?: string | null
+          secondary_color?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "branding_settings_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: true
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "branding_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       communication_logs: {
         Row: {
           content: string
@@ -820,6 +883,48 @@ export type Database = {
           },
         ]
       }
+      notification_reads: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          log_id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          log_id: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          log_id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_reads_log_id_fkey"
+            columns: ["log_id"]
+            isOneToOne: false
+            referencedRelation: "communication_logs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_reads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       offers: {
         Row: {
           description: string | null
@@ -1037,13 +1142,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
-          },
-          {
-            foreignKeyName: "provider_ratings_ticket_id_fkey"
-            columns: ["ticket_id"]
-            isOneToOne: false
-            referencedRelation: "service_providers"
-            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "provider_ratings_ticket_id_fkey1"

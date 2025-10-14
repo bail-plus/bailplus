@@ -68,27 +68,63 @@ export default function ProviderProfile() {
           .maybeSingle()
 
         if (error) throw error
-        if (!data) {
-          toast({
-            title: "Erreur",
-            description: "Profil prestataire non trouvé",
-            variant: "destructive",
-          })
-          return
+        let providerRow = data as any
+        if (!providerRow) {
+          // Tenter de créer un profil prestataire minimal à partir du profil utilisateur
+          const { data: myProfile } = await supabase
+            .from('profiles')
+            .select('first_name, last_name, company_name, linked_to_landlord')
+            .eq('user_id', user.id)
+            .maybeSingle()
+
+          const insertPayload: any = {
+            user_id: user.id,
+            company_name: myProfile?.company_name || null,
+            specialty: [],
+            professional_email: user.email,
+            professional_phone: null,
+            hourly_rate: null,
+            siret: null,
+            address: null,
+            available: true,
+            insurance_certificate_url: null,
+            insurance_expiry_date: null,
+          }
+          // lier au bailleur si connu
+          if (myProfile?.linked_to_landlord) {
+            insertPayload.landlord_id = myProfile.linked_to_landlord
+          }
+
+          const { data: created, error: createError } = await supabase
+            .from('service_providers')
+            .insert(insertPayload)
+            .select('*')
+            .single()
+
+          if (createError) {
+            console.error('Error auto-creating provider profile:', createError)
+            toast({
+              title: "Erreur",
+              description: "Profil prestataire non trouvé et impossible à créer",
+              variant: "destructive",
+            })
+            return
+          }
+          providerRow = created
         }
 
-        setProvider(data as ServiceProvider)
+        setProvider(providerRow as ServiceProvider)
         setFormData({
-          company_name: data.company_name || "",
-          specialty: data.specialty || [],
-          professional_email: data.professional_email || "",
-          professional_phone: data.professional_phone || "",
-          hourly_rate: data.hourly_rate,
-          siret: data.siret || "",
-          address: data.address || "",
-          available: data.available ?? true,
-          insurance_certificate_url: data.insurance_certificate_url || "",
-          insurance_expiry_date: data.insurance_expiry_date || "",
+          company_name: providerRow.company_name || "",
+          specialty: providerRow.specialty || [],
+          professional_email: providerRow.professional_email || (user.email || ""),
+          professional_phone: providerRow.professional_phone || "",
+          hourly_rate: providerRow.hourly_rate,
+          siret: providerRow.siret || "",
+          address: providerRow.address || "",
+          available: providerRow.available ?? true,
+          insurance_certificate_url: providerRow.insurance_certificate_url || "",
+          insurance_expiry_date: providerRow.insurance_expiry_date || "",
         })
       } catch (error) {
         console.error('Error loading provider:', error)
