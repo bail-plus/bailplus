@@ -60,6 +60,7 @@ export default function Settings() {
     ticket_status_changed: true,
     provider_assigned: true,
     payment_received: false,
+    frequency: 'immediate' as 'immediate' | 'daily',
   })
 
   const loadEntities = useCallback(async () => {
@@ -159,6 +160,7 @@ export default function Settings() {
             ticket_status_changed: !!data.ticket_status_changed,
             provider_assigned: !!data.provider_assigned,
             payment_received: !!data.payment_received,
+            frequency: (data as any).frequency || 'immediate',
           })
         } else {
           // initialize row with defaults
@@ -189,6 +191,7 @@ export default function Settings() {
           ticket_status_changed: prefs.ticket_status_changed,
           provider_assigned: prefs.provider_assigned,
           payment_received: prefs.payment_received,
+          frequency: prefs.frequency,
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', user.id)
@@ -568,6 +571,27 @@ export default function Settings() {
                   onCheckedChange={(v) => setPrefs({ ...prefs, payment_received: Boolean(v) })}
                   disabled={loadingPrefs}
                 />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Fréquence</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="space-y-2">
+                <Label>Fréquence d'envoi des emails</Label>
+                <Select value={prefs.frequency} onValueChange={(v: 'immediate' | 'daily') => setPrefs({ ...prefs, frequency: v })}>
+                  <SelectTrigger className="w-64">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="immediate">Immédiat</SelectItem>
+                    <SelectItem value="daily">Digest quotidien</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Immédiat: un email par événement. Digest: résumé quotidien (à implémenter).</p>
               </div>
             </CardContent>
           </Card>
