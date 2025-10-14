@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -37,6 +37,8 @@ export default function Properties() {
     city: "",
     postal_code: "",
   })
+  const [citySuggestions, setCitySuggestions] = useState<string[]>([])
+  const postalFetchRef = useRef<AbortController | null>(null)
 
   // Units management
   const [isUnitsDialogOpen, setIsUnitsDialogOpen] = useState(false)
@@ -71,6 +73,7 @@ export default function Properties() {
       city: "",
       postal_code: "",
     })
+    setCitySuggestions([])
     setIsEditMode(false)
     setSelectedProperty(null)
   }
@@ -335,7 +338,46 @@ export default function Properties() {
                     id="postal_code"
                     placeholder="75001"
                     value={formData.postal_code ?? ""}
-                    onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })}
+                    onChange={async (e) => {
+                      const value = e.target.value.replace(/\s+/g, "").slice(0, 5)
+                      setFormData({ ...formData, postal_code: value })
+
+                      // reset when empty or incomplete
+                      if (!value || value.length < 2) {
+                        setCitySuggestions([])
+                        return
+                      }
+
+                      // cancel any ongoing request
+                      if (postalFetchRef.current) {
+                        postalFetchRef.current.abort()
+                      }
+                      const controller = new AbortController()
+                      postalFetchRef.current = controller
+
+                      try {
+                        // Query official French GEO API for communes by postal code
+                        const url = `https://geo.api.gouv.fr/communes?codePostal=${encodeURIComponent(
+                          value
+                        )}&fields=nom,codesPostaux&format=json` as const
+                        const res = await fetch(url, { signal: controller.signal })
+                        if (!res.ok) throw new Error("Erreur réseau GEO API")
+                        const data: Array<{ nom: string; codesPostaux?: string[] }> = await res.json()
+
+                        const cities = (data || []).map((c) => c.nom).filter(Boolean)
+                        setCitySuggestions(cities)
+
+                        // Auto-fill if exactly one city
+                        if (cities.length === 1) {
+                          setFormData((prev) => ({ ...prev, city: cities[0] }))
+                        }
+                      } catch (err) {
+                        if ((err as any)?.name !== "AbortError") {
+                          // On error, just clear suggestions; keep manual entry possible
+                          setCitySuggestions([])
+                        }
+                      }
+                    }}
                   />
                 </div>
                 <div className="space-y-2">
@@ -343,9 +385,15 @@ export default function Properties() {
                   <Input
                     id="city"
                     placeholder="Paris"
+                    list="city-suggestions"
                     value={formData.city ?? ""}
                     onChange={(e) => setFormData({ ...formData, city: e.target.value })}
                   />
+                  <datalist id="city-suggestions">
+                    {citySuggestions.map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
                 </div>
               </div>
 
