@@ -34,6 +34,8 @@ import { notifyProviderAssignment } from "@/hooks/useNotifications"
 import { useAuth } from "@/hooks/useAuth"
 import { RatingDialog } from "@/components/provider/RatingDialog"
 import { useCheckUserRating } from "@/hooks/useProviderRatings"
+import { useTicketMessages, useSendTicketMessage } from "@/hooks/useTicketChat"
+import { useTicketUnread, useMarkTicketRead, useMarkTicketNotificationsRead } from "@/hooks/useTicketUnread"
 import { useSearchParams } from "react-router-dom"
 
 const KANBAN_COLUMNS = [
@@ -145,6 +147,70 @@ function ProviderRatingSection({
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+function TicketMessagesPanel({ ticket }: { ticket: MaintenanceTicketWithDetails }) {
+  const { data: msgs = [] } = useTicketMessages(ticket.id)
+  const send = useSendTicketMessage(ticket.id, ticket.title)
+  const mark = useMarkTicketRead()
+  const markNotif = useMarkTicketNotificationsRead()
+  useEffect(() => {
+    if (ticket.id) {
+      mark.mutate(ticket.id)
+      markNotif.mutate(ticket.id)
+    }
+  }, [ticket.id])
+  return (
+    <div className="space-y-3">
+      <div className="border rounded-md max-h-64 overflow-auto p-2 bg-muted/20">
+        {msgs.length === 0 ? (
+          <div className="text-sm text-muted-foreground p-3">Aucun message. Commencez la discussion.</div>
+        ) : (
+          msgs.map((m) => (
+            <div key={m.id} className="p-2 border-b last:border-0">
+              <div className="text-xs text-muted-foreground">{new Date(m.created_at || '').toLocaleString('fr-FR')} • {m.sender_role}</div>
+              <div className="text-sm whitespace-pre-wrap">{m.message}</div>
+            </div>
+          ))
+        )}
+      </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          const form = e.target as HTMLFormElement
+          const textarea = form.elements.namedItem('message') as HTMLTextAreaElement
+          const text = (textarea?.value || '').trim()
+          if (!text) return
+          send.mutate(text)
+          textarea.value = ''
+        }}
+        className="flex items-start gap-2"
+      >
+        <Textarea name="message" placeholder="Écrire un message..." className="flex-1" rows={2} />
+        <Button type="submit" disabled={send.isPending}>Envoyer</Button>
+      </form>
+      <div className="text-xs text-muted-foreground">Participants: bailleur, locataire (si présent), prestataire assigné.</div>
+    </div>
+  )
+}
+
+function TicketTitleWithUnread({ ticketId, title, className }: { ticketId: string; title: string; className?: string }) {
+  const { data: unread } = useTicketUnread(ticketId)
+  return (
+    <div className={`flex items-center gap-2 ${className || ''}`}>
+      <span className="truncate">{title}</span>
+      {unread ? <span className="inline-block w-2 h-2 rounded-full bg-red-500" /> : null}
+    </div>
+  )
+}
+
+function MessagesTabLabel({ ticketId }: { ticketId: string }) {
+  const { data: unread } = useTicketUnread(ticketId)
+  return (
+    <span className="inline-flex items-center gap-2">
+      Messages {unread ? <span className="inline-block w-2 h-2 rounded-full bg-red-500" /> : null}
+    </span>
   )
 }
 
@@ -917,7 +983,7 @@ export default function Maintenance() {
                         <div className="space-y-3">
                           {/* Title & Priority */}
                           <div className="space-y-2">
-                            <h4 className="font-semibold text-sm line-clamp-2">{ticket.title}</h4>
+                            <TicketTitleWithUnread ticketId={ticket.id} title={ticket.title} className="font-semibold text-sm line-clamp-2" />
                             <Badge {...getPriorityBadge(ticket.priority)} className="text-xs" />
                           </div>
 
@@ -986,7 +1052,7 @@ export default function Maintenance() {
                     >
                       <TableCell>
                         <div>
-                          <div className="font-medium text-sm line-clamp-1">{ticket.title}</div>
+                          <TicketTitleWithUnread ticketId={ticket.id} title={ticket.title} className="font-medium text-sm line-clamp-1" />
                           <div className="text-xs text-muted-foreground">
                             {formatDate(ticket.created_at)}
                           </div>
@@ -1068,16 +1134,17 @@ export default function Maintenance() {
             </DialogHeader>
 
             <Tabs defaultValue="summary" className="mt-4">
-              <TabsList>
-                <TabsTrigger value="summary">Résumé</TabsTrigger>
-                {/* Seuls les propriétaires peuvent gérer les prestataires et ordres de travail */}
-                {isLandlord && <TabsTrigger value="provider">Prestataire</TabsTrigger>}
-                {isLandlord && (
-                  <TabsTrigger value="workorders">
-                    Ordres de travail ({selectedTicket.work_orders?.length || 0})
-                  </TabsTrigger>
-                )}
-              </TabsList>
+            <TabsList>
+              <TabsTrigger value="summary">Résumé</TabsTrigger>
+              <TabsTrigger value="messages"><MessagesTabLabel ticketId={selectedTicket.id} /></TabsTrigger>
+              {/* Seuls les propriétaires peuvent gérer les prestataires et ordres de travail */}
+              {isLandlord && <TabsTrigger value="provider">Prestataire</TabsTrigger>}
+              {isLandlord && (
+                <TabsTrigger value="workorders">
+                  Ordres de travail ({selectedTicket.work_orders?.length || 0})
+                </TabsTrigger>
+              )}
+            </TabsList>
 
               <TabsContent value="summary" className="space-y-4">
                 <div className="grid grid-cols-2 gap-4 text-sm">
@@ -1117,6 +1184,11 @@ export default function Maintenance() {
                     <span className="font-medium">Créé le:</span> {formatDate(selectedTicket.created_at)}
                   </div>
                 </div>
+              </TabsContent>
+
+              {/* Messages Tab */}
+              <TabsContent value="messages" className="space-y-3">
+                <TicketMessagesPanel ticket={selectedTicket} />
               </TabsContent>
 
               <TabsContent value="provider" className="space-y-4">
