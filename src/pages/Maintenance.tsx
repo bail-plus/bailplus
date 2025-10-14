@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { AlertTriangle, Clock, CheckCircle, Wrench, Plus, Search, Edit, Trash2, DollarSign } from "lucide-react"
+import { AlertTriangle, Clock, CheckCircle, Wrench, Plus, Search, Edit, Trash2, DollarSign, User, Star } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import {
   useMaintenanceTicketsWithDetails,
@@ -26,6 +26,18 @@ import {
 } from "@/hooks/useMaintenance"
 import { usePropertiesWithUnits } from "@/hooks/useProperties"
 import { useContactsWithLeaseInfo } from "@/hooks/useContacts"
+import { FileUpload } from "@/components/FileUpload"
+import { useFileUpload } from "@/hooks/useFileUpload"
+import { addServiceProviderToTicket } from "@/hooks/useTicketParticipants"
+import { useServiceProviderUsers } from "@/hooks/useUsers"
+import { notifyProviderAssignment } from "@/hooks/useNotifications"
+import { useAuth } from "@/hooks/useAuth"
+import { RatingDialog } from "@/components/provider/RatingDialog"
+import { useCheckUserRating } from "@/hooks/useProviderRatings"
+import { useTicketMessages, useSendTicketMessage } from "@/hooks/useTicketChat"
+import { useTicketUnread, useMarkTicketRead, useMarkTicketNotificationsRead } from "@/hooks/useTicketUnread"
+import { useSearchParams } from "react-router-dom"
+import { supabase } from "@/integrations/supabase/client"
 
 const KANBAN_COLUMNS = [
   { id: "NOUVEAU", title: "Nouveau", color: "bg-red-50", icon: AlertTriangle },
@@ -42,7 +54,169 @@ const WORK_ORDER_STATUSES = [
   { value: "ANNULE", label: "Annulé" }
 ]
 
+// Component to handle provider rating section
+function ProviderRatingSection({
+  selectedTicket,
+  serviceProviders,
+  onRateProvider
+}: {
+  selectedTicket: MaintenanceTicketWithDetails
+  serviceProviders: any[]
+  onRateProvider: (providerId: string, providerName: string) => void
+}) {
+  // Trouver le service_provider correspondant au user_id assigné
+  const provider = serviceProviders.find(p => p.user_id === selectedTicket.assigned_to)
+
+  // Vérifier si l'utilisateur a déjà noté ce prestataire pour ce ticket
+  const { data: existingRating } = useCheckUserRating(
+    provider?.user_id || provider?.id || '',
+    selectedTicket.id
+  )
+
+  if (!selectedTicket.assigned_contact) {
+    return (
+      <div className="space-y-4">
+        <div className="text-center py-6 text-muted-foreground">
+          <User className="w-12 h-12 mx-auto mb-2 text-muted-foreground" />
+          <p>Aucun prestataire assigné</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                <User className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium">
+                  {selectedTicket.assigned_contact.first_name} {selectedTicket.assigned_contact.last_name}
+                </p>
+                {selectedTicket.assigned_contact.phone && (
+                  <p className="text-sm text-muted-foreground">
+                    {selectedTicket.assigned_contact.phone}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline">Assigné</Badge>
+
+              {/* Bouton noter si ticket terminé ET pas encore noté */}
+              {selectedTicket.status === "TERMINE" && provider && (
+                existingRating ? (
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1 text-sm">
+                      <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                      <span className="font-medium">{existingRating.rating}/5</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      Vous avez déjà noté ce prestataire pour ce ticket
+                    </span>
+                  </div>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      onRateProvider(
+                        provider.user_id || provider.id,
+                        `${selectedTicket.assigned_contact?.first_name} ${selectedTicket.assigned_contact?.last_name}`
+                      )
+                    }}
+                    className="gap-2"
+                  >
+                    <Star className="w-4 h-4" />
+                    Noter
+                  </Button>
+                )
+              )}
+
+              {/* Message si ticket pas encore terminé */}
+              {selectedTicket.status !== "TERMINE" && (
+                <p className="text-xs text-muted-foreground">
+                  Disponible une fois terminé
+                </p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function TicketMessagesPanel({ ticket }: { ticket: MaintenanceTicketWithDetails }) {
+  const { data: msgs = [] } = useTicketMessages(ticket.id)
+  const send = useSendTicketMessage(ticket.id, ticket.title)
+  const mark = useMarkTicketRead()
+  const markNotif = useMarkTicketNotificationsRead()
+  useEffect(() => {
+    if (ticket.id) {
+      mark.mutate(ticket.id)
+      markNotif.mutate(ticket.id)
+    }
+  }, [ticket.id])
+  return (
+    <div className="space-y-3">
+      <div className="border rounded-md max-h-64 overflow-auto p-2 bg-muted/20">
+        {msgs.length === 0 ? (
+          <div className="text-sm text-muted-foreground p-3">Aucun message. Commencez la discussion.</div>
+        ) : (
+          msgs.map((m) => (
+            <div key={m.id} className="p-2 border-b last:border-0">
+              <div className="text-xs text-muted-foreground">{new Date(m.created_at || '').toLocaleString('fr-FR')} • {m.sender_role}</div>
+              <div className="text-sm whitespace-pre-wrap">{m.message}</div>
+            </div>
+          ))
+        )}
+      </div>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          const form = e.target as HTMLFormElement
+          const textarea = form.elements.namedItem('message') as HTMLTextAreaElement
+          const text = (textarea?.value || '').trim()
+          if (!text) return
+          send.mutate(text)
+          textarea.value = ''
+        }}
+        className="flex items-start gap-2"
+      >
+        <Textarea name="message" placeholder="Écrire un message..." className="flex-1" rows={2} />
+        <Button type="submit" disabled={send.isPending}>Envoyer</Button>
+      </form>
+      <div className="text-xs text-muted-foreground">Participants: bailleur, locataire (si présent), prestataire assigné.</div>
+    </div>
+  )
+}
+
+function TicketTitleWithUnread({ ticketId, title, className }: { ticketId: string; title: string; className?: string }) {
+  const { data: unread } = useTicketUnread(ticketId)
+  return (
+    <div className={`flex items-center gap-2 ${className || ''}`}>
+      <span className="truncate">{title}</span>
+      {unread ? <span className="inline-block w-2 h-2 rounded-full bg-red-500" /> : null}
+    </div>
+  )
+}
+
+function MessagesTabLabel({ ticketId }: { ticketId: string }) {
+  const { data: unread } = useTicketUnread(ticketId)
+  return (
+    <span className="inline-flex items-center gap-2">
+      Messages {unread ? <span className="inline-block w-2 h-2 rounded-full bg-red-500" /> : null}
+    </span>
+  )
+}
+
 export default function Maintenance() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [viewMode, setViewMode] = useState<"list" | "kanban">("kanban")
   const [searchTerm, setSearchTerm] = useState("")
   const [priorityFilter, setPriorityFilter] = useState("all")
@@ -53,6 +227,10 @@ export default function Maintenance() {
   const [selectedWorkOrder, setSelectedWorkOrder] = useState<WorkOrder | null>(null)
   const [draggedTicket, setDraggedTicket] = useState<MaintenanceTicketWithDetails | null>(null)
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [selectedProviderId, setSelectedProviderId] = useState<string>("")
+  const [isRatingDialogOpen, setIsRatingDialogOpen] = useState(false)
+  const [providerToRate, setProviderToRate] = useState<{ id: string; name: string } | null>(null)
 
   const [ticketFormData, setTicketFormData] = useState<MaintenanceTicketInsert>({
     title: "",
@@ -75,19 +253,74 @@ export default function Maintenance() {
   })
 
   const { toast } = useToast()
+  const { profile } = useAuth()
   const { data: tickets = [], isLoading, error } = useMaintenanceTicketsWithDetails()
   const { data: properties = [] } = usePropertiesWithUnits()
   const { data: contacts = [] } = useContactsWithLeaseInfo()
+  const { data: serviceProviders = [] } = useServiceProviderUsers()
   const createTicket = useCreateMaintenanceTicket()
   const updateTicket = useUpdateMaintenanceTicket()
   const deleteTicket = useDeleteMaintenanceTicket()
   const createWorkOrder = useCreateWorkOrder()
   const updateWorkOrder = useUpdateWorkOrder()
   const deleteWorkOrder = useDeleteWorkOrder()
+  const { uploadFiles, isUploading } = useFileUpload()
+
+  // Determine user permissions
+  const userType = profile?.user_type || 'LANDLORD'
+  const isLandlord = userType === 'LANDLORD'
+  const isTenant = userType === 'TENANT'
+  const isProvider = userType === 'SERVICE_PROVIDER'
+
+  // Debug: log service providers
+  console.log('[MAINTENANCE] User type:', userType)
+  console.log('[MAINTENANCE] Service Providers:', serviceProviders)
+  console.log('[MAINTENANCE] Tickets:', tickets)
+
+  // Open ticket dialog directly via URL param ?openTicket=<id>&openTab=messages|summary|provider|workorders
+  useEffect(() => {
+    const openId = searchParams.get('openTicket')
+    const openTab = searchParams.get('openTab') || undefined
+    if (!openId) return
+    if (tickets.length === 0) return
+    const t = tickets.find(t => t.id === openId)
+    if (t) {
+      // Ouvrir uniquement la modale de consultation du ticket, pas la création
+      setSelectedTicket(t)
+      // Ouvrir éventuellement un onglet spécifique
+      if (openTab) {
+        // petite temporisation pour laisser la modale se monter
+        setTimeout(() => {
+          const allowed = ['summary','messages','provider','workorders']
+          // @ts-ignore state declared later
+          if (allowed.includes(openTab)) {
+            // @ts-ignore: will set state if exists
+            try { (setActiveTab as any)?.(openTab) } catch {}
+          }
+        }, 0)
+      }
+      const sp = new URLSearchParams(searchParams)
+      sp.delete('openTicket')
+      sp.delete('openTab')
+      setSearchParams(sp, { replace: true })
+    }
+  }, [tickets, searchParams, setSearchParams])
 
   // Get units for selected property
   const selectedProperty = properties.find(p => p.id === ticketFormData.property_id)
   const availableUnits = selectedProperty?.units ?? []
+
+  // Get tenants for selected unit (from contacts with active leases)
+  const availableTenants = contacts.filter(contact => {
+    if (!ticketFormData.unit_id || ticketFormData.unit_id === "none") return false
+    // Check if contact has an active lease for the selected unit
+    return contact.leases?.some(lease =>
+      lease.unit_id === ticketFormData.unit_id &&
+      lease.status === 'ACTIF'
+    )
+  })
+
+  // Plus d'auto-sélection de contact: on bascule vers tenant_user_id (profil)
 
   const resetTicketForm = () => {
     setTicketFormData({
@@ -100,6 +333,7 @@ export default function Maintenance() {
     })
     setIsEditMode(false)
     setSelectedTicket(null)
+    setSelectedFiles([])
   }
 
   const resetWorkOrderForm = () => {
@@ -155,16 +389,98 @@ export default function Maintenance() {
           unit_id: ticketFormData.unit_id === "none" ? null : ticketFormData.unit_id,
           description: ticketFormData.description || null,
         })
+
+        // Upload files if any
+        if (selectedFiles.length > 0) {
+          await uploadFiles(selectedFiles, {
+            ticketId: selectedTicket.id,
+            propertyId: ticketFormData.property_id,
+            category: 'maintenance'
+          })
+        }
+
         toast({
           title: "Succès",
           description: "Ticket modifié avec succès",
         })
       } else {
-        await createTicket.mutateAsync({
+        // Déterminer lease_id et tenant_user_id en fonction du logement sélectionné
+        let resolvedLeaseId: string | null = null
+        let resolvedTenantUserId: string | null = (ticketFormData as any).tenant_user_id || null
+        if (ticketFormData.unit_id && ticketFormData.unit_id !== 'none') {
+          // Essai n°1: nouveau schéma (tenant_user_id)
+          const q1 = await supabase
+            .from('leases')
+            .select('id, tenant_user_id, status')
+            .eq('unit_id', ticketFormData.unit_id)
+            .in('status', ['active', 'ACTIVE'])
+            .maybeSingle()
+          if (q1.error) {
+            console.debug('[TICKET] leases (tenant_user_id) not available, fallback to tenant_id')
+          }
+          let activeLease: any = q1.data
+          if (!activeLease) {
+            // Essai n°2: ancien schéma (tenant_id)
+            const q2 = await supabase
+              .from('leases')
+              .select('id, tenant_id, status')
+              .eq('unit_id', ticketFormData.unit_id)
+              .in('status', ['active', 'ACTIVE'])
+              .maybeSingle()
+            if (q2.error) {
+              console.debug('[TICKET] leases (tenant_id) also unavailable')
+            }
+            activeLease = q2.data
+            if (activeLease?.tenant_id && !resolvedTenantUserId) {
+              // Dans ton schéma, leases.tenant_id est déjà un profiles.user_id
+              resolvedTenantUserId = activeLease.tenant_id as string
+            }
+          } else {
+            resolvedTenantUserId = activeLease.tenant_user_id || resolvedTenantUserId
+          }
+          console.log('[TICKET] Lookup active lease for unit', ticketFormData.unit_id, '=>', activeLease)
+          if (activeLease) {
+            resolvedLeaseId = activeLease.id
+            console.log('[TICKET] Using tenant_user_id:', resolvedTenantUserId)
+          }
+        }
+
+        console.log('[TICKET] Final payload tenant_user_id:', resolvedTenantUserId, 'lease_id:', resolvedLeaseId)
+        const newTicket = await createTicket.mutateAsync({
           ...ticketFormData,
           unit_id: ticketFormData.unit_id === "none" ? null : ticketFormData.unit_id,
           description: ticketFormData.description || null,
+          lease_id: resolvedLeaseId,
+          tenant_user_id: resolvedTenantUserId,
+          assigned_to: selectedProviderId || null,
         })
+
+        // Upload files if any
+        if (selectedFiles.length > 0 && newTicket) {
+          await uploadFiles(selectedFiles, {
+            ticketId: newTicket.id,
+            propertyId: ticketFormData.property_id,
+            category: 'maintenance'
+          })
+        }
+
+        // Si prestataire choisi à la création, ajouter en participants et notifier
+        if (selectedProviderId) {
+          try {
+            await addServiceProviderToTicket(newTicket.id, selectedProviderId)
+            await notifyProviderAssignment(
+              newTicket.id,
+              selectedProviderId,
+              newTicket.title || 'Ticket',
+              (newTicket as any).property_name || 'Propriété'
+            )
+          } catch (e) {
+            console.debug('[TICKET] provider assign at creation failed:', e)
+          }
+        }
+
+        // reset provider select after creation
+        setSelectedProviderId("")
         toast({
           title: "Succès",
           description: "Ticket créé avec succès",
@@ -294,6 +610,50 @@ export default function Maintenance() {
     }
   }
 
+  const handleAssignServiceProvider = async (ticketId: string, providerId: string) => {
+    try {
+      // Get ticket details for notification
+      const ticket = tickets.find(t => t.id === ticketId)
+      if (!ticket) {
+        throw new Error("Ticket non trouvé")
+      }
+
+      // Add provider to ticket participants
+      await addServiceProviderToTicket(ticketId, providerId)
+
+      // Update the ticket to set assigned_to
+      await updateTicket.mutateAsync({
+        id: ticketId,
+        assigned_to: providerId,
+      })
+
+      // Send notification to the service provider
+      try {
+        await notifyProviderAssignment(
+          ticketId,
+          providerId,
+          ticket.title,
+          ticket.property?.name || 'Propriété'
+        )
+      } catch (notifError) {
+        console.error('Error sending notification:', notifError)
+        // Don't fail the assignment if notification fails
+      }
+
+      toast({
+        title: "Succès",
+        description: "Prestataire assigné avec succès",
+      })
+      setSelectedProviderId("")
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible d'assigner le prestataire",
+        variant: "destructive",
+      })
+    }
+  }
+
   const handleDragStart = (ticket: MaintenanceTicketWithDetails) => {
     setDraggedTicket(ticket)
   }
@@ -313,7 +673,7 @@ export default function Maintenance() {
     try {
       await updateTicket.mutateAsync({
         id: draggedTicket.id,
-        status: newStatus,
+        status: newStatus as any,
       })
       toast({
         title: "Succès",
@@ -437,13 +797,15 @@ export default function Maintenance() {
             </Button>
           </div>
 
-          <Dialog open={isTicketDialogOpen} onOpenChange={setIsTicketDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2" onClick={handleOpenTicketDialog}>
-                <Plus className="w-4 h-4" />
-                Nouveau ticket
-              </Button>
-            </DialogTrigger>
+          {/* Prestataires ne peuvent pas créer de tickets */}
+          {!isProvider && (
+            <Dialog open={isTicketDialogOpen} onOpenChange={setIsTicketDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2" onClick={handleOpenTicketDialog}>
+                  <Plus className="w-4 h-4" />
+                  Nouveau ticket
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
@@ -515,12 +877,36 @@ export default function Maintenance() {
                   </div>
                 </div>
 
+                {/* Tenant Selection */}
+                {ticketFormData.unit_id && ticketFormData.unit_id !== "none" && availableTenants.length > 0 && (
+                  <div className="space-y-2">
+                    <Label htmlFor="tenant_id">Locataire concerné</Label>
+                    <Select
+                      value={ticketFormData.tenant_id || "none"}
+                      onValueChange={(value) => setTicketFormData({ ...ticketFormData, tenant_id: value === "none" ? undefined : value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner un locataire" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Aucun locataire spécifique</SelectItem>
+                        {availableTenants.map((tenant) => (
+                          <SelectItem key={tenant.id} value={tenant.id}>
+                            {tenant.first_name} {tenant.last_name}
+                            {tenant.email && ` (${tenant.email})`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="priority">Priorité</Label>
                     <Select
                       value={ticketFormData.priority ?? "MOYEN"}
-                      onValueChange={(value) => setTicketFormData({ ...ticketFormData, priority: value })}
+                      onValueChange={(value) => setTicketFormData({ ...ticketFormData, priority: value as any })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Priorité" />
@@ -538,7 +924,7 @@ export default function Maintenance() {
                     <Label htmlFor="status">Statut</Label>
                     <Select
                       value={ticketFormData.status ?? "NOUVEAU"}
-                      onValueChange={(value) => setTicketFormData({ ...ticketFormData, status: value })}
+                      onValueChange={(value) => setTicketFormData({ ...ticketFormData, status: value as any })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Statut" />
@@ -553,8 +939,55 @@ export default function Maintenance() {
                   </div>
                 </div>
 
+                {/* Prestataire (optionnel) à la création */}
+                {!isProvider && (
+                  <div className="space-y-2">
+                    <Label htmlFor="assigned_to">Prestataire (optionnel)</Label>
+                    <Select
+                      value={selectedProviderId}
+                      onValueChange={setSelectedProviderId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner un prestataire" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {serviceProviders.length === 0 ? (
+                          <SelectItem value="" disabled>Aucun prestataire disponible</SelectItem>
+                        ) : (
+                          serviceProviders.map((provider) => {
+                            const displayName = provider.first_name && provider.last_name
+                              ? `${provider.first_name} ${provider.last_name}`
+                              : (provider.company_name || provider.email)
+                            return (
+                              <SelectItem key={provider.user_id} value={provider.user_id}>
+                                {displayName}
+                                {provider.specialty && ` - ${provider.specialty}`}
+                              </SelectItem>
+                            )
+                          })
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* File Upload */}
+                <div className="space-y-2">
+                  <Label>Photos et documents</Label>
+                  <FileUpload
+                    onFilesChange={(files) => setSelectedFiles(files.map(f => f.file))}
+                    maxFiles={5}
+                    maxSize={10 * 1024 * 1024}
+                    acceptedTypes={['image/*', 'application/pdf']}
+                  />
+                </div>
+
                 <div className="flex gap-2 pt-4">
-                  <Button type="submit" className="flex-1" disabled={createTicket.isPending || updateTicket.isPending}>
+                  <Button
+                    type="submit"
+                    className="flex-1"
+                    disabled={createTicket.isPending || updateTicket.isPending || isUploading}
+                  >
                     {isEditMode ? "Modifier" : "Créer"}
                   </Button>
                   <Button type="button" variant="outline" onClick={() => setIsTicketDialogOpen(false)}>
@@ -564,6 +997,7 @@ export default function Maintenance() {
               </form>
             </DialogContent>
           </Dialog>
+          )}
         </div>
       </div>
 
@@ -649,9 +1083,9 @@ export default function Maintenance() {
                   ) : columnTickets.map(ticket => (
                     <Card
                       key={ticket.id}
-                      draggable
-                      onDragStart={() => handleDragStart(ticket)}
-                      className={`cursor-move transition-all hover:shadow-md ${column.color} ${
+                      draggable={isLandlord} // Seuls les propriétaires peuvent déplacer les tickets
+                      onDragStart={() => isLandlord && handleDragStart(ticket)}
+                      className={`${isLandlord ? 'cursor-move' : 'cursor-pointer'} transition-all hover:shadow-md ${column.color} ${
                         draggedTicket?.id === ticket.id ? 'opacity-50' : ''
                       }`}
                       onClick={() => setSelectedTicket(ticket)}
@@ -660,7 +1094,7 @@ export default function Maintenance() {
                         <div className="space-y-3">
                           {/* Title & Priority */}
                           <div className="space-y-2">
-                            <h4 className="font-semibold text-sm line-clamp-2">{ticket.title}</h4>
+                            <TicketTitleWithUnread ticketId={ticket.id} title={ticket.title} className="font-semibold text-sm line-clamp-2" />
                             <Badge {...getPriorityBadge(ticket.priority)} className="text-xs" />
                           </div>
 
@@ -729,7 +1163,7 @@ export default function Maintenance() {
                     >
                       <TableCell>
                         <div>
-                          <div className="font-medium text-sm line-clamp-1">{ticket.title}</div>
+                          <TicketTitleWithUnread ticketId={ticket.id} title={ticket.title} className="font-medium text-sm line-clamp-1" />
                           <div className="text-xs text-muted-foreground">
                             {formatDate(ticket.created_at)}
                           </div>
@@ -763,28 +1197,32 @@ export default function Maintenance() {
                       </TableCell>
 
                       <TableCell>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleEditTicket(ticket)
-                            }}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDeleteTicket(ticket.id)
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
+                        {/* Seuls les propriétaires peuvent modifier/supprimer */}
+                        {isLandlord && (
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleEditTicket(ticket)
+                              }}
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteTicket(ticket.id)
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        )}
+                        {!isLandlord && <span className="text-xs text-muted-foreground">-</span>}
                       </TableCell>
                     </TableRow>
                   ))
@@ -807,12 +1245,17 @@ export default function Maintenance() {
             </DialogHeader>
 
             <Tabs defaultValue="summary" className="mt-4">
-              <TabsList>
-                <TabsTrigger value="summary">Résumé</TabsTrigger>
+            <TabsList>
+              <TabsTrigger value="summary">Résumé</TabsTrigger>
+              <TabsTrigger value="messages"><MessagesTabLabel ticketId={selectedTicket.id} /></TabsTrigger>
+              {/* Seuls les propriétaires peuvent gérer les prestataires et ordres de travail */}
+              {isLandlord && <TabsTrigger value="provider">Prestataire</TabsTrigger>}
+              {isLandlord && (
                 <TabsTrigger value="workorders">
                   Ordres de travail ({selectedTicket.work_orders?.length || 0})
                 </TabsTrigger>
-              </TabsList>
+              )}
+            </TabsList>
 
               <TabsContent value="summary" className="space-y-4">
                 <div className="grid grid-cols-2 gap-4 text-sm">
@@ -852,6 +1295,68 @@ export default function Maintenance() {
                     <span className="font-medium">Créé le:</span> {formatDate(selectedTicket.created_at)}
                   </div>
                 </div>
+              </TabsContent>
+
+              {/* Messages Tab */}
+              <TabsContent value="messages" className="space-y-3">
+                <TicketMessagesPanel ticket={selectedTicket} />
+              </TabsContent>
+
+              <TabsContent value="provider" className="space-y-4">
+                <ProviderRatingSection
+                  selectedTicket={selectedTicket}
+                  serviceProviders={serviceProviders}
+                  onRateProvider={(providerId, providerName) => {
+                    setProviderToRate({ id: providerId, name: providerName })
+                    setIsRatingDialogOpen(true)
+                  }}
+                />
+
+                  <div className="space-y-3">
+                    <Label htmlFor="service_provider">Assigner un prestataire</Label>
+                    <div className="flex gap-2">
+                      <Select
+                        value={selectedProviderId}
+                        onValueChange={setSelectedProviderId}
+                      >
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Sélectionner un prestataire" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {serviceProviders.length === 0 ? (
+                            <SelectItem value="none" disabled>
+                              Aucun prestataire disponible
+                            </SelectItem>
+                          ) : (
+                            serviceProviders.map((provider) => {
+                              // Afficher nom/prénom ou company_name si pas de nom
+                              const displayName = provider.first_name && provider.last_name
+                                ? `${provider.first_name} ${provider.last_name}`
+                                : (provider.company_name || provider.email);
+
+                              return (
+                                <SelectItem key={provider.user_id} value={provider.user_id}>
+                                  {displayName}
+                                  {provider.specialty && ` - ${provider.specialty}`}
+                                </SelectItem>
+                              );
+                            })
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        onClick={() => handleAssignServiceProvider(selectedTicket.id, selectedProviderId)}
+                        disabled={!selectedProviderId || updateTicket.isPending}
+                      >
+                        Assigner
+                      </Button>
+                    </div>
+                    {serviceProviders.length === 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        Vous n'avez pas encore ajouté de prestataires.
+                      </p>
+                    )}
+                  </div>
               </TabsContent>
 
               <TabsContent value="workorders" className="space-y-4">
@@ -916,24 +1421,38 @@ export default function Maintenance() {
               </TabsContent>
             </Tabs>
 
-            <div className="flex gap-2 pt-4 border-t">
-              <Button variant="outline" size="sm" onClick={() => handleEditTicket(selectedTicket)}>
-                <Edit className="w-4 h-4 mr-1" />
-                Modifier
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  handleDeleteTicket(selectedTicket.id)
-                }}
-              >
-                <Trash2 className="w-4 h-4 mr-1" />
-                Supprimer
-              </Button>
-            </div>
+            {/* Seuls les propriétaires peuvent modifier/supprimer */}
+            {isLandlord && (
+              <div className="flex gap-2 pt-4 border-t">
+                <Button variant="outline" size="sm" onClick={() => handleEditTicket(selectedTicket)}>
+                  <Edit className="w-4 h-4 mr-1" />
+                  Modifier
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    handleDeleteTicket(selectedTicket.id)
+                  }}
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Supprimer
+                </Button>
+              </div>
+            )}
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Rating Dialog */}
+      {providerToRate && (
+        <RatingDialog
+          open={isRatingDialogOpen}
+          onOpenChange={setIsRatingDialogOpen}
+          providerId={providerToRate.id}
+          providerName={providerToRate.name}
+          ticketId={selectedTicket?.id}
+        />
       )}
 
       {/* Work Order Dialog */}
@@ -1013,7 +1532,7 @@ export default function Maintenance() {
               <Label htmlFor="wo_status">Statut</Label>
               <Select
                 value={workOrderFormData.status ?? "EN ATTENTE"}
-                onValueChange={(value) => setWorkOrderFormData({ ...workOrderFormData, status: value })}
+                onValueChange={(value) => setWorkOrderFormData({ ...workOrderFormData, status: value as any })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Statut" />

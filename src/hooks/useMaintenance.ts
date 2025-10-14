@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { useAuth } from '@/hooks/useAuth';
 import { useEntity } from '@/contexts/EntityContext';
+import { autoCreateTicketParticipants } from '@/hooks/useTicketParticipants';
 
 export type MaintenanceTicket = Tables<'maintenance_tickets'>;
 export type MaintenanceTicketInsert = TablesInsert<'maintenance_tickets'>;
@@ -39,36 +40,76 @@ export type MaintenanceTicketWithDetails = MaintenanceTicket & {
 async function fetchMaintenanceTicketsWithDetails(userId: string, entityId?: string | null, showAll?: boolean): Promise<MaintenanceTicketWithDetails[]> {
   if (!userId) return [];
 
-  // Si une entité est sélectionnée, récupérer les property_ids de cette entité
-  let propertyIds: string[] = []
-  if (!showAll && entityId) {
+  console.log('[useMaintenance] Fetching tickets for user', userId);
+
+  // Get user profile to determine role
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('user_type')
+    .eq('user_id', userId)
+    .single();
+
+  const userType = profile?.user_type || 'LANDLORD';
+  console.log('[useMaintenance] User type:', userType);
+
+  // Requête: filtrer explicitement selon le rôle
+  let ticketsQuery = supabase.from('maintenance_tickets').select('*')
+
+  if (userType === 'LANDLORD') {
+    ticketsQuery = ticketsQuery.eq('user_id', userId)
+    if (!showAll && entityId) {
+      const { data: properties } = await supabase
+        .from('properties')
+        .select('id')
+        .eq('entity_id', entityId)
+      const propertyIds = properties?.map(p => p.id) || []
+      if (propertyIds.length === 0) return []
+      ticketsQuery = ticketsQuery.in('property_id', propertyIds)
+    }
+  } else if (userType === 'TENANT') {
+    // Locataire: tickets où tenant_user_id = moi OU je suis participant OU je suis auteur
+    const ors: string[] = [`tenant_user_id.eq.${userId}`, `created_by.eq.${userId}`]
+    const { data: parts } = await supabase
+      .from('ticket_participants')
+      .select('ticket_id')
+      .eq('user_id', userId)
+    const pIds = (parts || []).map(p => p.ticket_id)
+    if (pIds.length) ors.push(`id.in.(${pIds.join(',')})`)
+    ticketsQuery = ticketsQuery.or(ors.join(','))
+  } else if (userType === 'SERVICE_PROVIDER') {
+    // Prestataire: tickets où assigned_to = moi OU je suis participant OU je suis auteur
+    const ors: string[] = [`assigned_to.eq.${userId}`, `created_by.eq.${userId}`]
+    const { data: parts } = await supabase
+      .from('ticket_participants')
+      .select('ticket_id')
+      .eq('user_id', userId)
+    const pIds = (parts || []).map(p => p.ticket_id)
+    if (pIds.length) ors.push(`id.in.(${pIds.join(',')})`)
+    ticketsQuery = ticketsQuery.or(ors.join(','))
+  }
+
+  // Si une entité est sélectionnée (et que l'utilisateur est bailleur), filtrer par propriétés
+  if (userType === 'LANDLORD' && !showAll && entityId) {
     const { data: properties } = await supabase
       .from('properties')
       .select('id')
-      .eq('entity_id', entityId)
-
-    propertyIds = properties?.map(p => p.id) || []
-
+      .eq('entity_id', entityId);
+    const propertyIds = properties?.map(p => p.id) || [];
     if (propertyIds.length === 0) {
-      return [] // Aucune propriété pour cette entité
+      return [];
     }
-  }
-
-  // Get tickets
-  let ticketsQuery = supabase
-    .from('maintenance_tickets')
-    .select('*')
-    .eq('user_id', userId)
-
-  // Filtrer par property_id si une entité est sélectionnée
-  if (!showAll && entityId && propertyIds.length > 0) {
-    ticketsQuery = ticketsQuery.in('property_id', propertyIds)
+    ticketsQuery = ticketsQuery.in('property_id', propertyIds);
   }
 
   const { data: tickets, error: ticketsError } = await ticketsQuery
     .order('created_at', { ascending: false });
 
-  if (ticketsError) throw new Error(ticketsError.message);
+  console.log('[useMaintenance] Tickets found:', tickets?.length || 0);
+
+  if (ticketsError) {
+    console.error('[useMaintenance] Error fetching tickets:', ticketsError);
+    throw new Error(ticketsError.message);
+  }
   if (!tickets) return [];
 
   // Enrich each ticket with related data
@@ -92,26 +133,79 @@ async function fetchMaintenanceTicketsWithDetails(userId: string, entityId?: str
         unit = unitData;
       }
 
-      // Get assigned contact if specified
+      // Get assigned service provider if specified (from profiles, not contacts)
       let assigned_contact = null;
       if (ticket.assigned_to) {
-        const { data: contactData } = await supabase
-          .from('contacts')
-          .select('first_name, last_name, email, phone')
-          .eq('id', ticket.assigned_to)
-          .single();
-        assigned_contact = contactData;
+        console.log('[useMaintenance] Fetching provider for:', ticket.assigned_to);
+        const { data: providerData, error: providerError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', ticket.assigned_to)
+          .maybeSingle();
+
+        if (providerError) {
+          console.error('[useMaintenance] Error fetching provider:', providerError);
+        }
+
+        console.log('[useMaintenance] Provider data:', providerData);
+
+        if (providerData) {
+          // Use fallbacks: first_name+last_name > company_name > 'Prestataire'
+          let displayFirstName = '';
+          let displayLastName = '';
+
+          if (providerData.first_name && providerData.last_name) {
+            // Si on a prénom et nom, on les utilise
+            displayFirstName = providerData.first_name;
+            displayLastName = providerData.last_name;
+          } else if (providerData.company_name) {
+            // Sinon si on a un nom d'entreprise, on l'utilise comme prénom
+            displayFirstName = providerData.company_name;
+            displayLastName = '';
+          } else {
+            // Sinon on affiche "Prestataire"
+            displayFirstName = 'Prestataire';
+            displayLastName = '';
+          }
+
+          assigned_contact = {
+            first_name: displayFirstName,
+            last_name: displayLastName,
+            email: providerData.email || '',
+            phone: providerData.phone_number || '',
+          };
+        }
       }
 
-      // Get created by contact if specified
+      // Get created by user if specified (from profiles)
       let created_by_contact = null;
       if (ticket.created_by) {
-        const { data: contactData } = await supabase
-          .from('contacts')
-          .select('first_name, last_name')
-          .eq('id', ticket.created_by)
-          .single();
-        created_by_contact = contactData;
+        const { data: creatorData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('user_id', ticket.created_by)
+          .maybeSingle();
+
+        if (creatorData) {
+          let displayFirstName = '';
+          let displayLastName = '';
+
+          if (creatorData.first_name && creatorData.last_name) {
+            displayFirstName = creatorData.first_name;
+            displayLastName = creatorData.last_name;
+          } else if (creatorData.company_name) {
+            displayFirstName = creatorData.company_name;
+            displayLastName = '';
+          } else {
+            displayFirstName = 'Utilisateur';
+            displayLastName = '';
+          }
+
+          created_by_contact = {
+            first_name: displayFirstName,
+            last_name: displayLastName,
+          };
+        }
       }
 
       // Get work orders
@@ -148,15 +242,28 @@ async function fetchTicketById(id: string): Promise<MaintenanceTicket> {
 }
 
 // Create a new maintenance ticket
+import { notifyNewTicket, notifyProviderAssignment, notifyTicketStatusChange } from '@/hooks/useNotifications'
+
 async function createMaintenanceTicket(ticket: MaintenanceTicketInsert): Promise<MaintenanceTicket> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Non authentifié');
+
+  // Get user's role from profile
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('user_type')
+    .eq('user_id', user.id)
+    .single();
+
+  const userRole = profile?.user_type || 'LANDLORD';
 
   const { data, error } = await supabase
     .from('maintenance_tickets')
     .insert({
       ...ticket,
       user_id: user.id,
+      created_by: user.id,
+      created_by_role: userRole,
     })
     .select()
     .single();
@@ -166,11 +273,45 @@ async function createMaintenanceTicket(ticket: MaintenanceTicketInsert): Promise
     throw new Error(error.message);
   }
 
+  // Auto-create participants (landlord + tenant via tenant_user_id if applicable)
+  try {
+    await autoCreateTicketParticipants(
+      data.id,
+      user.id, // landlord
+      (ticket as any).tenant_user_id || null // tenant user_id if provided
+    );
+  } catch (participantError) {
+    console.error('Error creating participants:', participantError);
+    // Don't fail the ticket creation if participant creation fails
+  }
+
+  // Notifications: informer le bailleur et le locataire (s'il existe)
+  try {
+    // Notifier le bailleur (toujours) pour vérifier le flux
+    if (data.user_id) {
+      await notifyNewTicket(data.user_id, data.id, data.title || 'Nouveau ticket', (data as any).property_name)
+    }
+    // Notifier le locataire (profil) si renseigné (dans data ou dans le payload d'insert)
+    const tenantUserId = (data as any).tenant_user_id || (ticket as any).tenant_user_id || null
+    if (tenantUserId) {
+      await notifyNewTicket(tenantUserId, data.id, data.title || 'Nouveau ticket', (data as any).property_name)
+    }
+  } catch (e) {
+    console.warn('[notifications] notifyNewTicket failed:', e)
+  }
+
   return data;
 }
 
 // Update an existing maintenance ticket
 async function updateMaintenanceTicket({ id, ...updates }: MaintenanceTicketUpdate & { id: string }): Promise<MaintenanceTicket> {
+  // Fetch previous state to detect changes
+  const { data: prev } = await supabase
+    .from('maintenance_tickets')
+    .select('id, user_id, tenant_user_id, property_id, title, status, assigned_to')
+    .eq('id', id)
+    .maybeSingle()
+
   const { data, error } = await supabase
     .from('maintenance_tickets')
     .update(updates)
@@ -179,6 +320,41 @@ async function updateMaintenanceTicket({ id, ...updates }: MaintenanceTicketUpda
     .single();
 
   if (error) throw new Error(error.message);
+
+  // Detect status change
+  try {
+    if (prev && updates.status && updates.status !== prev.status) {
+      // Notify landlord and tenant if present
+      if (prev.user_id) {
+        await notifyTicketStatusChange(prev.user_id, id, data.title || 'Ticket', prev.status || undefined, updates.status)
+      }
+      if (prev.tenant_id) {
+        await notifyTicketStatusChange(prev.tenant_id, id, data.title || 'Ticket', prev.status || undefined, updates.status)
+      }
+    }
+  } catch (e) {
+    console.warn('[notifications] status change notify failed:', e)
+  }
+
+  // Detect provider assignment
+  try {
+    if (prev && updates.assigned_to && updates.assigned_to !== prev.assigned_to) {
+      // fetch property name
+      let propertyName: string | undefined
+      if (data.property_id) {
+        const { data: prop } = await supabase
+          .from('properties')
+          .select('name')
+          .eq('id', data.property_id)
+          .maybeSingle()
+        propertyName = prop?.name || undefined
+      }
+      await notifyProviderAssignment(id, updates.assigned_to as string, data.title || 'Ticket', propertyName || '')
+    }
+  } catch (e) {
+    console.warn('[notifications] provider assignment notify failed:', e)
+  }
+
   return data;
 }
 

@@ -88,12 +88,14 @@ export default function Communications() {
   }
 
   const getStatusBadge = (status: string) => {
+    const key = (status || '').toString().toUpperCase()
     const statuses = {
       PENDING: { label: "En attente", variant: "secondary" as const, icon: Clock },
       DELIVERED: { label: "Livré", variant: "default" as const, icon: CheckCircle },
+      SENT: { label: "Livré", variant: "default" as const, icon: CheckCircle },
       FAILED: { label: "Échec", variant: "destructive" as const, icon: AlertCircle }
     }
-    return statuses[status as keyof typeof statuses] || { label: status, variant: "secondary" as const, icon: Clock }
+    return (statuses as any)[key] || { label: status, variant: "secondary" as const, icon: Clock }
   }
 
   const getMessageTypeBadge = (type: string) => {
@@ -116,8 +118,8 @@ export default function Communications() {
 
   // Calculate stats
   const totalMessages = messages.length
-  const deliveredMessages = messages.filter(m => m.status === "sent").length
-  const pendingMessages = messages.filter(m => m.status === "pending").length
+  const deliveredMessages = messages.filter(m => (m.status || '').toLowerCase() === "sent").length
+  const pendingMessages = messages.filter(m => (m.status || '').toLowerCase() === "pending").length
   const emailMessages = messages.filter(m => m.recipient_email).length
 
   if (loading) {
@@ -407,7 +409,44 @@ export default function Communications() {
                           </TableCell>
                           
                           <TableCell>
-                            <Button size="sm" variant="ghost" className="gap-1">
+                            <Button size="sm" variant="ghost" className="gap-1" onClick={async () => {
+                              try {
+                                const { data: fresh } = await supabase
+                                  .from('communication_logs')
+                                  .select('*')
+                                  .eq('id', message.id)
+                                  .maybeSingle()
+                                const row = fresh || message
+                                const channel = row.recipient_email ? 'EMAIL' : 'SMS'
+                                const sentAt = row.sent_at || (row as any).created_at || null
+                                const subject = row.subject || null
+                                const body = row.content || ''
+                                const to = row.recipient_email || row.recipient_phone || row.recipient_id || '—'
+                                setSelectedMessage({
+                                  id: row.id,
+                                  channel,
+                                  toName: to,
+                                  to,
+                                  sentAt,
+                                  subject,
+                                  body,
+                                  status: (row.status || '').toString(),
+                                })
+                              } catch (e) {
+                                console.warn('[COMMUNICATIONS] open message failed', e)
+                                const channel = message.recipient_email ? 'EMAIL' : 'SMS'
+                                setSelectedMessage({
+                                  id: message.id,
+                                  channel,
+                                  toName: message.recipient_email || message.recipient_phone || message.recipient_id || '—',
+                                  to: message.recipient_email || message.recipient_phone || message.recipient_id || '—',
+                                  sentAt: message.sent_at || (message as any).created_at || null,
+                                  subject: message.subject,
+                                  body: message.content || '',
+                                  status: (message.status || '').toString(),
+                                })
+                              }
+                            }}>
                               <Eye className="w-3 h-3" />
                               Voir
                             </Button>
@@ -517,32 +556,32 @@ export default function Communications() {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                {getChannelIcon(selectedMessage.channel)({className: "w-5 h-5"})}
+                {(() => { const Icon = getChannelIcon(selectedMessage.channel); return <Icon className="w-5 h-5" /> })()}
                 Message à {selectedMessage.toName}
               </DialogTitle>
             </DialogHeader>
             
             <div className="space-y-4 pt-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="font-medium">Canal:</span>
-                  <Badge variant="secondary" className="ml-2 text-xs">
-                    {getChannelBadge(selectedMessage.channel).label}
-                  </Badge>
-                </div>
-                <div>
-                  <span className="font-medium">Statut:</span>
-                  <Badge variant="secondary" className="ml-2 text-xs">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium">Canal:</span>
+                    <Badge variant="secondary" className="ml-2 text-xs">
+                      {getChannelBadge(selectedMessage.channel).label}
+                    </Badge>
+                  </div>
+                  <div>
+                    <span className="font-medium">Statut:</span>
+                    <Badge variant="secondary" className="ml-2 text-xs">
                     {getStatusBadge(selectedMessage.status).label}
-                  </Badge>
+                    </Badge>
+                  </div>
+                  <div>
+                    <span className="font-medium">Destinataire:</span> {selectedMessage.to || '—'}
+                  </div>
+                  <div>
+                    <span className="font-medium">Envoyé le:</span> {selectedMessage.sentAt ? formatDate(selectedMessage.sentAt) : 'N/A'}
+                  </div>
                 </div>
-                <div>
-                  <span className="font-medium">Destinataire:</span> {selectedMessage.to}
-                </div>
-                <div>
-                  <span className="font-medium">Envoyé le:</span> {formatDate(selectedMessage.sentAt)}
-                </div>
-              </div>
               
               {selectedMessage.subject && (
                 <div>
@@ -553,9 +592,13 @@ export default function Communications() {
               
               <div>
                 <span className="font-medium text-sm">Message:</span>
-                <div className="mt-1 p-3 bg-muted/20 rounded-lg text-sm whitespace-pre-wrap">
-                  {selectedMessage.body}
-                </div>
+                {selectedMessage.body ? (
+                  <div className="mt-2 border rounded-md p-3 bg-white max-h-[60vh] overflow-auto text-sm prose prose-sm prose-slate">
+                    <div dangerouslySetInnerHTML={{ __html: selectedMessage.body }} />
+                  </div>
+                ) : (
+                  <div className="mt-2 text-sm text-muted-foreground">Aucun contenu</div>
+                )}
               </div>
             </div>
           </DialogContent>
@@ -568,7 +611,7 @@ export default function Communications() {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                {getChannelIcon(selectedTemplate.channel)({className: "w-5 h-5"})}
+                {(() => { const Icon = getChannelIcon(selectedTemplate.type || 'EMAIL'); return <Icon className="w-5 h-5" /> })()}
                 {selectedTemplate.name}
               </DialogTitle>
             </DialogHeader>
@@ -578,11 +621,11 @@ export default function Communications() {
                 <div>
                   <span className="font-medium">Canal:</span>
                   <Badge variant="secondary" className="ml-2 text-xs">
-                    {getChannelBadge(selectedTemplate.channel).label}
+                    {getChannelBadge(selectedTemplate.type || 'EMAIL').label}
                   </Badge>
                 </div>
                 <div>
-                  <span className="font-medium">Utilisations:</span> {selectedTemplate.usage}
+                  <span className="font-medium">Utilisations:</span> {selectedTemplate.usage ?? 'N/A'}
                 </div>
               </div>
               
@@ -596,18 +639,30 @@ export default function Communications() {
               <div>
                 <span className="font-medium text-sm">Contenu:</span>
                 <div className="mt-1 p-3 bg-muted/20 rounded-lg text-sm whitespace-pre-wrap">
-                  {selectedTemplate.body}
+                  {selectedTemplate.content}
                 </div>
               </div>
               
               <div>
                 <span className="font-medium text-sm">Variables disponibles:</span>
                 <div className="mt-1 flex flex-wrap gap-1">
-                  {selectedTemplate.variables.map((variable: string) => (
-                    <Badge key={variable} variant="outline" className="text-xs">
-                      {variable}
-                    </Badge>
-                  ))}
+                  {(() => {
+                    let vars: string[] = []
+                    try {
+                      if (typeof selectedTemplate.variables === 'string') {
+                        const parsed = JSON.parse(selectedTemplate.variables)
+                        if (Array.isArray(parsed)) vars = parsed
+                        else if (parsed && typeof parsed === 'object') vars = Object.keys(parsed)
+                      } else if (Array.isArray(selectedTemplate.variables)) {
+                        vars = selectedTemplate.variables
+                      } else if (selectedTemplate.variables && typeof selectedTemplate.variables === 'object') {
+                        vars = Object.keys(selectedTemplate.variables)
+                      }
+                    } catch {}
+                    return vars.length > 0 ? vars.map((v) => (
+                      <Badge key={v} variant="outline" className="text-xs">{v}</Badge>
+                    )) : <span className="text-xs text-muted-foreground">Aucune</span>
+                  })()}
                 </div>
               </div>
               

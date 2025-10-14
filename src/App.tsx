@@ -15,6 +15,8 @@ import Properties from "./pages/Properties";
 import Leases from "./pages/Leases";
 import LeaseDetail from "./pages/LeaseDetail";
 import People from "./pages/People";
+import Providers from "./pages/Providers";
+import ProviderProfile from "./pages/ProviderProfile";
 import Maintenance from "./pages/Maintenance";
 import Accounting from "./pages/Accounting";
 import Documents from "./pages/Documents";
@@ -30,6 +32,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import ChangeEmail from "./pages/ChangeEmail";
 import LostEmailAccess from "./pages/LostEmailAccess";
+import AcceptInvitation from "./pages/AcceptInvitation";
 import Offers from "./pages/marketing/Offers";
 import Auth from "./pages/Auth";
 
@@ -91,6 +94,7 @@ function App() {
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/lost-email-access" element={<LostEmailAccess />} />
+            <Route path="/accept-invitation" element={<AcceptInvitation />} />
 
             {/* Protected app routes */}
             <Route element={<RequireAuth />}>
@@ -110,6 +114,8 @@ function App() {
                 <Route path="/app/leases" element={<Layout><Leases /></Layout>} />
                 <Route path="/app/leases/:id" element={<Layout><LeaseDetail /></Layout>} />
                 <Route path="/app/people" element={<Layout><People /></Layout>} />
+                <Route path="/app/providers" element={<Layout><Providers /></Layout>} />
+                <Route path="/app/provider-profile" element={<Layout><ProviderProfile /></Layout>} />
                 <Route path="/app/maintenance" element={<Layout><Maintenance /></Layout>} />
                 <Route path="/app/accounting" element={<Layout><Accounting /></Layout>} />
                 <Route path="/app/documents" element={<Layout><Documents /></Layout>} />

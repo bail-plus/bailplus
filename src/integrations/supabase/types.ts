@@ -71,45 +71,126 @@ export type Database = {
           },
         ]
       }
+      branding_settings: {
+        Row: {
+          brand_name: string | null
+          created_at: string
+          entity_id: string
+          footer_text: string | null
+          from_email: string | null
+          from_name: string | null
+          id: string
+          logo_url: string | null
+          primary_color: string | null
+          reply_to_email: string | null
+          secondary_color: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          brand_name?: string | null
+          created_at?: string
+          entity_id: string
+          footer_text?: string | null
+          from_email?: string | null
+          from_name?: string | null
+          id?: string
+          logo_url?: string | null
+          primary_color?: string | null
+          reply_to_email?: string | null
+          secondary_color?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          brand_name?: string | null
+          created_at?: string
+          entity_id?: string
+          footer_text?: string | null
+          from_email?: string | null
+          from_name?: string | null
+          id?: string
+          logo_url?: string | null
+          primary_color?: string | null
+          reply_to_email?: string | null
+          secondary_color?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "branding_settings_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: true
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "branding_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       communication_logs: {
         Row: {
           content: string
+          context_type:
+            | Database["public"]["Enums"]["communication_context_enum"]
+            | null
           created_at: string
           id: string
           recipient_email: string | null
           recipient_id: string | null
           recipient_phone: string | null
           recipient_type: string
+          sender_id: string | null
+          sender_role: Database["public"]["Enums"]["user_type_enum"] | null
           sent_at: string | null
           status: string | null
           subject: string | null
           template_id: string | null
+          ticket_id: string | null
         }
         Insert: {
           content: string
+          context_type?:
+            | Database["public"]["Enums"]["communication_context_enum"]
+            | null
           created_at?: string
           id?: string
           recipient_email?: string | null
           recipient_id?: string | null
           recipient_phone?: string | null
           recipient_type: string
+          sender_id?: string | null
+          sender_role?: Database["public"]["Enums"]["user_type_enum"] | null
           sent_at?: string | null
           status?: string | null
           subject?: string | null
           template_id?: string | null
+          ticket_id?: string | null
         }
         Update: {
           content?: string
+          context_type?:
+            | Database["public"]["Enums"]["communication_context_enum"]
+            | null
           created_at?: string
           id?: string
           recipient_email?: string | null
           recipient_id?: string | null
           recipient_phone?: string | null
           recipient_type?: string
+          sender_id?: string | null
+          sender_role?: Database["public"]["Enums"]["user_type_enum"] | null
           sent_at?: string | null
           status?: string | null
           subject?: string | null
           template_id?: string | null
+          ticket_id?: string | null
         }
         Relationships: [
           {
@@ -117,6 +198,13 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "communication_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communication_logs_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_tickets"
             referencedColumns: ["id"]
           },
         ]
@@ -605,8 +693,8 @@ export type Database = {
             foreignKeyName: "leases_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
-            referencedColumns: ["id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "leases_unit_id_fkey"
@@ -620,10 +708,15 @@ export type Database = {
       maintenance_tickets: {
         Row: {
           assigned_to: string | null
+          category: string | null
           created_at: string
           created_by: string | null
+          created_by_role: Database["public"]["Enums"]["user_type_enum"] | null
           description: string | null
+          estimated_resolution_date: string | null
           id: string
+          last_update_by: string | null
+          lease_id: string | null
           priority:
             | Database["public"]["Enums"]["maintenance_tickets_priority_enum"]
             | null
@@ -631,17 +724,26 @@ export type Database = {
           status:
             | Database["public"]["Enums"]["maintenance_tickets_status_enum"]
             | null
+          tenant_user_id: string | null
           title: string
           unit_id: string | null
           updated_at: string
           user_id: string | null
+          visibility:
+            | Database["public"]["Enums"]["ticket_visibility_enum"]
+            | null
         }
         Insert: {
           assigned_to?: string | null
+          category?: string | null
           created_at?: string
           created_by?: string | null
+          created_by_role?: Database["public"]["Enums"]["user_type_enum"] | null
           description?: string | null
+          estimated_resolution_date?: string | null
           id?: string
+          last_update_by?: string | null
+          lease_id?: string | null
           priority?:
             | Database["public"]["Enums"]["maintenance_tickets_priority_enum"]
             | null
@@ -649,17 +751,26 @@ export type Database = {
           status?:
             | Database["public"]["Enums"]["maintenance_tickets_status_enum"]
             | null
+          tenant_user_id?: string | null
           title: string
           unit_id?: string | null
           updated_at?: string
           user_id?: string | null
+          visibility?:
+            | Database["public"]["Enums"]["ticket_visibility_enum"]
+            | null
         }
         Update: {
           assigned_to?: string | null
+          category?: string | null
           created_at?: string
           created_by?: string | null
+          created_by_role?: Database["public"]["Enums"]["user_type_enum"] | null
           description?: string | null
+          estimated_resolution_date?: string | null
           id?: string
+          last_update_by?: string | null
+          lease_id?: string | null
           priority?:
             | Database["public"]["Enums"]["maintenance_tickets_priority_enum"]
             | null
@@ -667,12 +778,23 @@ export type Database = {
           status?:
             | Database["public"]["Enums"]["maintenance_tickets_status_enum"]
             | null
+          tenant_user_id?: string | null
           title?: string
           unit_id?: string | null
           updated_at?: string
           user_id?: string | null
+          visibility?:
+            | Database["public"]["Enums"]["ticket_visibility_enum"]
+            | null
         }
         Relationships: [
+          {
+            foreignKeyName: "maintenance_tickets_lease_id_fkey"
+            columns: ["lease_id"]
+            isOneToOne: false
+            referencedRelation: "leases"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "maintenance_tickets_property_id_fkey"
             columns: ["property_id"]
@@ -681,11 +803,128 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "maintenance_tickets_tenant_user_id_fkey"
+            columns: ["tenant_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "maintenance_tickets_unit_id_fkey"
             columns: ["unit_id"]
             isOneToOne: false
             referencedRelation: "units"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_preferences: {
+        Row: {
+          created_at: string | null
+          email_enabled: boolean | null
+          frequency: Database["public"]["Enums"]["notification_frequency_enum"]
+          id: string
+          landlord_reply: boolean | null
+          message_received: boolean | null
+          new_assignment: boolean | null
+          new_ticket_created: boolean | null
+          payment_received: boolean | null
+          provider_assigned: boolean | null
+          push_enabled: boolean | null
+          sms_enabled: boolean | null
+          ticket_message: boolean | null
+          ticket_status_changed: boolean | null
+          ticket_updated: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          email_enabled?: boolean | null
+          frequency?: Database["public"]["Enums"]["notification_frequency_enum"]
+          id?: string
+          landlord_reply?: boolean | null
+          message_received?: boolean | null
+          new_assignment?: boolean | null
+          new_ticket_created?: boolean | null
+          payment_received?: boolean | null
+          provider_assigned?: boolean | null
+          push_enabled?: boolean | null
+          sms_enabled?: boolean | null
+          ticket_message?: boolean | null
+          ticket_status_changed?: boolean | null
+          ticket_updated?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          email_enabled?: boolean | null
+          frequency?: Database["public"]["Enums"]["notification_frequency_enum"]
+          id?: string
+          landlord_reply?: boolean | null
+          message_received?: boolean | null
+          new_assignment?: boolean | null
+          new_ticket_created?: boolean | null
+          payment_received?: boolean | null
+          provider_assigned?: boolean | null
+          push_enabled?: boolean | null
+          sms_enabled?: boolean | null
+          ticket_message?: boolean | null
+          ticket_status_changed?: boolean | null
+          ticket_updated?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      notification_reads: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          log_id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          log_id: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          log_id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_reads_log_id_fkey"
+            columns: ["log_id"]
+            isOneToOne: false
+            referencedRelation: "communication_logs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_reads_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -727,6 +966,7 @@ export type Database = {
           adress: string | null
           birthdate: string | null
           city: string | null
+          company_name: string | null
           created_at: string
           current_period_end: string | null
           email: string | null
@@ -734,21 +974,28 @@ export type Database = {
           first_name: string | null
           gender: Database["public"]["Enums"]["gender_enum"] | null
           id: string
+          invitation_accepted_at: string | null
+          invited_by: string | null
+          is_invited_user: boolean | null
           last_name: string | null
+          linked_to_landlord: string | null
           phone_number: string | null
           postal_code: number | null
           role: Database["public"]["Enums"]["user_role_enum"] | null
+          specialty: string | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
           subscription_status: string | null
           trial_end_date: string | null
           updated_at: string
           user_id: string
+          user_type: Database["public"]["Enums"]["user_type_enum"] | null
         }
         Insert: {
           adress?: string | null
           birthdate?: string | null
           city?: string | null
+          company_name?: string | null
           created_at?: string
           current_period_end?: string | null
           email?: string | null
@@ -756,21 +1003,28 @@ export type Database = {
           first_name?: string | null
           gender?: Database["public"]["Enums"]["gender_enum"] | null
           id?: string
+          invitation_accepted_at?: string | null
+          invited_by?: string | null
+          is_invited_user?: boolean | null
           last_name?: string | null
+          linked_to_landlord?: string | null
           phone_number?: string | null
           postal_code?: number | null
           role?: Database["public"]["Enums"]["user_role_enum"] | null
+          specialty?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_status?: string | null
           trial_end_date?: string | null
           updated_at?: string
           user_id: string
+          user_type?: Database["public"]["Enums"]["user_type_enum"] | null
         }
         Update: {
           adress?: string | null
           birthdate?: string | null
           city?: string | null
+          company_name?: string | null
           created_at?: string
           current_period_end?: string | null
           email?: string | null
@@ -778,18 +1032,39 @@ export type Database = {
           first_name?: string | null
           gender?: Database["public"]["Enums"]["gender_enum"] | null
           id?: string
+          invitation_accepted_at?: string | null
+          invited_by?: string | null
+          is_invited_user?: boolean | null
           last_name?: string | null
+          linked_to_landlord?: string | null
           phone_number?: string | null
           postal_code?: number | null
           role?: Database["public"]["Enums"]["user_role_enum"] | null
+          specialty?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
           subscription_status?: string | null
           trial_end_date?: string | null
           updated_at?: string
           user_id?: string
+          user_type?: Database["public"]["Enums"]["user_type_enum"] | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "profiles_linked_to_landlord_fkey"
+            columns: ["linked_to_landlord"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       properties: {
         Row: {
@@ -831,6 +1106,51 @@ export type Database = {
             columns: ["entity_id"]
             isOneToOne: false
             referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      provider_ratings: {
+        Row: {
+          comment: string | null
+          created_at: string
+          id: string
+          provider_id: string | null
+          rated_by: string | null
+          rating: number | null
+          ticket_id: string | null
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          provider_id?: string | null
+          rated_by?: string | null
+          rating?: number | null
+          ticket_id?: string | null
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          id?: string
+          provider_id?: string | null
+          rated_by?: string | null
+          rating?: number | null
+          ticket_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_ratings_rated_by_fkey"
+            columns: ["rated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "provider_ratings_ticket_id_fkey1"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_tickets"
             referencedColumns: ["id"]
           },
         ]
@@ -894,6 +1214,90 @@ export type Database = {
           },
         ]
       }
+      service_providers: {
+        Row: {
+          address: string | null
+          availability_schedule: Json | null
+          available: boolean | null
+          average_rating: number | null
+          company_name: string | null
+          created_at: string | null
+          currency: string | null
+          hourly_rate: number | null
+          id: string
+          insurance_certificate_url: string | null
+          insurance_expiry_date: string | null
+          landlord_id: string
+          professional_email: string | null
+          professional_phone: string | null
+          response_time_hours: number | null
+          siret: string | null
+          specialty: string[] | null
+          total_interventions: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          availability_schedule?: Json | null
+          available?: boolean | null
+          average_rating?: number | null
+          company_name?: string | null
+          created_at?: string | null
+          currency?: string | null
+          hourly_rate?: number | null
+          id?: string
+          insurance_certificate_url?: string | null
+          insurance_expiry_date?: string | null
+          landlord_id: string
+          professional_email?: string | null
+          professional_phone?: string | null
+          response_time_hours?: number | null
+          siret?: string | null
+          specialty?: string[] | null
+          total_interventions?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          availability_schedule?: Json | null
+          available?: boolean | null
+          average_rating?: number | null
+          company_name?: string | null
+          created_at?: string | null
+          currency?: string | null
+          hourly_rate?: number | null
+          id?: string
+          insurance_certificate_url?: string | null
+          insurance_expiry_date?: string | null
+          landlord_id?: string
+          professional_email?: string | null
+          professional_phone?: string | null
+          response_time_hours?: number | null
+          siret?: string | null
+          specialty?: string[] | null
+          total_interventions?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_providers_landlord_id_fkey"
+            columns: ["landlord_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "service_providers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       subscriptions: {
         Row: {
           created_at: string
@@ -936,6 +1340,144 @@ export type Database = {
         }
         Relationships: []
       }
+      ticket_messages: {
+        Row: {
+          attachments: Json | null
+          created_at: string | null
+          deleted_at: string | null
+          edited: boolean | null
+          id: string
+          message: string
+          message_type: Database["public"]["Enums"]["message_type_enum"] | null
+          read_by: Json | null
+          sender_id: string
+          sender_role: Database["public"]["Enums"]["user_type_enum"]
+          ticket_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          attachments?: Json | null
+          created_at?: string | null
+          deleted_at?: string | null
+          edited?: boolean | null
+          id?: string
+          message: string
+          message_type?: Database["public"]["Enums"]["message_type_enum"] | null
+          read_by?: Json | null
+          sender_id: string
+          sender_role: Database["public"]["Enums"]["user_type_enum"]
+          ticket_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          attachments?: Json | null
+          created_at?: string | null
+          deleted_at?: string | null
+          edited?: boolean | null
+          id?: string
+          message?: string
+          message_type?: Database["public"]["Enums"]["message_type_enum"] | null
+          read_by?: Json | null
+          sender_id?: string
+          sender_role?: Database["public"]["Enums"]["user_type_enum"]
+          ticket_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_participants: {
+        Row: {
+          can_close: boolean | null
+          can_edit: boolean | null
+          id: string
+          joined_at: string | null
+          last_read_at: string | null
+          notifications_enabled: boolean | null
+          role: Database["public"]["Enums"]["user_type_enum"]
+          ticket_id: string
+          user_id: string
+        }
+        Insert: {
+          can_close?: boolean | null
+          can_edit?: boolean | null
+          id?: string
+          joined_at?: string | null
+          last_read_at?: string | null
+          notifications_enabled?: boolean | null
+          role: Database["public"]["Enums"]["user_type_enum"]
+          ticket_id: string
+          user_id: string
+        }
+        Update: {
+          can_close?: boolean | null
+          can_edit?: boolean | null
+          id?: string
+          joined_at?: string | null
+          last_read_at?: string | null
+          notifications_enabled?: boolean | null
+          role?: Database["public"]["Enums"]["user_type_enum"]
+          ticket_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_participants_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_status_history: {
+        Row: {
+          changed_by: string
+          changed_by_role: Database["public"]["Enums"]["user_type_enum"]
+          comment: string | null
+          created_at: string | null
+          id: string
+          new_status: string
+          previous_status: string | null
+          ticket_id: string
+        }
+        Insert: {
+          changed_by: string
+          changed_by_role: Database["public"]["Enums"]["user_type_enum"]
+          comment?: string | null
+          created_at?: string | null
+          id?: string
+          new_status: string
+          previous_status?: string | null
+          ticket_id: string
+        }
+        Update: {
+          changed_by?: string
+          changed_by_role?: Database["public"]["Enums"]["user_type_enum"]
+          comment?: string | null
+          created_at?: string | null
+          id?: string
+          new_status?: string
+          previous_status?: string | null
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_status_history_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       units: {
         Row: {
           created_at: string
@@ -977,6 +1519,95 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "properties"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_invitations: {
+        Row: {
+          accepted_at: string | null
+          created_at: string | null
+          custom_message: string | null
+          email: string
+          expires_at: string
+          first_name: string | null
+          id: string
+          invitation_context: Database["public"]["Enums"]["invitation_context_enum"]
+          invited_by: string
+          last_name: string | null
+          lease_id: string | null
+          property_id: string | null
+          role: Database["public"]["Enums"]["user_type_enum"]
+          status: Database["public"]["Enums"]["invitation_status_enum"] | null
+          token: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string | null
+          custom_message?: string | null
+          email: string
+          expires_at: string
+          first_name?: string | null
+          id?: string
+          invitation_context: Database["public"]["Enums"]["invitation_context_enum"]
+          invited_by: string
+          last_name?: string | null
+          lease_id?: string | null
+          property_id?: string | null
+          role: Database["public"]["Enums"]["user_type_enum"]
+          status?: Database["public"]["Enums"]["invitation_status_enum"] | null
+          token: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string | null
+          custom_message?: string | null
+          email?: string
+          expires_at?: string
+          first_name?: string | null
+          id?: string
+          invitation_context?: Database["public"]["Enums"]["invitation_context_enum"]
+          invited_by?: string
+          last_name?: string | null
+          lease_id?: string | null
+          property_id?: string | null
+          role?: Database["public"]["Enums"]["user_type_enum"]
+          status?: Database["public"]["Enums"]["invitation_status_enum"] | null
+          token?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_invitations_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "user_invitations_lease_id_fkey"
+            columns: ["lease_id"]
+            isOneToOne: false
+            referencedRelation: "leases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_invitations_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_invitations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -1038,20 +1669,42 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_landlord: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_service_provider: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_tenant: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_ticket_participant: {
+        Args: { p_ticket_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
+      communication_context_enum: "ticket" | "lease" | "general"
       entity_type_enum: "PERSONAL" | "SCI"
       gender_enum: "male" | "female" | "other"
+      invitation_context_enum: "lease" | "service_provider" | "manual"
+      invitation_status_enum: "pending" | "accepted" | "expired" | "cancelled"
       maintenance_tickets_priority_enum: "FAIBLE" | "MOYEN" | "ELEVE" | "URGENT"
       maintenance_tickets_status_enum:
         | "NOUVEAU"
         | "EN COURS"
         | "EN ATTENTE DE PIECE"
         | "TERMINE"
+      message_type_enum: "text" | "status_update" | "assignment" | "system"
+      notification_frequency_enum: "immediate" | "daily"
       period_enum: "/mois" | "/an"
       role_lease_tenants_enum: "tenant" | "co-tenant"
+      ticket_visibility_enum: "public" | "landlord_only"
       user_role_enum: "admin" | "user" | "trial"
+      user_type_enum: "LANDLORD" | "TENANT" | "SERVICE_PROVIDER"
       work_orders_satus_enum:
         | "EN ATTENTE"
         | "PLANIFIE"
@@ -1185,8 +1838,11 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      communication_context_enum: ["ticket", "lease", "general"],
       entity_type_enum: ["PERSONAL", "SCI"],
       gender_enum: ["male", "female", "other"],
+      invitation_context_enum: ["lease", "service_provider", "manual"],
+      invitation_status_enum: ["pending", "accepted", "expired", "cancelled"],
       maintenance_tickets_priority_enum: ["FAIBLE", "MOYEN", "ELEVE", "URGENT"],
       maintenance_tickets_status_enum: [
         "NOUVEAU",
@@ -1194,9 +1850,13 @@ export const Constants = {
         "EN ATTENTE DE PIECE",
         "TERMINE",
       ],
+      message_type_enum: ["text", "status_update", "assignment", "system"],
+      notification_frequency_enum: ["immediate", "daily"],
       period_enum: ["/mois", "/an"],
       role_lease_tenants_enum: ["tenant", "co-tenant"],
+      ticket_visibility_enum: ["public", "landlord_only"],
       user_role_enum: ["admin", "user", "trial"],
+      user_type_enum: ["LANDLORD", "TENANT", "SERVICE_PROVIDER"],
       work_orders_satus_enum: [
         "EN ATTENTE",
         "PLANIFIE",

@@ -58,7 +58,17 @@ export function RequireSubscription() {
     );
   }
 
-  // Vérifier l'abonnement
+  // Les locataires et prestataires n'ont pas besoin d'abonnement
+  // Seul le propriétaire (landlord) qui les invite doit avoir un abonnement
+  const userType = profile?.user_type;
+  const isInvitedUser = userType === 'TENANT' || userType === 'SERVICE_PROVIDER';
+
+  if (isInvitedUser) {
+    // Les utilisateurs invités ont un accès gratuit
+    return <Outlet />;
+  }
+
+  // Vérifier l'abonnement (uniquement pour les landlords)
   const subStatus = (subscription?.subscription_status ?? "").toLowerCase();
   const hasActiveSubscription =
     subscription?.subscribed ||

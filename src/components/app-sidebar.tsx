@@ -1,10 +1,11 @@
-import { useCallback } from "react"
+import { useCallback, useMemo } from "react"
 import {
   BarChart3,
   Calendar,
   Building2,
   UserCheck,
   Users,
+  User,
   Wrench,
   Calculator,
   FileText,
@@ -30,28 +31,45 @@ import { useAuth, useSignOut } from "@/hooks/useAuth"
 import { LogOut } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 
-const items = [
-  { title: "Accueil", url: "/app/dashboard", icon: BarChart3 },
-  { title: "Calendrier", url: "/app/calendar", icon: Calendar },
-  { title: "Parc", url: "/app/properties", icon: Building2 },
-  { title: "Baux", url: "/app/leases", icon: UserCheck },
-  { title: "Personnes", url: "/app/people", icon: Users },
-  { title: "Maintenance", url: "/app/maintenance", icon: Wrench },
-  { title: "Comptabilité", url: "/app/accounting", icon: Calculator },
-  { title: "Documents", url: "/app/documents", icon: FileText },
-  { title: "Communications", url: "/app/communications", icon: MessageCircle },
-  { title: "Rapports", url: "/app/reports", icon: TrendingUp },
-  { title: "TRI (simulateur)", url: "/app/tools/tri", icon: Target },
-  { title: "Paramètres", url: "/app/settings", icon: Settings },
+type UserType = 'LANDLORD' | 'TENANT' | 'SERVICE_PROVIDER'
+
+interface NavigationItem {
+  title: string
+  url: string
+  icon: any
+  roles: UserType[] // Quels rôles peuvent voir cet item
+}
+
+const allItems: NavigationItem[] = [
+  { title: "Accueil", url: "/app/dashboard", icon: BarChart3, roles: ['LANDLORD', 'TENANT', 'SERVICE_PROVIDER'] },
+  { title: "Calendrier", url: "/app/calendar", icon: Calendar, roles: ['LANDLORD', 'SERVICE_PROVIDER'] },
+  { title: "Mon Profil", url: "/app/provider-profile", icon: User, roles: ['SERVICE_PROVIDER'] },
+  { title: "Parc", url: "/app/properties", icon: Building2, roles: ['LANDLORD'] },
+  { title: "Baux", url: "/app/leases", icon: UserCheck, roles: ['LANDLORD'] },
+  { title: "Personnes", url: "/app/people", icon: Users, roles: ['LANDLORD'] },
+  { title: "Prestataires", url: "/app/providers", icon: Wrench, roles: ['LANDLORD'] },
+  { title: "Maintenance", url: "/app/maintenance", icon: Wrench, roles: ['LANDLORD', 'TENANT', 'SERVICE_PROVIDER'] },
+  { title: "Comptabilité", url: "/app/accounting", icon: Calculator, roles: ['LANDLORD'] },
+  { title: "Documents", url: "/app/documents", icon: FileText, roles: ['LANDLORD', 'TENANT', 'SERVICE_PROVIDER'] },
+  { title: "Communications", url: "/app/communications", icon: MessageCircle, roles: ['LANDLORD', 'TENANT', 'SERVICE_PROVIDER'] },
+  { title: "Rapports", url: "/app/reports", icon: TrendingUp, roles: ['LANDLORD'] },
+  { title: "TRI (simulateur)", url: "/app/tools/tri", icon: Target, roles: ['LANDLORD'] },
+  { title: "Paramètres", url: "/app/settings", icon: Settings, roles: ['LANDLORD'] },
 ]
 
 export function AppSidebar() {
   const { state } = useSidebar()
   const location = useLocation()
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { mutate: signOut } = useSignOut();
   const currentPath = location.pathname
   const collapsed = state === "collapsed"
+
+  // Filtrer les items selon le rôle de l'utilisateur
+  const userType = (profile?.user_type || 'LANDLORD') as UserType
+  const items = useMemo(() => {
+    return allItems.filter(item => item.roles.includes(userType))
+  }, [userType])
 
   const isActive = useCallback((path: string) => {
     if (path === "/app/dashboard") {

@@ -21,8 +21,10 @@ import {
 } from "@/hooks/useLeases"
 import { usePropertiesWithUnits, useCreateProperty } from "@/hooks/useProperties"
 import { useContactsWithLeaseInfo } from "@/hooks/useContacts"
+import { useTenants } from "@/hooks/useUsers"
 import { useCreateUnit } from "@/hooks/useUnits"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useInvitations } from "@/hooks/useInvitations"
 
 export default function Leases() {
   const renderCount = useRef(0);
@@ -41,6 +43,12 @@ export default function Leases() {
   const [newUnitSurface, setNewUnitSurface] = useState<number | "">("")
   const [newUnitFurnished, setNewUnitFurnished] = useState(false)
   const [selectedGuarantors, setSelectedGuarantors] = useState<string[]>([])
+  const [selectedCoTenants, setSelectedCoTenants] = useState<string[]>([])
+  const [isInviteTenantDialogOpen, setIsInviteTenantDialogOpen] = useState(false)
+  const [inviteTenantEmail, setInviteTenantEmail] = useState("")
+  const [inviteTenantFirstName, setInviteTenantFirstName] = useState("")
+  const [inviteTenantLastName, setInviteTenantLastName] = useState("")
+  const [pendingInvitationId, setPendingInvitationId] = useState<string | null>(null)
   const [formData, setFormData] = useState<LeaseInsert>({
     unit_id: "",
     tenant_id: "",
@@ -56,11 +64,13 @@ export default function Leases() {
   const { toast } = useToast()
   const { data: leases = [], isLoading, error } = useLeasesWithDetails()
   const { data: properties = [] } = usePropertiesWithUnits()
-  const { data: contacts = [] } = useContactsWithLeaseInfo()
+  const { data: tenants = [] } = useTenants()
+  const { data: guarantors = [] } = useContactsWithLeaseInfo()
   const createLease = useCreateLease()
   const updateLease = useUpdateLease()
   const deleteLease = useDeleteLease()
   const createUnit = useCreateUnit()
+  const { createInvitation } = useInvitations()
 
   console.log('[PAGE/LEASES]', {
     isLoading,
@@ -68,7 +78,8 @@ export default function Leases() {
     hasLeases: leases.length > 0,
     leasesCount: leases.length,
     hasProperties: properties.length > 0,
-    hasContacts: contacts.length > 0
+    hasTenants: tenants.length > 0,
+    hasGuarantors: guarantors.length > 0
   })
 
   // Get units for selected property
@@ -114,6 +125,44 @@ export default function Leases() {
     }
   }
 
+  const handleInviteTenant = async () => {
+    if (!inviteTenantEmail) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez renseigner l'email du locataire",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const invitation = await createInvitation({
+        email: inviteTenantEmail,
+        role: "TENANT",
+        invitation_context: "lease",
+        first_name: inviteTenantFirstName || undefined,
+        last_name: inviteTenantLastName || undefined,
+      })
+
+      setPendingInvitationId(invitation.id)
+      setIsInviteTenantDialogOpen(false)
+      setInviteTenantEmail("")
+      setInviteTenantFirstName("")
+      setInviteTenantLastName("")
+
+      toast({
+        title: "Succès",
+        description: "Invitation envoyée avec succès. Le locataire pourra accepter l'invitation pour créer son compte.",
+      })
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Erreur lors de l'envoi de l'invitation",
+        variant: "destructive",
+      })
+    }
+  }
+
   const resetForm = () => {
     setFormData({
       unit_id: "",
@@ -130,6 +179,8 @@ export default function Leases() {
     setSelectedLease(null)
     setSelectedPropertyId("")
     setSelectedGuarantors([])
+    setSelectedCoTenants([])
+    setPendingInvitationId(null)
   }
 
   const handleOpenDialog = () => {
@@ -157,10 +208,11 @@ export default function Leases() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!formData.unit_id || !formData.tenant_id || !formData.start_date || !formData.rent_amount) {
+    // Vérifier que soit un tenant_id soit une invitation en attente est fourni
+    if (!formData.unit_id || (!formData.tenant_id && !pendingInvitationId) || !formData.start_date || !formData.rent_amount) {
       toast({
         title: "Erreur",
-        description: "Veuillez remplir tous les champs requis",
+        description: "Veuillez remplir tous les champs requis (logement, locataire ou invitation, date de début, loyer)",
         variant: "destructive",
       })
       return
@@ -177,18 +229,52 @@ export default function Leases() {
           description: "Bail modifié avec succès",
         })
       } else {
-        const newLease = await createLease.mutateAsync(formData)
+        // Si une invitation est en attente et qu'aucun tenant n'est sélectionné, utiliser l'ID du propriétaire temporairement
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('Non authentifié');
 
-        // Créer les garanties si des garants ont été sélectionnés
-        if (selectedGuarantors.length > 0 && newLease) {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
+        const leaseData = {
+          ...formData,
+          // Si pas de tenant_id mais une invitation en attente, on met l'id du propriétaire temporairement
+          // Le tenant sera mis à jour quand il acceptera l'invitation
+          tenant_id: formData.tenant_id || (pendingInvitationId ? user.id : ""),
+        };
+
+        const newLease = await createLease.mutateAsync(leaseData)
+
+        if (newLease) {
+          // Si une invitation en attente existe, la lier au bail
+          if (pendingInvitationId) {
+            await supabase
+              .from('user_invitations')
+              .update({
+                lease_id: newLease.id,
+                property_id: selectedPropertyId || null
+              })
+              .eq('id', pendingInvitationId);
+          }
+
+          // Créer les colocataires si sélectionnés
+          if (selectedCoTenants.length > 0) {
+            await Promise.all(
+              selectedCoTenants.map(coTenantUserId =>
+                supabase.from('lease_tenants').insert({
+                  lease_id: newLease.id,
+                  user_id: coTenantUserId,
+                  role: 'co-tenant',
+                })
+              )
+            )
+          }
+
+          // Créer les garanties si des garants ont été sélectionnés
+          if (selectedGuarantors.length > 0) {
             await Promise.all(
               selectedGuarantors.map(guarantorId =>
                 supabase.from('lease_guarantors').insert({
                   lease_id: newLease.id,
                   guarantor_contact_id: guarantorId,
-                  tenant_contact_id: formData.tenant_id,
+                  tenant_contact_id: null, // On ne lie plus le garant à un contact locataire
                   user_id: user.id,
                 })
               )
@@ -442,42 +528,159 @@ export default function Leases() {
                     <SelectValue placeholder="Sélectionner un locataire" />
                   </SelectTrigger>
                   <SelectContent>
-                    {contacts.map((contact) => (
-                      <SelectItem key={contact.id} value={contact.id}>
-                        {contact.first_name} {contact.last_name}
-                      </SelectItem>
-                    ))}
+                    {tenants.length === 0 ? (
+                      <div className="p-2 text-sm text-muted-foreground text-center">
+                        Aucun locataire invité. Allez dans Paramètres → Utilisateurs pour inviter des locataires.
+                      </div>
+                    ) : (
+                      tenants.map((tenant) => (
+                        <SelectItem key={tenant.user_id} value={tenant.user_id}>
+                          {tenant.first_name} {tenant.last_name} {tenant.email && `(${tenant.email})`}
+                        </SelectItem>
+                      ))
+                    )}
                   </SelectContent>
                 </Select>
+
+                {/* Invitation Dialog */}
+                <Dialog open={isInviteTenantDialogOpen} onOpenChange={setIsInviteTenantDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button type="button" variant="link" className="h-auto p-0 text-xs text-muted-foreground hover:text-primary">
+                      Aucun locataire ? Inviter un nouveau locataire
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Inviter un nouveau locataire</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 pt-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="invite_tenant_email">Email *</Label>
+                        <Input
+                          id="invite_tenant_email"
+                          type="email"
+                          placeholder="locataire@example.com"
+                          value={inviteTenantEmail}
+                          onChange={(e) => setInviteTenantEmail(e.target.value)}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="invite_tenant_first_name">Prénom</Label>
+                          <Input
+                            id="invite_tenant_first_name"
+                            placeholder="Jean"
+                            value={inviteTenantFirstName}
+                            onChange={(e) => setInviteTenantFirstName(e.target.value)}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="invite_tenant_last_name">Nom</Label>
+                          <Input
+                            id="invite_tenant_last_name"
+                            placeholder="Dupont"
+                            value={inviteTenantLastName}
+                            onChange={(e) => setInviteTenantLastName(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <Alert>
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription className="text-xs">
+                          Une invitation sera envoyée à cette adresse email. Le locataire pourra créer son compte et sera automatiquement lié à ce bail une fois l'invitation acceptée.
+                        </AlertDescription>
+                      </Alert>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          className="flex-1"
+                          onClick={handleInviteTenant}
+                        >
+                          Envoyer l'invitation
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setIsInviteTenantDialogOpen(false)}
+                        >
+                          Annuler
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
+                {pendingInvitationId && (
+                  <Alert className="mt-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-xs">
+                      Une invitation a été envoyée. Le locataire sera automatiquement lié à ce bail une fois qu'il aura accepté l'invitation.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+
+              {/* Co-Tenants Selection */}
+              <div className="space-y-2">
+                <Label>Colocataires (optionnel)</Label>
+                <div className="border rounded-lg p-3 space-y-2 max-h-40 overflow-y-auto">
+                  {tenants.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Aucun locataire disponible</p>
+                  ) : (
+                    tenants
+                      .filter(tenant => tenant.user_id !== formData.tenant_id)
+                      .map((tenant) => (
+                        <div key={tenant.user_id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`cotenant-${tenant.user_id}`}
+                            checked={selectedCoTenants.includes(tenant.user_id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedCoTenants([...selectedCoTenants, tenant.user_id])
+                              } else {
+                                setSelectedCoTenants(selectedCoTenants.filter(id => id !== tenant.user_id))
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`cotenant-${tenant.user_id}`} className="cursor-pointer text-sm">
+                            {tenant.first_name} {tenant.last_name} {tenant.email && `(${tenant.email})`}
+                          </Label>
+                        </div>
+                      ))
+                  )}
+                </div>
+                {selectedCoTenants.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {selectedCoTenants.length} colocataire(s) sélectionné(s)
+                  </p>
+                )}
               </div>
 
               {/* Guarantors Selection */}
               <div className="space-y-2">
                 <Label>Garants (optionnel)</Label>
                 <div className="border rounded-lg p-3 space-y-2 max-h-40 overflow-y-auto">
-                  {contacts.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Aucun contact disponible</p>
+                  {guarantors.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Aucun garant disponible. Allez dans Garants pour en créer.</p>
                   ) : (
-                    contacts
-                      .filter(contact => contact.id !== formData.tenant_id)
-                      .map((contact) => (
-                        <div key={contact.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`guarantor-${contact.id}`}
-                            checked={selectedGuarantors.includes(contact.id)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedGuarantors([...selectedGuarantors, contact.id])
-                              } else {
-                                setSelectedGuarantors(selectedGuarantors.filter(id => id !== contact.id))
-                              }
-                            }}
-                          />
-                          <Label htmlFor={`guarantor-${contact.id}`} className="cursor-pointer text-sm">
-                            {contact.first_name} {contact.last_name}
-                          </Label>
-                        </div>
-                      ))
+                    guarantors.map((guarantor) => (
+                      <div key={guarantor.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`guarantor-${guarantor.id}`}
+                          checked={selectedGuarantors.includes(guarantor.id)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedGuarantors([...selectedGuarantors, guarantor.id])
+                            } else {
+                              setSelectedGuarantors(selectedGuarantors.filter(id => id !== guarantor.id))
+                            }
+                          }}
+                        />
+                        <Label htmlFor={`guarantor-${guarantor.id}`} className="cursor-pointer text-sm">
+                          {guarantor.first_name} {guarantor.last_name}
+                        </Label>
+                      </div>
+                    ))
                   )}
                 </div>
                 {selectedGuarantors.length > 0 && (
