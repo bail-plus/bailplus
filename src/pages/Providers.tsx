@@ -16,6 +16,7 @@ import {
   useDeleteServiceProvider,
   type ServiceProvider
 } from "@/hooks/useServiceProviders"
+import { useServiceProviderUsers, type User as ProviderUser } from "@/hooks/useUsers"
 import { useInvitations } from "@/hooks/useInvitations"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
@@ -68,6 +69,7 @@ export default function Providers() {
 
   const { toast } = useToast()
   const { data: providers = [], isLoading, error } = useServiceProviders()
+  const { data: providerUsers = [] } = useServiceProviderUsers()
   const updateProvider = useUpdateServiceProvider()
   const deleteProvider = useDeleteServiceProvider()
   const { createInvitation } = useInvitations()
@@ -193,7 +195,25 @@ export default function Providers() {
     }
   }
 
-  const filteredProviders = providers.filter(provider => {
+  // Si aucun provider dans service_providers, fallback aux profiles SERVICE_PROVIDER
+  const mergedProviders: (ServiceProvider | any)[] = providers.length > 0 ? providers : providerUsers.map((u: ProviderUser) => ({
+    // Aligner les champs minimum pour l'affichage
+    id: u.user_id,
+    user_id: u.user_id,
+    company_name: u.company_name,
+    specialty: u.specialty ? [u.specialty] : [],
+    available: true,
+    total_interventions: 0,
+    average_rating: null,
+    professional_phone: u.phone_number,
+    professional_email: u.email,
+    hourly_rate: null,
+    siret: null,
+    address: null,
+    user: { first_name: u.first_name, last_name: u.last_name, email: u.email },
+  }))
+
+  const filteredProviders = mergedProviders.filter((provider: any) => {
     const matchesSearch =
       provider.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       provider.user.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -212,11 +232,11 @@ export default function Providers() {
     return matchesSearch && matchesAvailability && matchesSpecialty
   })
 
-  const totalProviders = providers.length
-  const availableProviders = providers.filter(p => p.available).length
-  const totalInterventions = providers.reduce((sum, p) => sum + (p.total_interventions || 0), 0)
-  const avgRating = providers.length > 0
-    ? providers.reduce((sum, p) => sum + (p.average_rating || 0), 0) / providers.length
+  const totalProviders = mergedProviders.length
+  const availableProviders = mergedProviders.filter((p: any) => p.available).length
+  const totalInterventions = mergedProviders.reduce((sum: number, p: any) => sum + (p.total_interventions || 0), 0)
+  const avgRating = mergedProviders.length > 0
+    ? mergedProviders.reduce((sum: number, p: any) => sum + (p.average_rating || 0), 0) / mergedProviders.length
     : 0
 
   if (error) {
@@ -446,7 +466,7 @@ export default function Providers() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredProviders.map((provider) => (
+                filteredProviders.map((provider: any) => (
                   <TableRow key={provider.id} className="hover:bg-muted/50">
                     <TableCell>
                       <div>
@@ -463,7 +483,7 @@ export default function Providers() {
 
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {provider.specialty?.slice(0, 2).map((spec) => (
+                        {provider.specialty?.slice(0, 2).map((spec: string) => (
                           <Badge key={spec} variant="secondary" className="text-xs">
                             {spec}
                           </Badge>

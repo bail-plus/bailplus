@@ -29,7 +29,7 @@ import { useContactsWithLeaseInfo } from "@/hooks/useContacts"
 import { FileUpload } from "@/components/FileUpload"
 import { useFileUpload } from "@/hooks/useFileUpload"
 import { addServiceProviderToTicket } from "@/hooks/useTicketParticipants"
-import { useServiceProviders } from "@/hooks/useServiceProviders"
+import { useServiceProviderUsers } from "@/hooks/useUsers"
 import { notifyProviderAssignment } from "@/hooks/useNotifications"
 import { useAuth } from "@/hooks/useAuth"
 import { RatingDialog } from "@/components/provider/RatingDialog"
@@ -188,7 +188,7 @@ export default function Maintenance() {
   const { data: tickets = [], isLoading, error } = useMaintenanceTicketsWithDetails()
   const { data: properties = [] } = usePropertiesWithUnits()
   const { data: contacts = [] } = useContactsWithLeaseInfo()
-  const { data: serviceProviders = [] } = useServiceProviders()
+  const { data: serviceProviders = [] } = useServiceProviderUsers()
   const createTicket = useCreateMaintenanceTicket()
   const updateTicket = useUpdateMaintenanceTicket()
   const deleteTicket = useDeleteMaintenanceTicket()
@@ -1130,12 +1130,12 @@ export default function Maintenance() {
                           ) : (
                             serviceProviders.map((provider) => {
                               // Afficher nom/prénom ou company_name si pas de nom
-                              const displayName = provider.user?.first_name && provider.user?.last_name
-                                ? `${provider.user.first_name} ${provider.user.last_name}`
-                                : provider.company_name;
+                              const displayName = provider.first_name && provider.last_name
+                                ? `${provider.first_name} ${provider.last_name}`
+                                : (provider.company_name || provider.email);
 
                               return (
-                                <SelectItem key={provider.id} value={provider.id}>
+                                <SelectItem key={provider.user_id} value={provider.user_id}>
                                   {displayName}
                                   {provider.specialty && ` - ${provider.specialty}`}
                                 </SelectItem>

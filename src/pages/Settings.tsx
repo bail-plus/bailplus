@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import { Settings as SettingsIcon, Plus, Building, Users, CreditCard, FileText, Palette, Shield, Upload, Download, Loader2, Trash2 } from "lucide-react"
+import { Settings as SettingsIcon, Plus, Building, Users, CreditCard, FileText, Palette, Shield, Upload, Download, Loader2, Trash2, Bell } from "lucide-react"
 import SubscriptionPanel from "@/components/dashboard/settings/payment/SubscriptionPanel"
 import { InvitationManager } from "@/components/settings/InvitationManager"
 import { supabase } from "@/integrations/supabase/client"
@@ -48,6 +48,19 @@ export default function Settings() {
   const [newEntityType, setNewEntityType] = useState<EntityType>("PERSONAL")
   const [newEntityDescription, setNewEntityDescription] = useState("")
   const [creating, setCreating] = useState(false)
+  // Notification preferences state
+  const [loadingPrefs, setLoadingPrefs] = useState(true)
+  const [savingPrefs, setSavingPrefs] = useState(false)
+  const [prefs, setPrefs] = useState({
+    email_enabled: true,
+    sms_enabled: false,
+    push_enabled: false,
+    new_ticket_created: true,
+    ticket_message: true,
+    ticket_status_changed: true,
+    provider_assigned: true,
+    payment_received: false,
+  })
 
   const loadEntities = useCallback(async () => {
     try {
@@ -122,6 +135,73 @@ export default function Settings() {
   useEffect(() => {
     loadEntities()
   }, [loadEntities])
+
+  // Load notification preferences
+  useEffect(() => {
+    (async () => {
+      try {
+        setLoadingPrefs(true)
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        const { data } = await supabase
+          .from('notification_preferences')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        if (data) {
+          setPrefs({
+            email_enabled: !!data.email_enabled,
+            sms_enabled: !!data.sms_enabled,
+            push_enabled: !!data.push_enabled,
+            new_ticket_created: !!data.new_ticket_created,
+            ticket_message: !!data.ticket_message,
+            ticket_status_changed: !!data.ticket_status_changed,
+            provider_assigned: !!data.provider_assigned,
+            payment_received: !!data.payment_received,
+          })
+        } else {
+          // initialize row with defaults
+          await supabase.from('notification_preferences').insert({ user_id: user.id })
+        }
+      } catch (e) {
+        console.error('[SETTINGS] load notification prefs error', e)
+      } finally {
+        setLoadingPrefs(false)
+      }
+    })()
+  }, [])
+
+  const saveNotificationPrefs = async () => {
+    try {
+      setSavingPrefs(true)
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('User not authenticated')
+
+      const { error } = await supabase
+        .from('notification_preferences')
+        .update({
+          email_enabled: prefs.email_enabled,
+          sms_enabled: prefs.sms_enabled,
+          push_enabled: prefs.push_enabled,
+          new_ticket_created: prefs.new_ticket_created,
+          ticket_message: prefs.ticket_message,
+          ticket_status_changed: prefs.ticket_status_changed,
+          provider_assigned: prefs.provider_assigned,
+          payment_received: prefs.payment_received,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', user.id)
+
+      if (error) throw error
+      alert('Préférences enregistrées')
+    } catch (e) {
+      console.error('[SETTINGS] save notification prefs error', e)
+      alert('Erreur lors de la sauvegarde des préférences')
+    } finally {
+      setSavingPrefs(false)
+    }
+  }
 
   const handleCreateEntity = async () => {
     if (!newEntityName.trim()) {
@@ -225,7 +305,7 @@ export default function Settings() {
 
       {/* Main Settings Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="organizations">Entités</TabsTrigger>
           <TabsTrigger value="users">Utilisateurs</TabsTrigger>
           <TabsTrigger value="banking">Banques</TabsTrigger>
@@ -233,6 +313,7 @@ export default function Settings() {
           <TabsTrigger value="rent-rules">Règles loyers</TabsTrigger>
           <TabsTrigger value="branding">Branding</TabsTrigger>
           <TabsTrigger value="privacy">RGPD</TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
         </TabsList>
 
         {/* Organizations Tab */}
@@ -373,6 +454,130 @@ export default function Settings() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        {/* Notifications Tab */}
+        <TabsContent value="notifications" className="space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Bell className="w-4 h-4" />
+              Notifications
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Choisissez vos canaux et types d’événements à notifier.
+            </p>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Canaux</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Email</Label>
+                  <p className="text-xs text-muted-foreground">Recevoir les notifications par email</p>
+                </div>
+                <Switch
+                  checked={prefs.email_enabled}
+                  onCheckedChange={(v) => setPrefs({ ...prefs, email_enabled: Boolean(v) })}
+                  disabled={loadingPrefs}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>SMS</Label>
+                  <p className="text-xs text-muted-foreground">Recevoir des SMS (bientôt)</p>
+                </div>
+                <Switch
+                  checked={prefs.sms_enabled}
+                  onCheckedChange={(v) => setPrefs({ ...prefs, sms_enabled: Boolean(v) })}
+                  disabled={loadingPrefs}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Push</Label>
+                  <p className="text-xs text-muted-foreground">Notifications push (bientôt)</p>
+                </div>
+                <Switch
+                  checked={prefs.push_enabled}
+                  onCheckedChange={(v) => setPrefs({ ...prefs, push_enabled: Boolean(v) })}
+                  disabled={loadingPrefs}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Événements</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Nouveau ticket</Label>
+                  <p className="text-xs text-muted-foreground">Lorsqu’un ticket est créé</p>
+                </div>
+                <Switch
+                  checked={prefs.new_ticket_created}
+                  onCheckedChange={(v) => setPrefs({ ...prefs, new_ticket_created: Boolean(v) })}
+                  disabled={loadingPrefs}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Message reçu</Label>
+                  <p className="text-xs text-muted-foreground">Nouveau message dans un ticket</p>
+                </div>
+                <Switch
+                  checked={prefs.ticket_message}
+                  onCheckedChange={(v) => setPrefs({ ...prefs, ticket_message: Boolean(v) })}
+                  disabled={loadingPrefs}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Changement de statut</Label>
+                  <p className="text-xs text-muted-foreground">Le statut du ticket change</p>
+                </div>
+                <Switch
+                  checked={prefs.ticket_status_changed}
+                  onCheckedChange={(v) => setPrefs({ ...prefs, ticket_status_changed: Boolean(v) })}
+                  disabled={loadingPrefs}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Assignation prestataire</Label>
+                  <p className="text-xs text-muted-foreground">Un ticket vous est assigné (prestataire)</p>
+                </div>
+                <Switch
+                  checked={prefs.provider_assigned}
+                  onCheckedChange={(v) => setPrefs({ ...prefs, provider_assigned: Boolean(v) })}
+                  disabled={loadingPrefs}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Paiement reçu</Label>
+                  <p className="text-xs text-muted-foreground">Confirmation d’un paiement (landlord)</p>
+                </div>
+                <Switch
+                  checked={prefs.payment_received}
+                  onCheckedChange={(v) => setPrefs({ ...prefs, payment_received: Boolean(v) })}
+                  disabled={loadingPrefs}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-end">
+            <Button onClick={saveNotificationPrefs} disabled={savingPrefs || loadingPrefs}>
+              {savingPrefs && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {savingPrefs ? 'Enregistrement...' : 'Enregistrer'}
+            </Button>
+          </div>
         </TabsContent>
 
         {/* Users Tab */}

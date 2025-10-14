@@ -250,6 +250,8 @@ async function fetchTicketById(id: string): Promise<MaintenanceTicket> {
 }
 
 // Create a new maintenance ticket
+import { notifyNewTicket, notifyProviderAssignment, notifyTicketStatusChange } from '@/hooks/useNotifications'
+
 async function createMaintenanceTicket(ticket: MaintenanceTicketInsert): Promise<MaintenanceTicket> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Non authentifié');
@@ -291,11 +293,39 @@ async function createMaintenanceTicket(ticket: MaintenanceTicketInsert): Promise
     // Don't fail the ticket creation if participant creation fails
   }
 
+  // Notifications: informer le tenant (s'il existe)
+  try {
+    // Notifier le bailleur (toujours) pour vérifier le flux
+    if (data.user_id) {
+      await notifyNewTicket(data.user_id, data.id, data.title || 'Nouveau ticket', (data as any).property_name)
+    }
+    // Notifier le locataire uniquement s'il a un compte (profil)
+    if (data.tenant_id) {
+      const { data: tenantProfile } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .eq('user_id', data.tenant_id)
+        .maybeSingle()
+      if (tenantProfile?.user_id) {
+        await notifyNewTicket(tenantProfile.user_id, data.id, data.title || 'Nouveau ticket', (data as any).property_name)
+      }
+    }
+  } catch (e) {
+    console.warn('[notifications] notifyNewTicket failed:', e)
+  }
+
   return data;
 }
 
 // Update an existing maintenance ticket
 async function updateMaintenanceTicket({ id, ...updates }: MaintenanceTicketUpdate & { id: string }): Promise<MaintenanceTicket> {
+  // Fetch previous state to detect changes
+  const { data: prev } = await supabase
+    .from('maintenance_tickets')
+    .select('id, user_id, tenant_id, property_id, title, status, assigned_to')
+    .eq('id', id)
+    .maybeSingle()
+
   const { data, error } = await supabase
     .from('maintenance_tickets')
     .update(updates)
@@ -304,6 +334,41 @@ async function updateMaintenanceTicket({ id, ...updates }: MaintenanceTicketUpda
     .single();
 
   if (error) throw new Error(error.message);
+
+  // Detect status change
+  try {
+    if (prev && updates.status && updates.status !== prev.status) {
+      // Notify landlord and tenant if present
+      if (prev.user_id) {
+        await notifyTicketStatusChange(prev.user_id, id, data.title || 'Ticket', prev.status || undefined, updates.status)
+      }
+      if (prev.tenant_id) {
+        await notifyTicketStatusChange(prev.tenant_id, id, data.title || 'Ticket', prev.status || undefined, updates.status)
+      }
+    }
+  } catch (e) {
+    console.warn('[notifications] status change notify failed:', e)
+  }
+
+  // Detect provider assignment
+  try {
+    if (prev && updates.assigned_to && updates.assigned_to !== prev.assigned_to) {
+      // fetch property name
+      let propertyName: string | undefined
+      if (data.property_id) {
+        const { data: prop } = await supabase
+          .from('properties')
+          .select('name')
+          .eq('id', data.property_id)
+          .maybeSingle()
+        propertyName = prop?.name || undefined
+      }
+      await notifyProviderAssignment(id, updates.assigned_to as string, data.title || 'Ticket', propertyName || '')
+    }
+  } catch (e) {
+    console.warn('[notifications] provider assignment notify failed:', e)
+  }
+
   return data;
 }
 
