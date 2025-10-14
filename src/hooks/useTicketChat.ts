@@ -72,13 +72,19 @@ export function useSendTicketMessage(ticketId: string | undefined, ticketTitle?:
 
       // Notify other participants (excluding sender)
       try {
-        const { data: participants } = await supabase
-          .from('ticket_participants')
-          .select('user_id')
-          .eq('ticket_id', ticketId)
-        const others = (participants || []).map(p => p.user_id).filter(uid => uid && uid !== user.id)
+        // Destinataires: participants + bailleur + locataire (si profil), hors émetteur
+        const [participantsRes, ticketRes] = await Promise.all([
+          supabase.from('ticket_participants').select('user_id').eq('ticket_id', ticketId),
+          supabase.from('maintenance_tickets').select('user_id, tenant_user_id').eq('id', ticketId).maybeSingle(),
+        ])
+        const ids = new Set<string>()
+        ;(participantsRes.data || []).forEach(p => { if (p.user_id) ids.add(p.user_id) })
+        if (ticketRes.data?.user_id) ids.add(ticketRes.data.user_id) // bailleur
+        if ((ticketRes.data as any)?.tenant_user_id) ids.add((ticketRes.data as any).tenant_user_id)
+        ids.delete(user.id) // ne pas notifier l'émetteur
+        const recipients = Array.from(ids)
         const preview = text.length > 140 ? `${text.slice(0, 137)}…` : text
-        await Promise.all(others.map(uid => notifyTicketMessage(uid!, ticketId, ticketTitle || 'Ticket', user.email || 'Utilisateur', preview)))
+        await Promise.all(recipients.map(uid => notifyTicketMessage(uid, ticketId, ticketTitle || 'Ticket', user.email || 'Utilisateur', preview)))
       } catch (e) {
         console.warn('[CHAT] notifyTicketMessage failed', e)
       }
@@ -90,4 +96,3 @@ export function useSendTicketMessage(ticketId: string | undefined, ticketTitle?:
     }
   })
 }
-

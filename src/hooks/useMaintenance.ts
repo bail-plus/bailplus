@@ -52,61 +52,53 @@ async function fetchMaintenanceTicketsWithDetails(userId: string, entityId?: str
   const userType = profile?.user_type || 'LANDLORD';
   console.log('[useMaintenance] User type:', userType);
 
-  // Build query based on user type
-  let ticketsQuery = supabase
-    .from('maintenance_tickets')
-    .select('*');
+  // Requête: filtrer explicitement selon le rôle
+  let ticketsQuery = supabase.from('maintenance_tickets').select('*')
 
   if (userType === 'LANDLORD') {
-    // Propriétaires : voir tous leurs tickets
-    ticketsQuery = ticketsQuery.eq('user_id', userId);
-
-    // Si une entité est sélectionnée, filtrer par property_ids de cette entité
+    ticketsQuery = ticketsQuery.eq('user_id', userId)
     if (!showAll && entityId) {
       const { data: properties } = await supabase
         .from('properties')
         .select('id')
-        .eq('entity_id', entityId);
-
-      const propertyIds = properties?.map(p => p.id) || [];
-
-      if (propertyIds.length === 0) {
-        return []; // Aucune propriété pour cette entité
-      }
-
-      ticketsQuery = ticketsQuery.in('property_id', propertyIds);
+        .eq('entity_id', entityId)
+      const propertyIds = properties?.map(p => p.id) || []
+      if (propertyIds.length === 0) return []
+      ticketsQuery = ticketsQuery.in('property_id', propertyIds)
     }
   } else if (userType === 'TENANT') {
-    // Locataires : voir les tickets de leur logement
-    // D'abord récupérer le bail actif du locataire
-    const { data: activeLease, error: leaseError } = await supabase
-      .from('leases')
-      .select('unit_id')
-      .eq('tenant_id', userId)
-      .eq('status', 'active')
-      .maybeSingle();
-
-    if (leaseError) {
-      console.error('[useMaintenance] Error fetching lease:', leaseError);
-    }
-
-    console.log('[useMaintenance] Active lease for tenant:', activeLease);
-
-    if (!activeLease) {
-      console.log('[useMaintenance] No active lease found for tenant');
-      return []; // Pas de bail actif, pas de tickets à afficher
-    }
-
-    // Filtrer par unit_id ou tenant_id
-    ticketsQuery = ticketsQuery.or(`unit_id.eq.${activeLease.unit_id},tenant_id.eq.${userId}`);
+    // Locataire: tickets où tenant_user_id = moi OU je suis participant OU je suis auteur
+    const ors: string[] = [`tenant_user_id.eq.${userId}`, `created_by.eq.${userId}`]
+    const { data: parts } = await supabase
+      .from('ticket_participants')
+      .select('ticket_id')
+      .eq('user_id', userId)
+    const pIds = (parts || []).map(p => p.ticket_id)
+    if (pIds.length) ors.push(`id.in.(${pIds.join(',')})`)
+    ticketsQuery = ticketsQuery.or(ors.join(','))
   } else if (userType === 'SERVICE_PROVIDER') {
-    // Prestataires : voir uniquement les tickets qui leur sont assignés
-    ticketsQuery = ticketsQuery.eq('assigned_to', userId);
-    console.log('[useMaintenance] Filtering tickets by assigned_to:', userId);
-  } else {
-    // Type inconnu, ne rien afficher
-    console.warn('[useMaintenance] Unknown user type:', userType);
-    return [];
+    // Prestataire: tickets où assigned_to = moi OU je suis participant OU je suis auteur
+    const ors: string[] = [`assigned_to.eq.${userId}`, `created_by.eq.${userId}`]
+    const { data: parts } = await supabase
+      .from('ticket_participants')
+      .select('ticket_id')
+      .eq('user_id', userId)
+    const pIds = (parts || []).map(p => p.ticket_id)
+    if (pIds.length) ors.push(`id.in.(${pIds.join(',')})`)
+    ticketsQuery = ticketsQuery.or(ors.join(','))
+  }
+
+  // Si une entité est sélectionnée (et que l'utilisateur est bailleur), filtrer par propriétés
+  if (userType === 'LANDLORD' && !showAll && entityId) {
+    const { data: properties } = await supabase
+      .from('properties')
+      .select('id')
+      .eq('entity_id', entityId);
+    const propertyIds = properties?.map(p => p.id) || [];
+    if (propertyIds.length === 0) {
+      return [];
+    }
+    ticketsQuery = ticketsQuery.in('property_id', propertyIds);
   }
 
   const { data: tickets, error: ticketsError } = await ticketsQuery
@@ -281,34 +273,28 @@ async function createMaintenanceTicket(ticket: MaintenanceTicketInsert): Promise
     throw new Error(error.message);
   }
 
-  // Auto-create participants (landlord + tenant if applicable)
+  // Auto-create participants (landlord + tenant via tenant_user_id if applicable)
   try {
     await autoCreateTicketParticipants(
       data.id,
       user.id, // landlord
-      ticket.tenant_id || null // tenant if provided
+      (ticket as any).tenant_user_id || null // tenant user_id if provided
     );
   } catch (participantError) {
     console.error('Error creating participants:', participantError);
     // Don't fail the ticket creation if participant creation fails
   }
 
-  // Notifications: informer le tenant (s'il existe)
+  // Notifications: informer le bailleur et le locataire (s'il existe)
   try {
     // Notifier le bailleur (toujours) pour vérifier le flux
     if (data.user_id) {
       await notifyNewTicket(data.user_id, data.id, data.title || 'Nouveau ticket', (data as any).property_name)
     }
-    // Notifier le locataire uniquement s'il a un compte (profil)
-    if (data.tenant_id) {
-      const { data: tenantProfile } = await supabase
-        .from('profiles')
-        .select('user_id')
-        .eq('user_id', data.tenant_id)
-        .maybeSingle()
-      if (tenantProfile?.user_id) {
-        await notifyNewTicket(tenantProfile.user_id, data.id, data.title || 'Nouveau ticket', (data as any).property_name)
-      }
+    // Notifier le locataire (profil) si renseigné (dans data ou dans le payload d'insert)
+    const tenantUserId = (data as any).tenant_user_id || (ticket as any).tenant_user_id || null
+    if (tenantUserId) {
+      await notifyNewTicket(tenantUserId, data.id, data.title || 'Nouveau ticket', (data as any).property_name)
     }
   } catch (e) {
     console.warn('[notifications] notifyNewTicket failed:', e)
@@ -322,7 +308,7 @@ async function updateMaintenanceTicket({ id, ...updates }: MaintenanceTicketUpda
   // Fetch previous state to detect changes
   const { data: prev } = await supabase
     .from('maintenance_tickets')
-    .select('id, user_id, tenant_id, property_id, title, status, assigned_to')
+    .select('id, user_id, tenant_user_id, property_id, title, status, assigned_to')
     .eq('id', id)
     .maybeSingle()
 

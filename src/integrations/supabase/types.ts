@@ -724,7 +724,7 @@ export type Database = {
           status:
             | Database["public"]["Enums"]["maintenance_tickets_status_enum"]
             | null
-          tenant_id: string | null
+          tenant_user_id: string | null
           title: string
           unit_id: string | null
           updated_at: string
@@ -751,7 +751,7 @@ export type Database = {
           status?:
             | Database["public"]["Enums"]["maintenance_tickets_status_enum"]
             | null
-          tenant_id?: string | null
+          tenant_user_id?: string | null
           title: string
           unit_id?: string | null
           updated_at?: string
@@ -778,7 +778,7 @@ export type Database = {
           status?:
             | Database["public"]["Enums"]["maintenance_tickets_status_enum"]
             | null
-          tenant_id?: string | null
+          tenant_user_id?: string | null
           title?: string
           unit_id?: string | null
           updated_at?: string
@@ -803,11 +803,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "maintenance_tickets_tenant_id_fkey"
-            columns: ["tenant_id"]
+            foreignKeyName: "maintenance_tickets_tenant_user_id_fkey"
+            columns: ["tenant_user_id"]
             isOneToOne: false
-            referencedRelation: "contacts"
-            referencedColumns: ["id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "maintenance_tickets_unit_id_fkey"
@@ -822,6 +822,7 @@ export type Database = {
         Row: {
           created_at: string | null
           email_enabled: boolean | null
+          frequency: Database["public"]["Enums"]["notification_frequency_enum"]
           id: string
           landlord_reply: boolean | null
           message_received: boolean | null
@@ -840,6 +841,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           email_enabled?: boolean | null
+          frequency?: Database["public"]["Enums"]["notification_frequency_enum"]
           id?: string
           landlord_reply?: boolean | null
           message_received?: boolean | null
@@ -858,6 +860,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           email_enabled?: boolean | null
+          frequency?: Database["public"]["Enums"]["notification_frequency_enum"]
           id?: string
           landlord_reply?: boolean | null
           message_received?: boolean | null
@@ -1696,6 +1699,7 @@ export type Database = {
         | "EN ATTENTE DE PIECE"
         | "TERMINE"
       message_type_enum: "text" | "status_update" | "assignment" | "system"
+      notification_frequency_enum: "immediate" | "daily"
       period_enum: "/mois" | "/an"
       role_lease_tenants_enum: "tenant" | "co-tenant"
       ticket_visibility_enum: "public" | "landlord_only"
@@ -1847,6 +1851,7 @@ export const Constants = {
         "TERMINE",
       ],
       message_type_enum: ["text", "status_update", "assignment", "system"],
+      notification_frequency_enum: ["immediate", "daily"],
       period_enum: ["/mois", "/an"],
       role_lease_tenants_enum: ["tenant", "co-tenant"],
       ticket_visibility_enum: ["public", "landlord_only"],

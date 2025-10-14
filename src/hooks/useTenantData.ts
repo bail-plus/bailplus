@@ -44,7 +44,24 @@ async function fetchTenantData(): Promise<TenantDashboardData> {
 
   console.log('[TENANT DASHBOARD] Fetching data for tenant', user.id);
 
-  // Fetch active lease for this tenant
+  // Mapper le locataire (profil) -> contact via email (si schéma leases.tenant_id pointe vers contacts.id)
+  const { data: myProfile } = await supabase
+    .from('profiles')
+    .select('email')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  let tenantContactId: string | null = null
+  if (myProfile?.email) {
+    const { data: contact } = await supabase
+      .from('contacts')
+      .select('id')
+      .eq('email', myProfile.email)
+      .maybeSingle()
+    tenantContactId = contact?.id || null
+  }
+
+  // Fetch active lease for this tenant (par user_id ou par contact)
   const { data: lease, error: leaseError } = await supabase
     .from('leases')
     .select(`
@@ -71,9 +88,9 @@ async function fetchTenantData(): Promise<TenantDashboardData> {
         )
       )
     `)
-    .eq('tenant_id', user.id)
+    .or(`tenant_id.eq.${user.id}${tenantContactId ? `,tenant_id.eq.${tenantContactId}` : ''}`)
     .eq('status', 'active')
-    .single();
+    .maybeSingle();
 
   if (leaseError) {
     console.error('[TENANT DASHBOARD] Error fetching lease:', leaseError);
@@ -86,7 +103,7 @@ async function fetchTenantData(): Promise<TenantDashboardData> {
       .from('profiles')
       .select('user_id, first_name, last_name, email, phone_number')
       .eq('user_id', lease.user_id)
-      .single();
+      .maybeSingle();
 
     if (landlordError) {
       console.error('[TENANT DASHBOARD] Error fetching landlord:', landlordError);
@@ -99,7 +116,12 @@ async function fetchTenantData(): Promise<TenantDashboardData> {
   const { data: tickets, error: ticketsError } = await supabase
     .from('maintenance_tickets')
     .select('id, status, created_by')
-    .or(`created_by.eq.${user.id},lease_id.eq.${lease?.id || '00000000-0000-0000-0000-000000000000'}`);
+    .or(
+      [
+        `created_by.eq.${user.id}`,
+        lease?.id ? `lease_id.eq.${lease.id}` : ''
+      ].filter(Boolean).join(',')
+    );
 
   if (ticketsError) {
     console.error('[TENANT DASHBOARD] Error fetching tickets:', ticketsError);

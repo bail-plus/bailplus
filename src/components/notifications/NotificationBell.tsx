@@ -9,7 +9,8 @@ import { useNavigate } from 'react-router-dom'
 
 export function NotificationBell() {
   const { data: notifications = [], unreadCount, markAsRead, markAllAsRead, isLoading } = useInAppNotifications()
-  const [filter, setFilter] = useState<'all' | 'unread' | 'ticket' | 'general'>('all')
+  // Ouvre par défaut sur "Non lus"
+  const [filter, setFilter] = useState<'all' | 'unread' | 'ticket' | 'general'>('unread')
   const navigate = useNavigate()
 
   const filtered = useMemo(() => {
@@ -72,7 +73,7 @@ export function NotificationBell() {
                         className="px-0"
                         onClick={() => {
                           markAsRead.mutate(n.id)
-                          navigate(`/app/maintenance?openTicket=${n.ticket_id}`)
+                          navigate(`/app/maintenance?openTicket=${n.ticket_id}&openTab=messages`)
                         }}
                       >
                         Voir le ticket

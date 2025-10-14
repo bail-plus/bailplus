@@ -37,6 +37,7 @@ import { useCheckUserRating } from "@/hooks/useProviderRatings"
 import { useTicketMessages, useSendTicketMessage } from "@/hooks/useTicketChat"
 import { useTicketUnread, useMarkTicketRead, useMarkTicketNotificationsRead } from "@/hooks/useTicketUnread"
 import { useSearchParams } from "react-router-dom"
+import { supabase } from "@/integrations/supabase/client"
 
 const KANBAN_COLUMNS = [
   { id: "NOUVEAU", title: "Nouveau", color: "bg-red-50", icon: AlertTriangle },
@@ -276,17 +277,31 @@ export default function Maintenance() {
   console.log('[MAINTENANCE] Service Providers:', serviceProviders)
   console.log('[MAINTENANCE] Tickets:', tickets)
 
-  // Open ticket dialog directly via URL param ?openTicket=<id>
+  // Open ticket dialog directly via URL param ?openTicket=<id>&openTab=messages|summary|provider|workorders
   useEffect(() => {
     const openId = searchParams.get('openTicket')
+    const openTab = searchParams.get('openTab') || undefined
     if (!openId) return
     if (tickets.length === 0) return
     const t = tickets.find(t => t.id === openId)
     if (t) {
       // Ouvrir uniquement la modale de consultation du ticket, pas la création
       setSelectedTicket(t)
+      // Ouvrir éventuellement un onglet spécifique
+      if (openTab) {
+        // petite temporisation pour laisser la modale se monter
+        setTimeout(() => {
+          const allowed = ['summary','messages','provider','workorders']
+          // @ts-ignore state declared later
+          if (allowed.includes(openTab)) {
+            // @ts-ignore: will set state if exists
+            try { (setActiveTab as any)?.(openTab) } catch {}
+          }
+        }, 0)
+      }
       const sp = new URLSearchParams(searchParams)
       sp.delete('openTicket')
+      sp.delete('openTab')
       setSearchParams(sp, { replace: true })
     }
   }, [tickets, searchParams, setSearchParams])
@@ -304,6 +319,8 @@ export default function Maintenance() {
       lease.status === 'ACTIF'
     )
   })
+
+  // Plus d'auto-sélection de contact: on bascule vers tenant_user_id (profil)
 
   const resetTicketForm = () => {
     setTicketFormData({
@@ -387,10 +404,55 @@ export default function Maintenance() {
           description: "Ticket modifié avec succès",
         })
       } else {
+        // Déterminer lease_id et tenant_user_id en fonction du logement sélectionné
+        let resolvedLeaseId: string | null = null
+        let resolvedTenantUserId: string | null = (ticketFormData as any).tenant_user_id || null
+        if (ticketFormData.unit_id && ticketFormData.unit_id !== 'none') {
+          // Essai n°1: nouveau schéma (tenant_user_id)
+          const q1 = await supabase
+            .from('leases')
+            .select('id, tenant_user_id, status')
+            .eq('unit_id', ticketFormData.unit_id)
+            .in('status', ['active', 'ACTIVE'])
+            .maybeSingle()
+          if (q1.error) {
+            console.debug('[TICKET] leases (tenant_user_id) not available, fallback to tenant_id')
+          }
+          let activeLease: any = q1.data
+          if (!activeLease) {
+            // Essai n°2: ancien schéma (tenant_id)
+            const q2 = await supabase
+              .from('leases')
+              .select('id, tenant_id, status')
+              .eq('unit_id', ticketFormData.unit_id)
+              .in('status', ['active', 'ACTIVE'])
+              .maybeSingle()
+            if (q2.error) {
+              console.debug('[TICKET] leases (tenant_id) also unavailable')
+            }
+            activeLease = q2.data
+            if (activeLease?.tenant_id && !resolvedTenantUserId) {
+              // Dans ton schéma, leases.tenant_id est déjà un profiles.user_id
+              resolvedTenantUserId = activeLease.tenant_id as string
+            }
+          } else {
+            resolvedTenantUserId = activeLease.tenant_user_id || resolvedTenantUserId
+          }
+          console.log('[TICKET] Lookup active lease for unit', ticketFormData.unit_id, '=>', activeLease)
+          if (activeLease) {
+            resolvedLeaseId = activeLease.id
+            console.log('[TICKET] Using tenant_user_id:', resolvedTenantUserId)
+          }
+        }
+
+        console.log('[TICKET] Final payload tenant_user_id:', resolvedTenantUserId, 'lease_id:', resolvedLeaseId)
         const newTicket = await createTicket.mutateAsync({
           ...ticketFormData,
           unit_id: ticketFormData.unit_id === "none" ? null : ticketFormData.unit_id,
           description: ticketFormData.description || null,
+          lease_id: resolvedLeaseId,
+          tenant_user_id: resolvedTenantUserId,
+          assigned_to: selectedProviderId || null,
         })
 
         // Upload files if any
@@ -402,6 +464,23 @@ export default function Maintenance() {
           })
         }
 
+        // Si prestataire choisi à la création, ajouter en participants et notifier
+        if (selectedProviderId) {
+          try {
+            await addServiceProviderToTicket(newTicket.id, selectedProviderId)
+            await notifyProviderAssignment(
+              newTicket.id,
+              selectedProviderId,
+              newTicket.title || 'Ticket',
+              (newTicket as any).property_name || 'Propriété'
+            )
+          } catch (e) {
+            console.debug('[TICKET] provider assign at creation failed:', e)
+          }
+        }
+
+        // reset provider select after creation
+        setSelectedProviderId("")
         toast({
           title: "Succès",
           description: "Ticket créé avec succès",
@@ -859,6 +938,38 @@ export default function Maintenance() {
                     </Select>
                   </div>
                 </div>
+
+                {/* Prestataire (optionnel) à la création */}
+                {!isProvider && (
+                  <div className="space-y-2">
+                    <Label htmlFor="assigned_to">Prestataire (optionnel)</Label>
+                    <Select
+                      value={selectedProviderId}
+                      onValueChange={setSelectedProviderId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner un prestataire" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {serviceProviders.length === 0 ? (
+                          <SelectItem value="" disabled>Aucun prestataire disponible</SelectItem>
+                        ) : (
+                          serviceProviders.map((provider) => {
+                            const displayName = provider.first_name && provider.last_name
+                              ? `${provider.first_name} ${provider.last_name}`
+                              : (provider.company_name || provider.email)
+                            return (
+                              <SelectItem key={provider.user_id} value={provider.user_id}>
+                                {displayName}
+                                {provider.specialty && ` - ${provider.specialty}`}
+                              </SelectItem>
+                            )
+                          })
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {/* File Upload */}
                 <div className="space-y-2">

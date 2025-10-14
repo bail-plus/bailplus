@@ -81,15 +81,7 @@ export async function sendNotification(params: SendNotificationParams): Promise<
       .from('notification_preferences')
       .select('*')
       .eq('user_id', recipientId)
-      .single()
-
-    // Check if user wants email notifications
-    const emailEnabled = notificationPrefs?.email_enabled ?? true
-
-    if (!emailEnabled) {
-      console.log('User has disabled email notifications')
-      return
-    }
+      .maybeSingle()
 
     // Create communication log
     // Map recipient type to DB check constraint values
@@ -127,7 +119,8 @@ export async function sendNotification(params: SendNotificationParams): Promise<
       const branding = await loadBrandingForUser(user.id)
 
       const to = recipient?.email
-      if (to) {
+      const emailEnabled = notificationPrefs?.email_enabled ?? true
+      if (to && emailEnabled) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const payload: any = {
           to,
@@ -200,14 +193,6 @@ export async function notifyNewTicket(
   ticketTitle: string,
   propertyName?: string
 ) {
-  const { data: prefs } = await supabase
-    .from('notification_preferences')
-    .select('new_ticket_created, email_enabled')
-    .eq('user_id', recipientId)
-    .single()
-
-  if (prefs && (!prefs.email_enabled || !prefs.new_ticket_created)) return
-
   const subject = 'Nouveau ticket créé'
   const branding = await loadBrandingForUser((await supabase.auth.getUser()).data.user!.id)
   const { generateNewTicketEmailHTML } = await import('@/components/email/NewTicketEmail')
@@ -230,14 +215,6 @@ export async function notifyTicketMessage(
   authorName: string,
   messagePreview: string
 ) {
-  const { data: prefs } = await supabase
-    .from('notification_preferences')
-    .select('ticket_message, email_enabled')
-    .eq('user_id', recipientId)
-    .single()
-
-  if (prefs && (!prefs.email_enabled || !prefs.ticket_message)) return
-
   const subject = 'Nouveau message sur votre ticket'
   const branding = await loadBrandingForUser((await supabase.auth.getUser()).data.user!.id)
   const { generateTicketMessageEmailHTML } = await import('@/components/email/TicketMessageEmail')
