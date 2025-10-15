@@ -68,7 +68,7 @@ export default function BatchReceiptGenerator() {
           period_year,
           total_amount,
           lease:leases (
-            tenant:tenants (
+            tenant:profiles!leases_tenant_id_fkey (
               first_name,
               last_name,
               email
@@ -131,7 +131,8 @@ export default function BatchReceiptGenerator() {
               type: 'receipt',
               category: 'rent',
               file_url: `/receipts/${invoice.id}.pdf`,
-              lease_id: invoice.id
+              lease_id: (invoice as any).lease_id || (invoice as any).lease?.id || undefined,
+              mime_type: 'application/pdf'
             });
 
           successCount++;

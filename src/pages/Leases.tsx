@@ -1,4 +1,4 @@
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { FileText, Plus, Search, Calendar, Home, User, Edit, Trash2, Euro, AlertCircle } from "lucide-react"
+import { FileText, Plus, Search, Calendar as CalendarIcon, Home, User, Edit, Trash2, Euro, AlertCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/integrations/supabase/client"
 import {
@@ -25,8 +25,20 @@ import { useTenants } from "@/hooks/useUsers"
 import { useCreateUnit } from "@/hooks/useUnits"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useInvitations } from "@/hooks/useInvitations"
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { fr } from "date-fns/locale"
 
 export default function Leases() {
+  const currentYear = new Date().getFullYear()
+  const dayPickerLabels = {
+    labelMonthDropdown: () => "Mois",
+    labelYearDropdown: () => "Année",
+    labelPrevious: () => "Mois précédent",
+    labelNext: () => "Mois suivant",
+  } as const
+  const [startPickerOpen, setStartPickerOpen] = useState(false)
+  const [endPickerOpen, setEndPickerOpen] = useState(false)
   const renderCount = useRef(0);
   renderCount.current += 1;
   console.log('[PAGE/LEASES] Render #', renderCount.current);
@@ -60,6 +72,14 @@ export default function Leases() {
     status: "active",
     contract_type: "empty",
   })
+
+  // Fermer les calendriers lorsqu'on ferme la modale
+  useEffect(() => {
+    if (!isDialogOpen) {
+      setStartPickerOpen(false)
+      setEndPickerOpen(false)
+    }
+  }, [isDialogOpen])
 
   const { toast } = useToast()
   const { data: leases = [], isLoading, error } = useLeasesWithDetails()
@@ -520,95 +540,105 @@ export default function Leases() {
               {/* Tenant Selection */}
               <div className="space-y-2">
                 <Label htmlFor="tenant_id">Locataire principal *</Label>
-                <Select
-                  value={formData.tenant_id}
-                  onValueChange={(value) => setFormData({ ...formData, tenant_id: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un locataire" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {tenants.length === 0 ? (
-                      <div className="p-2 text-sm text-muted-foreground text-center">
-                        Aucun locataire invité. Allez dans Paramètres → Utilisateurs pour inviter des locataires.
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={formData.tenant_id}
+                    onValueChange={(value) => setFormData({ ...formData, tenant_id: value })}
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Sélectionner un locataire" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tenants.length === 0 ? (
+                        <div className="p-2 text-sm text-muted-foreground text-center">
+                          Aucun locataire invité. Utilisez le bouton + pour inviter.
+                        </div>
+                      ) : (
+                        tenants.map((tenant) => (
+                          <SelectItem key={tenant.user_id} value={tenant.user_id}>
+                            {tenant.first_name} {tenant.last_name} {tenant.email && `(${tenant.email})`}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                  <Dialog open={isInviteTenantDialogOpen} onOpenChange={setIsInviteTenantDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        aria-label="Inviter un locataire"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Inviter un nouveau locataire</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 pt-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="invite_tenant_email">Email *</Label>
+                          <Input
+                            id="invite_tenant_email"
+                            type="email"
+                            placeholder="locataire@example.com"
+                            value={inviteTenantEmail}
+                            onChange={(e) => setInviteTenantEmail(e.target.value)}
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="invite_tenant_first_name">Prénom</Label>
+                            <Input
+                              id="invite_tenant_first_name"
+                              placeholder="Jean"
+                              value={inviteTenantFirstName}
+                              onChange={(e) => setInviteTenantFirstName(e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="invite_tenant_last_name">Nom</Label>
+                            <Input
+                              id="invite_tenant_last_name"
+                              placeholder="Dupont"
+                              value={inviteTenantLastName}
+                              onChange={(e) => setInviteTenantLastName(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <Alert>
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription className="text-xs">
+                            Une invitation sera envoyée à cette adresse email. Le locataire pourra créer son compte et sera automatiquement lié à ce bail une fois l'invitation acceptée.
+                          </AlertDescription>
+                        </Alert>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            className="flex-1"
+                            onClick={handleInviteTenant}
+                          >
+                            Envoyer l'invitation
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsInviteTenantDialogOpen(false)}
+                          >
+                            Annuler
+                          </Button>
+                        </div>
                       </div>
-                    ) : (
-                      tenants.map((tenant) => (
-                        <SelectItem key={tenant.user_id} value={tenant.user_id}>
-                          {tenant.first_name} {tenant.last_name} {tenant.email && `(${tenant.email})`}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+                    </DialogContent>
+                  </Dialog>
+                </div>
 
-                {/* Invitation Dialog */}
-                <Dialog open={isInviteTenantDialogOpen} onOpenChange={setIsInviteTenantDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button type="button" variant="link" className="h-auto p-0 text-xs text-muted-foreground hover:text-primary">
-                      Aucun locataire ? Inviter un nouveau locataire
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Inviter un nouveau locataire</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4 pt-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="invite_tenant_email">Email *</Label>
-                        <Input
-                          id="invite_tenant_email"
-                          type="email"
-                          placeholder="locataire@example.com"
-                          value={inviteTenantEmail}
-                          onChange={(e) => setInviteTenantEmail(e.target.value)}
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="invite_tenant_first_name">Prénom</Label>
-                          <Input
-                            id="invite_tenant_first_name"
-                            placeholder="Jean"
-                            value={inviteTenantFirstName}
-                            onChange={(e) => setInviteTenantFirstName(e.target.value)}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="invite_tenant_last_name">Nom</Label>
-                          <Input
-                            id="invite_tenant_last_name"
-                            placeholder="Dupont"
-                            value={inviteTenantLastName}
-                            onChange={(e) => setInviteTenantLastName(e.target.value)}
-                          />
-                        </div>
-                      </div>
-                      <Alert>
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription className="text-xs">
-                          Une invitation sera envoyée à cette adresse email. Le locataire pourra créer son compte et sera automatiquement lié à ce bail une fois l'invitation acceptée.
-                        </AlertDescription>
-                      </Alert>
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          className="flex-1"
-                          onClick={handleInviteTenant}
-                        >
-                          Envoyer l'invitation
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setIsInviteTenantDialogOpen(false)}
-                        >
-                          Annuler
-                        </Button>
-                      </div>
-                    </div>
-                  </DialogContent>
-                </Dialog>
+                {/* Lien alternatif conservé si besoin */}
+                <Button type="button" variant="link" className="h-auto p-0 text-xs text-muted-foreground hover:text-primary" onClick={() => setIsInviteTenantDialogOpen(true)}>
+                  Aucun locataire ? Inviter un nouveau locataire
+                </Button>
 
                 {pendingInvitationId && (
                   <Alert className="mt-2">
@@ -694,23 +724,70 @@ export default function Leases() {
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="start_date">Date de début *</Label>
-                    <Input
-                      id="start_date"
-                      type="date"
-                      value={formData.start_date}
-                      onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                      required
-                    />
+                    <Label>Date de début *</Label>
+                    <Popover open={startPickerOpen} onOpenChange={setStartPickerOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start text-left font-normal">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {formData.start_date
+                            ? new Date(formData.start_date + "T00:00:00").toLocaleDateString("fr-FR")
+                            : "Choisir une date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="p-0 w-auto" align="start">
+                        <Calendar
+                          mode="single"
+                          locale={fr}
+                          selected={formData.start_date ? new Date(formData.start_date + "T00:00:00") : undefined}
+                          onSelect={(d) => {
+                            if (!d) return
+                            const iso = d.toISOString().slice(0, 10)
+                            setFormData({ ...formData, start_date: iso })
+                            setStartPickerOpen(false)
+                          }}
+                          captionLayout="dropdown-buttons"
+                          fromYear={currentYear - 50}
+                          toYear={currentYear + 10}
+                          labels={dayPickerLabels}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="end_date">Date de fin (optionnelle)</Label>
-                    <Input
-                      id="end_date"
-                      type="date"
-                      value={formData.end_date ?? ""}
-                      onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                    />
+                    <Label>Date de fin (optionnelle)</Label>
+                    <Popover open={endPickerOpen} onOpenChange={setEndPickerOpen}>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start text-left font-normal">
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {formData.end_date
+                            ? new Date(formData.end_date + "T00:00:00").toLocaleDateString("fr-FR")
+                            : "Choisir une date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="p-0 w-auto" align="start">
+                        <Calendar
+                          mode="single"
+                          locale={fr}
+                          selected={formData.end_date ? new Date(formData.end_date + "T00:00:00") : undefined}
+                          onSelect={(d) => {
+                            if (!d) {
+                              setFormData({ ...formData, end_date: "" })
+                              setEndPickerOpen(false)
+                              return
+                            }
+                            const iso = d.toISOString().slice(0, 10)
+                            setFormData({ ...formData, end_date: iso })
+                            setEndPickerOpen(false)
+                          }}
+                          captionLayout="dropdown-buttons"
+                          fromYear={currentYear - 50}
+                          toYear={currentYear + 10}
+                          labels={dayPickerLabels}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
                 <Alert>
@@ -729,8 +806,11 @@ export default function Leases() {
                     id="rent_amount"
                     type="number"
                     placeholder="800"
-                    value={formData.rent_amount}
-                    onChange={(e) => setFormData({ ...formData, rent_amount: Number(e.target.value) })}
+                    value={formData.rent_amount === 0 ? "" : formData.rent_amount}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      setFormData({ ...formData, rent_amount: v === "" ? 0 : Number(v) })
+                    }}
                     required
                   />
                 </div>
@@ -740,8 +820,11 @@ export default function Leases() {
                     id="charges_amount"
                     type="number"
                     placeholder="100"
-                    value={formData.charges_amount ?? ""}
-                    onChange={(e) => setFormData({ ...formData, charges_amount: Number(e.target.value) })}
+                    value={!formData.charges_amount ? "" : formData.charges_amount}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      setFormData({ ...formData, charges_amount: v === "" ? 0 : Number(v) })
+                    }}
                   />
                 </div>
                 <div className="space-y-2">
@@ -750,8 +833,11 @@ export default function Leases() {
                     id="deposit_amount"
                     type="number"
                     placeholder="800"
-                    value={formData.deposit_amount ?? ""}
-                    onChange={(e) => setFormData({ ...formData, deposit_amount: Number(e.target.value) })}
+                    value={!formData.deposit_amount ? "" : formData.deposit_amount}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      setFormData({ ...formData, deposit_amount: v === "" ? 0 : Number(v) })
+                    }}
                   />
                 </div>
               </div>
@@ -924,7 +1010,7 @@ export default function Leases() {
                     <TableCell>
                       <div className="text-sm">
                         <div className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
+                          <CalendarIcon className="w-3 h-3" />
                           {new Date(lease.start_date).toLocaleDateString()}
                         </div>
                         {lease.end_date && (
