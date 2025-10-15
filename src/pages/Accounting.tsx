@@ -25,10 +25,14 @@ import {
   type ExpenseInsert,
   type BankTransactionWithDetails,
   type BankTransactionInsert,
+  useUpdateRentInvoice,
 } from "@/hooks/useAccounting"
 import { usePropertiesWithUnits } from "@/hooks/useProperties"
 import { useQueryClient } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
+import { pdf } from '@react-pdf/renderer'
+import { ReceiptPDFTemplate } from "@/components/receipt-pdf-template-quittance"
+import BatchReceiptGenerator from "@/components/batch-receipt-generator"
 
 const EXPENSE_CATEGORIES = [
   { value: "MAINTENANCE", label: "Maintenance" },
@@ -103,6 +107,7 @@ export default function Accounting() {
   const createTransaction = useCreateBankTransaction()
   const updateTransaction = useUpdateBankTransaction()
   const deleteTransaction = useDeleteBankTransaction()
+  const updateRentInvoice = useUpdateRentInvoice()
 
   // Realtime refresh for rent invoices
   useEffect(() => {
@@ -408,6 +413,195 @@ export default function Accounting() {
     return map[key] || { label: status || '—', className: 'bg-gray-100 text-gray-800' }
   }
 
+  const getInvoiceStatusBadge = (status: string | null) => {
+    const key = (status || '').toLowerCase()
+    const map: Record<string, { label: string; className: string }> = {
+      pending: { label: 'En attente', className: 'bg-yellow-100 text-yellow-800' },
+      paid: { label: 'Payé', className: 'bg-green-100 text-green-800' },
+      late: { label: 'En retard', className: 'bg-red-100 text-red-800' },
+    }
+    return map[key] || { label: status || '—', className: 'bg-gray-100 text-gray-800' }
+  }
+
+  // Debuggable, reusable receipt download
+  const downloadInvoiceReceipt = async (inv: any) => {
+    try {
+      console.log('[RECEIPT-DL] START', { invoiceId: inv.id, pdf_url: inv.pdf_url })
+      let path: string | null = inv.pdf_url || null
+      if (!path || (!path.startsWith('QUITTANCES') && !path.startsWith('PRIVATE/'))) {
+        console.log('[RECEIPT-DL] Fallback to documents for lease', inv.lease_id)
+        const { data: docs } = await supabase
+          .from('documents')
+          .select('file_url')
+          .eq('lease_id', inv.lease_id)
+          .eq('type', 'receipt')
+          .order('created_at', { ascending: false })
+          .limit(1)
+        if (docs && docs.length > 0) path = docs[0].file_url as string
+        console.log('[RECEIPT-DL] Fallback path', path)
+      }
+      if (!path) throw new Error('Aucune quittance disponible')
+      let blob: Blob
+      if (path.startsWith('QUITTANCES') || path.startsWith('PRIVATE/')) {
+        const cleanPath = path.startsWith('PRIVATE/') ? path.slice('PRIVATE/'.length) : path
+        console.log('[RECEIPT-DL] Storage download', cleanPath)
+        const { data, error } = await supabase.storage.from('PRIVATE').download(cleanPath)
+        if (error || !data) throw error || new Error('Téléchargement Storage impossible')
+        blob = data as Blob
+      } else if (/^https?:\/\//i.test(path)) {
+        console.log('[RECEIPT-DL] HTTP fetch', path)
+        const resp = await fetch(path)
+        if (!resp.ok) throw new Error('HTTP ' + resp.status)
+        blob = await resp.blob()
+      } else {
+        console.warn('[RECEIPT-DL] Invalid path', path)
+        throw new Error('Chemin de quittance invalide')
+      }
+      const url = URL.createObjectURL(blob)
+      const displayMonth = inv.period_month.toString().padStart(2, '0')
+      const filename = `quittance_${inv.period_year}_${displayMonth}.pdf`
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      console.log('[RECEIPT-DL] DONE', filename)
+    } catch (e) {
+      console.error('[RECEIPT-DL] ERROR', e)
+      toast({ title: 'Erreur', description: 'Téléchargement impossible', variant: 'destructive' })
+    }
+  }
+
+  // Mark invoice as paid and generate a receipt PDF from template
+  const handleMarkInvoicePaid = async (invoiceId: string) => {
+    try {
+      const today = new Date().toISOString().slice(0, 10)
+      const target = rentInvoices.find(inv => inv.id === invoiceId)
+      // Build private storage path: PRIVATE/QUITTANCES/<profile_id>/quittance_YYYY_MM_lastname_<ts>.pdf
+      let storagePath = ''
+      let docName = 'Quittance'
+      let tenantLastName = 'locataire'
+      let ownerUserId: string | null = null
+
+      if (target) {
+        const displayMonth = target.period_month.toString().padStart(2, '0')
+        tenantLastName = (target.lease?.tenant?.last_name || 'locataire').replace(/\s+/g, '_').toLowerCase()
+
+        // Folder ownership must match auth.uid() due to RLS: use landlord's user_id
+        const { data: auth } = await supabase.auth.getUser()
+        ownerUserId = auth?.user?.id || null
+
+        const ts = Date.now()
+        const filename = `quittance_${target.period_year}_${displayMonth}_${tenantLastName}_${ts}.pdf`
+        const folder = ownerUserId ? `QUITTANCES/${ownerUserId}` : 'QUITTANCES'
+        storagePath = `${folder}/${filename}`
+        docName = `Quittance ${displayMonth}/${target.period_year} - ${target.lease?.tenant ? `${target.lease.tenant.first_name} ${target.lease.tenant.last_name}` : 'Locataire'}`
+      }
+
+      // Build data for receipt template
+      if (!target) throw new Error('Facture non trouvée')
+
+      // Fetch landlord profile (current user)
+      const { data: auth } = await supabase.auth.getUser()
+      if (!auth?.user) throw new Error('Utilisateur non connecté')
+      const { data: landlord } = await supabase
+        .from('profiles')
+        .select('first_name,last_name,adress,city,postal_code')
+        .eq('user_id', auth.user.id)
+        .maybeSingle()
+
+      // Fetch property address from unit
+      let propertyAddress = '-'
+      if (target.lease?.unit_id) {
+        const { data: unit } = await supabase
+          .from('units')
+          .select('unit_number, properties (address, city, postal_code, name)')
+          .eq('id', target.lease.unit_id)
+          .maybeSingle()
+        if (unit?.properties) {
+          const p: any = unit.properties
+          propertyAddress = [p.address, p.postal_code, p.city].filter(Boolean).join(' ')
+        }
+      }
+
+      // Tenant profile (address)
+      const { data: tenantProf } = await supabase
+        .from('profiles')
+        .select('first_name,last_name,adress,city,postal_code,id')
+        .eq('user_id', target.lease?.tenant_id || '')
+        .maybeSingle()
+
+      // Dates and period
+      const monthLabel = new Intl.DateTimeFormat('fr-FR', { month: 'long' }).format(new Date(target.period_year, target.period_month - 1, 1))
+      const periodStart = new Date(target.period_year, target.period_month - 1, 1)
+      const periodEnd = new Date(target.period_year, target.period_month, 0)
+
+      const landlordName = landlord ? `${landlord.first_name || ''} ${landlord.last_name || ''}`.trim() : '—'
+      const landlordAddr = landlord ? [landlord.adress, landlord.postal_code ? `${landlord.postal_code} ${landlord.city || ''}` : landlord.city].filter(Boolean).join(', ') : '—'
+      const tenantName = tenantProf ? `${tenantProf.first_name || ''} ${tenantProf.last_name || ''}`.trim() : '—'
+      const tenantAddr = tenantProf ? [tenantProf.adress, tenantProf.postal_code ? `${tenantProf.postal_code} ${tenantProf.city || ''}` : tenantProf.city].filter(Boolean).join(', ') : '—'
+
+      const receiptData = {
+        month: monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1),
+        year: String(target.period_year),
+        landlordName,
+        landlordAddress: landlordAddr,
+        tenantName,
+        tenantAddress: tenantAddr,
+        propertyAddress,
+        unitNumber: target.lease?.unit?.unit_number || '-',
+        rentAmount: target.rent_amount,
+        chargesAmount: target.charges_amount || 0,
+        totalAmount: target.total_amount,
+        issueDate: new Date().toLocaleDateString('fr-FR'),
+        periodStart: periodStart.toLocaleDateString('fr-FR'),
+        periodEnd: periodEnd.toLocaleDateString('fr-FR'),
+      }
+
+      const pdfDoc = <ReceiptPDFTemplate data={receiptData} />
+      const blob = await pdf(pdfDoc).toBlob()
+
+      // Upload to PRIVATE bucket
+      if (storagePath) {
+        const { error: uploadError } = await supabase.storage.from('PRIVATE').upload(storagePath, blob, {
+          contentType: 'application/pdf',
+          upsert: true,
+        })
+        if (uploadError) {
+          toast({ title: 'Erreur', description: `Upload quittance: ${uploadError.message}`, variant: 'destructive' })
+          return
+        }
+      }
+
+      await updateRentInvoice.mutateAsync({
+        id: invoiceId,
+        status: 'paid',
+        paid_date: today,
+        pdf_url: storagePath || null,
+      } as any)
+
+      // Create a document entry linked to the lease
+      if (target) {
+        const tenantName = target.lease?.tenant ? `${target.lease.tenant.first_name} ${target.lease.tenant.last_name}` : 'Locataire'
+        await supabase
+          .from('documents')
+          .insert({
+            name: docName,
+            type: 'receipt',
+            category: 'rent',
+            file_url: storagePath || '',
+            lease_id: target.lease_id,
+            mime_type: 'application/pdf',
+          })
+      }
+      toast({ title: 'Succès', description: 'Facture marquée comme payée et quittance générée.' })
+    } catch (error) {
+      toast({ title: 'Erreur', description: error instanceof Error ? error.message : 'Impossible de marquer payé', variant: 'destructive' })
+    }
+  }
+
   if (expensesLoading || invoicesLoading || transactionsLoading) {
     return (
       <div className="space-y-6">
@@ -491,7 +685,7 @@ export default function Accounting() {
       <Tabs defaultValue="expenses" className="space-y-4">
         <TabsList>
           <TabsTrigger value="expenses">Dépenses ({expenses.length})</TabsTrigger>
-          
+          <TabsTrigger value="loyers">Loyers ({rentInvoices.length})</TabsTrigger>
           <TabsTrigger value="transactions">Transactions bancaires ({transactions.length})</TabsTrigger>
         </TabsList>
 
@@ -681,6 +875,7 @@ export default function Accounting() {
                     <TableHead>Propriété</TableHead>
                     <TableHead>Montant</TableHead>
                     <TableHead>Statut</TableHead>
+                    <TableHead>Actions</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -705,6 +900,7 @@ export default function Accounting() {
                         <TableCell>
                           <Badge variant="outline">{expense.category || "Autre"}</Badge>
                         </TableCell>
+
                         <TableCell>
                           {expense.property ? (
                             <div className="text-sm">
@@ -843,9 +1039,28 @@ export default function Accounting() {
             </DialogContent>
           </Dialog>
 
+
+        </TabsContent>
+
+        {/* LOYERS TAB */}
+        <TabsContent value="loyers" className="space-y-4">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex items-center justify-between">
               <CardTitle>Factures de loyer</CardTitle>
+              {/* Bouton debug: tente un téléchargement sur la première facture payée */}
+              {rentInvoices.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const inv = rentInvoices.find(i => !!i.pdf_url) || rentInvoices[0]
+                    console.log('[RECEIPT-DL] DEBUG button clicked', inv?.id)
+                    if (inv) downloadInvoiceReceipt(inv)
+                  }}
+                >
+                  Test téléchargement (debug)
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="p-0">
               <Table>
@@ -859,12 +1074,13 @@ export default function Accounting() {
                     <TableHead>Total</TableHead>
                     <TableHead>Date d'échéance</TableHead>
                     <TableHead>Statut</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {rentInvoices.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8">
+                      <TableCell colSpan={9} className="text-center py-8">
                         <div className="text-center">
                           <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                           <h3 className="text-lg font-semibold mb-2">Aucune facture</h3>
@@ -899,10 +1115,29 @@ export default function Accounting() {
                         <TableCell className="font-medium">{formatCurrency(invoice.total_amount)}</TableCell>
                         <TableCell>{formatDate(invoice.due_date)}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={getStatusBadge(invoice.status).className}>
-                            {getStatusBadge(invoice.status).label}
+                          <Badge variant="outline" className={getInvoiceStatusBadge(invoice.status).className}>
+                            {getInvoiceStatusBadge(invoice.status).label}
                           </Badge>
                         </TableCell>
+                        <TableCell className="pointer-events-auto">
+                          {invoice.status !== 'paid' ? (
+                            <Button size="sm" onClick={() => handleMarkInvoicePaid(invoice.id)} disabled={updateRentInvoice.isPending}>
+                              Marquer payé
+                            </Button>
+                          ) : invoice.pdf_url ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={(e) => { e.stopPropagation(); downloadInvoiceReceipt(invoice) }}
+                            >
+                              Télécharger une quittance
+                            </Button>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">Quittance à générer</span>
+                          )}
+                        </TableCell>
+
                       </TableRow>
                     ))
                   )}
@@ -910,6 +1145,8 @@ export default function Accounting() {
               </Table>
             </CardContent>
           </Card>
+
+          <BatchReceiptGenerator />
         </TabsContent>
 
         {/* TRANSACTIONS TAB */}
@@ -1031,9 +1268,11 @@ export default function Accounting() {
                           {formatCurrency(transaction.amount)}
                         </TableCell>
                         <TableCell>
-                          {(() => { const b = getTransactionStatusBadge(transaction.status); return (
-                            <Badge variant="outline" className={b.className}>{b.label}</Badge>
-                          )})()}
+                          {(() => {
+                            const b = getTransactionStatusBadge(transaction.status); return (
+                              <Badge variant="outline" className={b.className}>{b.label}</Badge>
+                            )
+                          })()}
                         </TableCell>
                         <TableCell>
                           {transaction.matched_expense ? (

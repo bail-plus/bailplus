@@ -131,7 +131,7 @@ export default function Documents() {
                 entity_id
               )
             ),
-            contacts!inner (
+            profiles!leases_tenant_id_fkey!inner (
               first_name,
               last_name
             )
@@ -155,7 +155,7 @@ export default function Documents() {
       // 4. Transformer les quittances en format Document
       const transformedReceipts = filteredReceipts.map(receipt => ({
         id: receipt.id,
-        name: `Quittance ${receipt.period_month}/${receipt.period_year} - ${receipt.leases.contacts.first_name} ${receipt.leases.contacts.last_name}`,
+        name: `Quittance ${receipt.period_month}/${receipt.period_year} - ${receipt.leases.profiles.first_name} ${receipt.leases.profiles.last_name}`,
         type: 'RECEIPT',
         category: 'Quittances',
         file_size: null,
@@ -192,9 +192,10 @@ export default function Documents() {
       // Check if it's a document stored in PRIVATE bucket (RECEIPT, LEASE, EDL, LETTER)
       if (document.type === 'RECEIPT' || document.type === 'LEASE' || document.type === 'EDL' || document.type === 'LETTER') {
         // Get signed URL for private file
+        const path = document.file_url.startsWith('PRIVATE/') ? document.file_url.slice('PRIVATE/'.length) : document.file_url
         const { data, error } = await supabase.storage
           .from('PRIVATE')
-          .createSignedUrl(document.file_url, 3600) // Valid for 1 hour
+          .createSignedUrl(path, 3600) // Valid for 1 hour
 
         if (error) throw error
         return data?.signedUrl || null

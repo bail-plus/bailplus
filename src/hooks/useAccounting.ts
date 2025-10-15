@@ -243,9 +243,10 @@ async function fetchRentInvoices(entityId?: string | null, showAll?: boolean): P
               name
             )
           ),
-          contacts (
+          profiles!leases_tenant_id_fkey (
             first_name,
-            last_name
+            last_name,
+            email
           )
         `)
         .eq('id', invoice.lease_id)
@@ -262,9 +263,10 @@ async function fetchRentInvoices(entityId?: string | null, showAll?: boolean): P
               name: ((lease.units as any).properties as any).name
             } : null
           } : null,
-          tenant: lease?.contacts ? {
-            first_name: (lease.contacts as any).first_name,
-            last_name: (lease.contacts as any).last_name
+          tenant: (lease as any)?.profiles ? {
+            first_name: (lease as any).profiles.first_name,
+            last_name: (lease as any).profiles.last_name,
+            email: (lease as any).profiles.email,
           } : null
         } as any,
       };
@@ -272,6 +274,18 @@ async function fetchRentInvoices(entityId?: string | null, showAll?: boolean): P
   );
 
   return enrichedInvoices;
+}
+
+async function updateRentInvoice({ id, ...updates }: RentInvoiceUpdate & { id: string }): Promise<RentInvoice> {
+  const { data, error } = await supabase
+    .from('rent_invoices')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data;
 }
 
 /* =======================
@@ -420,6 +434,17 @@ export function useRentInvoices() {
     queryKey: ['rent-invoices', selectedEntity?.id, showAll],
     queryFn: () => fetchRentInvoices(selectedEntity?.id, showAll),
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useUpdateRentInvoice() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: updateRentInvoice,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rent-invoices'] });
+    },
   });
 }
 

@@ -99,7 +99,7 @@ serve(async (req) => {
         status,
         start_date,
         end_date,
-        tenant:contacts!leases_tenant_id_fkey (
+        tenant:profiles!leases_tenant_id_fkey (
           id,
           first_name,
           last_name,
@@ -165,7 +165,7 @@ serve(async (req) => {
       }
 
       // Prepare invoice data
-      const totalAmount = lease.rent_amount + lease.charges_amount;
+      const totalAmount = lease.rent_amount + (lease.charges_amount || 0);
 
       invoicesToCreate.push({
         lease_id: lease.id,
@@ -173,7 +173,7 @@ serve(async (req) => {
         period_month: currentMonth,
         period_year: currentYear,
         rent_amount: lease.rent_amount,
-        charges_amount: lease.charges_amount,
+        charges_amount: lease.charges_amount ?? 0,
         total_amount: totalAmount,
         due_date: dueDateStr,
         status: 'pending',
