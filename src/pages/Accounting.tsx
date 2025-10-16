@@ -1045,22 +1045,8 @@ export default function Accounting() {
         {/* LOYERS TAB */}
         <TabsContent value="loyers" className="space-y-4">
           <Card>
-            <CardHeader className="flex items-center justify-between">
+            <CardHeader>
               <CardTitle>Factures de loyer</CardTitle>
-              {/* Bouton debug: tente un téléchargement sur la première facture payée */}
-              {rentInvoices.length > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const inv = rentInvoices.find(i => !!i.pdf_url) || rentInvoices[0]
-                    console.log('[RECEIPT-DL] DEBUG button clicked', inv?.id)
-                    if (inv) downloadInvoiceReceipt(inv)
-                  }}
-                >
-                  Test téléchargement (debug)
-                </Button>
-              )}
             </CardHeader>
             <CardContent className="p-0">
               <Table>
