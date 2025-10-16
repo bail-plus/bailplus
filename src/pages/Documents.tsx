@@ -26,12 +26,13 @@ interface Document {
 
 const DOCUMENT_CATEGORIES = [
   { value: "all", label: "Tous les documents" },
-  { value: "Contrats", label: "Contrats" },
-  { value: "Quittances", label: "Quittances" },
-  { value: "États des lieux", label: "États des lieux" },
-  { value: "KYC", label: "Documents locataires" },
-  { value: "Factures", label: "Factures" },
-  { value: "Lettres", label: "Lettres types" }
+  { value: "rent", label: "Quittances" },
+  { value: "lease", label: "Contrats" },
+  { value: "edl", label: "États des lieux" },
+  { value: "kyc", label: "Documents locataires" },
+  { value: "invoice", label: "Factures" },
+  { value: "letter", label: "Lettres types" },
+  { value: "other", label: "Autres" }
 ]
 
 export default function Documents() {
@@ -106,68 +107,7 @@ export default function Documents() {
         }) || []
       }
 
-      // 2. Charger les quittances depuis rent_invoices FILTRÉES PAR USER
-      const { data: receiptsData, error: receiptsError } = await supabase
-        .from('rent_invoices')
-        .select(`
-          id,
-          created_at,
-          period_month,
-          period_year,
-          total_amount,
-          pdf_url,
-          lease_id,
-          user_id,
-          leases!inner (
-            id,
-            unit_id,
-            tenant_id,
-            units!inner (
-              unit_number,
-              property_id,
-              properties!inner (
-                id,
-                name,
-                entity_id
-              )
-            ),
-            profiles!leases_tenant_id_fkey!inner (
-              first_name,
-              last_name
-            )
-          )
-        `)
-        .eq('user_id', user.id)  // ← FILTRAGE PAR USER
-        .not('pdf_url', 'is', null)
-        .order('created_at', { ascending: false })
-
-      if (receiptsError) throw receiptsError
-
-      // 3. Filtrer les quittances par entité si nécessaire
-      let filteredReceipts = receiptsData || []
-      if (!showAll && selectedEntity) {
-        filteredReceipts = receiptsData?.filter(receipt => {
-          const entityId = receipt.leases?.units?.properties?.entity_id
-          return entityId === selectedEntity.id
-        }) || []
-      }
-
-      // 4. Transformer les quittances en format Document
-      const transformedReceipts = filteredReceipts.map(receipt => ({
-        id: receipt.id,
-        name: `Quittance ${receipt.period_month}/${receipt.period_year} - ${receipt.leases.profiles.first_name} ${receipt.leases.profiles.last_name}`,
-        type: 'RECEIPT',
-        category: 'Quittances',
-        file_size: null,
-        created_at: receipt.created_at,
-        file_url: receipt.pdf_url || ''
-      }))
-
-      // 5. Combiner tous les documents (utiliser filteredDocs au lieu de docsData)
-      const allDocuments = [...filteredDocs, ...transformedReceipts]
-      allDocuments.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-
-      setDocuments(allDocuments)
+      setDocuments(filteredDocs)
     } catch (error) {
       console.error('❌ Erreur chargement documents:', error)
     } finally {
@@ -189,15 +129,24 @@ export default function Documents() {
     if (!document.file_url) return null
 
     try {
+      const docType = document.type.toUpperCase()
       // Check if it's a document stored in PRIVATE bucket (RECEIPT, LEASE, EDL, LETTER)
-      if (document.type === 'RECEIPT' || document.type === 'LEASE' || document.type === 'EDL' || document.type === 'LETTER') {
+      if (docType === 'RECEIPT' || docType === 'LEASE' || docType === 'EDL' || docType === 'LETTER') {
         // Get signed URL for private file
-        const path = document.file_url.startsWith('PRIVATE/') ? document.file_url.slice('PRIVATE/'.length) : document.file_url
+        const path = document.file_url.startsWith('PRIVATE/')
+          ? document.file_url.slice('PRIVATE/'.length)
+          : document.file_url.startsWith('QUITTANCES/') || document.file_url.startsWith('LEASES/') || document.file_url.startsWith('EDL/') || document.file_url.startsWith('LETTERS/')
+            ? document.file_url
+            : document.file_url
+
         const { data, error } = await supabase.storage
           .from('PRIVATE')
           .createSignedUrl(path, 3600) // Valid for 1 hour
 
-        if (error) throw error
+        if (error) {
+          console.error('Error creating signed URL:', error)
+          throw error
+        }
         return data?.signedUrl || null
       } else {
         // For other documents, use the file_url directly
@@ -267,14 +216,29 @@ export default function Documents() {
   }
 
   const getDocumentBadge = (type: string) => {
+    const typeUpper = type.toUpperCase()
     const types = {
       LEASE: { label: "Bail", variant: "default" as const },
       RECEIPT: { label: "Quittance", variant: "secondary" as const },
-      EDL: { label: "EDL", variant: "outline" as const },
+      EDL: { label: "État des lieux", variant: "outline" as const },
       LETTER: { label: "Lettre", variant: "secondary" as const },
       OTHER: { label: "Autre", variant: "secondary" as const }
     }
-    return types[type as keyof typeof types] || { label: type, variant: "secondary" as const }
+    return types[typeUpper as keyof typeof types] || { label: "Autre", variant: "secondary" as const }
+  }
+
+  const getCategoryLabel = (category: string | null) => {
+    if (!category) return 'Autre'
+    const categoryMap: Record<string, string> = {
+      rent: 'Quittances',
+      lease: 'Contrats',
+      edl: 'États des lieux',
+      kyc: 'Documents locataires',
+      invoice: 'Factures',
+      letter: 'Lettres types',
+      other: 'Autres'
+    }
+    return categoryMap[category.toLowerCase()] || category
   }
 
   const formatDate = (dateString: string) => {
@@ -285,13 +249,6 @@ export default function Documents() {
       hour: '2-digit',
       minute: '2-digit'
     })
-  }
-
-  const formatFileSize = (size: number | null) => {
-    if (!size) return 'N/A'
-    if (size < 1024) return `${size} B`
-    if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`
-    return `${Math.round(size / (1024 * 1024))} MB`
   }
 
   // Calculate stats
@@ -446,29 +403,29 @@ export default function Documents() {
               <File className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm font-medium">Quittances</span>
             </div>
-            <div className="text-2xl font-bold">{documentsByCategory.Quittances || 0}</div>
+            <div className="text-2xl font-bold">{documentsByCategory.rent || 0}</div>
             <p className="text-xs text-muted-foreground mt-1">générées</p>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-2">
               <Folder className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm font-medium">États des lieux</span>
             </div>
-            <div className="text-2xl font-bold">{documentsByCategory["États des lieux"] || 0}</div>
+            <div className="text-2xl font-bold">{documentsByCategory.edl || 0}</div>
             <p className="text-xs text-muted-foreground mt-1">en stock</p>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm font-medium">Contrats</span>
             </div>
-            <div className="text-2xl font-bold">{documentsByCategory.Contrats || 0}</div>
+            <div className="text-2xl font-bold">{documentsByCategory.lease || 0}</div>
             <p className="text-xs text-muted-foreground mt-1">actifs</p>
           </CardContent>
         </Card>
@@ -551,7 +508,6 @@ export default function Documents() {
                 <TableHead>Document</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Catégorie</TableHead>
-                <TableHead>Taille</TableHead>
                 <TableHead>Créé le</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
@@ -559,7 +515,7 @@ export default function Documents() {
             <TableBody>
               {filteredDocuments.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                     <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
                     Aucun document trouvé
                   </TableCell>
@@ -592,15 +548,11 @@ export default function Documents() {
                           {badgeConfig.label}
                         </Badge>
                       </TableCell>
-                      
+
                       <TableCell>
-                        <span className="text-sm">{document.category || 'N/A'}</span>
+                        <span className="text-sm">{getCategoryLabel(document.category)}</span>
                       </TableCell>
-                      
-                      <TableCell>
-                        <span className="text-sm text-muted-foreground">{formatFileSize(document.file_size)}</span>
-                      </TableCell>
-                      
+
                       <TableCell>
                         <span className="text-sm text-muted-foreground">{formatDate(document.created_at)}</span>
                       </TableCell>
@@ -662,10 +614,7 @@ export default function Documents() {
                   </Badge>
                 </div>
                 <div>
-                  <span className="font-medium">Catégorie:</span> {selectedDocument.category}
-                </div>
-                <div>
-                  <span className="font-medium">Taille:</span> {formatFileSize(selectedDocument.file_size)}
+                  <span className="font-medium">Catégorie:</span> {getCategoryLabel(selectedDocument.category)}
                 </div>
                 <div>
                   <span className="font-medium">Créé le:</span> {formatDate(selectedDocument.created_at)}
