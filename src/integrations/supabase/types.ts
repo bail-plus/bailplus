@@ -1478,6 +1478,44 @@ export type Database = {
           },
         ]
       }
+      tri_simulations: {
+        Row: {
+          created_at: string
+          entity_id: string | null
+          id: string
+          name: string
+          simulation_data: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          entity_id?: string | null
+          id?: string
+          name: string
+          simulation_data: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string | null
+          id?: string
+          name?: string
+          simulation_data?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tri_simulations_entity_id_fkey"
+            columns: ["entity_id"]
+            isOneToOne: false
+            referencedRelation: "entities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       units: {
         Row: {
           created_at: string
