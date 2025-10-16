@@ -46,7 +46,7 @@ const allItems: NavigationItem[] = [
   { title: "Mon Profil", url: "/app/provider-profile", icon: User, roles: ['SERVICE_PROVIDER'] },
   { title: "Parc", url: "/app/properties", icon: Building2, roles: ['LANDLORD'] },
   { title: "Baux", url: "/app/leases", icon: UserCheck, roles: ['LANDLORD'] },
-  { title: "Personnes", url: "/app/people", icon: Users, roles: ['LANDLORD'] },
+  { title: "Garant", url: "/app/people", icon: Users, roles: ['LANDLORD'] },
   { title: "Prestataires", url: "/app/providers", icon: Wrench, roles: ['LANDLORD'] },
   { title: "Maintenance", url: "/app/maintenance", icon: Wrench, roles: ['LANDLORD', 'TENANT', 'SERVICE_PROVIDER'] },
   { title: "Comptabilité", url: "/app/accounting", icon: Calculator, roles: ['LANDLORD'] },
