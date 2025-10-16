@@ -1,7 +1,8 @@
 import React, { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Save, FileDown, RotateCcw, Info, TrendingUp, TrendingDown } from "lucide-react";
+import { Save, FileDown, RotateCcw, Info, TrendingUp, TrendingDown, FolderOpen, Trash2, Upload } from "lucide-react";
+import { pdf } from '@react-pdf/renderer';
 import { 
   LineChart, 
   Line, 
@@ -22,24 +23,42 @@ import { Switch } from "@/components/ui/switch";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tooltip as TooltipComponent, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
-import { 
-  TriFormData, 
-  triFormSchema, 
+import {
+  TriFormData,
+  triFormSchema,
   defaultTriInputs,
   fiscalRegimeOptions,
   deferredTypeOptions,
-  frequencyOptions 
+  frequencyOptions
 } from "@/lib/tri-schemas";
 import { computeTri, TriResult } from "@/lib/tri-calculator";
 import { formatCurrency, formatPercentage, formatDuration, formatCompactCurrency } from "@/lib/format";
+import {
+  useCreateTRISimulation,
+  useUpdateTRISimulation,
+  useTRISimulations,
+  useDeleteTRISimulation
+} from "@/hooks/useTRISimulations";
+import { TRIPDFTemplate } from "@/components/tri-pdf-template";
 
 export default function TRISimulator() {
   const { toast } = useToast();
-  const [isCalculating, setIsCalculating] = useState(false);
+  const createSimulation = useCreateTRISimulation();
+  const updateSimulation = useUpdateTRISimulation();
+  const { data: simulations = [], isLoading: isLoadingSimulations } = useTRISimulations();
+  const deleteSimulation = useDeleteTRISimulation();
+
+  // State pour la gestion des simulations
+  const [currentSimulationId, setCurrentSimulationId] = useState<string | null>(null);
+  const [currentSimulationName, setCurrentSimulationName] = useState<string>("");
+  const [isSaveDialogOpen, setIsSaveDialogOpen] = useState(false);
+  const [saveSimulationName, setSaveSimulationName] = useState("");
+  const [deleteDialogSimId, setDeleteDialogSimId] = useState<string | null>(null);
 
   const form = useForm<TriFormData>({
     resolver: zodResolver(triFormSchema),
@@ -52,8 +71,6 @@ export default function TRISimulator() {
   // Calcul en temps réel des résultats
   const results = useMemo<TriResult | null>(() => {
     try {
-      setIsCalculating(true);
-      
       // Petite validation rapide avant calcul
       if (watchedValues.acquisitionPrice <= 0 || watchedValues.holdingPeriodYears <= 0) {
         return null;
@@ -61,8 +78,8 @@ export default function TRISimulator() {
 
       const triInputs = {
         ...watchedValues,
-        loanAmount: watchedValues.loanAmount || 
-          (watchedValues.acquisitionPrice + watchedValues.furniturePrice + watchedValues.notaryFees + 
+        loanAmount: watchedValues.loanAmount ||
+          (watchedValues.acquisitionPrice + watchedValues.furniturePrice + watchedValues.notaryFees +
            watchedValues.agencyFees + watchedValues.worksCost - watchedValues.downPayment)
       };
 
@@ -71,8 +88,6 @@ export default function TRISimulator() {
     } catch (error) {
       console.error('Erreur de calcul TRI:', error);
       return null;
-    } finally {
-      setIsCalculating(false);
     }
   }, [watchedValues]);
 
@@ -95,26 +110,57 @@ export default function TRISimulator() {
     return data;
   }, [results]);
 
-  const handleSaveSimulation = () => {
-    const simulation = {
-      id: Date.now().toString(),
-      name: `Simulation du ${new Date().toLocaleDateString('fr-FR')}`,
-      data: watchedValues,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
+  // Ouvrir la dialog de sauvegarde
+  const handleOpenSaveDialog = () => {
+    setSaveSimulationName(currentSimulationName || `Simulation du ${new Date().toLocaleDateString('fr-FR')}`);
+    setIsSaveDialogOpen(true);
+  };
+
+  // Sauvegarder ou mettre à jour une simulation
+  const handleSaveSimulation = async () => {
+    if (!saveSimulationName.trim()) {
+      toast({
+        title: "Nom requis",
+        description: "Veuillez saisir un nom pour la simulation.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     try {
-      const saved = localStorage.getItem('tri-simulations');
-      const simulations = saved ? JSON.parse(saved) : [];
-      simulations.push(simulation);
-      localStorage.setItem('tri-simulations', JSON.stringify(simulations));
-      
-      toast({
-        title: "Simulation sauvegardée",
-        description: "La simulation a été enregistrée localement."
-      });
+      if (currentSimulationId) {
+        // UPDATE si simulation existante
+        await updateSimulation.mutateAsync({
+          id: currentSimulationId,
+          name: saveSimulationName,
+          simulation_data: watchedValues
+        });
+
+        setCurrentSimulationName(saveSimulationName);
+
+        toast({
+          title: "Simulation mise à jour",
+          description: "Les modifications ont été enregistrées."
+        });
+      } else {
+        // CREATE nouvelle simulation
+        const newSim = await createSimulation.mutateAsync({
+          name: saveSimulationName,
+          simulation_data: watchedValues
+        });
+
+        setCurrentSimulationId(newSim.id);
+        setCurrentSimulationName(saveSimulationName);
+
+        toast({
+          title: "Simulation sauvegardée",
+          description: "La simulation a été créée avec succès."
+        });
+      }
+
+      setIsSaveDialogOpen(false);
     } catch (error) {
+      console.error('Error saving simulation:', error);
       toast({
         title: "Erreur de sauvegarde",
         description: "Impossible d'enregistrer la simulation.",
@@ -123,20 +169,107 @@ export default function TRISimulator() {
     }
   };
 
-  const handleExportPDF = () => {
+  // Charger une simulation
+  const handleLoadSimulation = (simulation: typeof simulations[0]) => {
+    form.reset(simulation.simulation_data as TriFormData);
+    setCurrentSimulationId(simulation.id);
+    setCurrentSimulationName(simulation.name);
+
     toast({
-      title: "Export en cours",
-      description: "L'export PDF sera bientôt disponible."
+      title: "Simulation chargée",
+      description: `"${simulation.name}" a été chargée.`
     });
   };
 
-  const handleReset = () => {
+  // Supprimer une simulation
+  const handleDeleteSimulation = async (id: string) => {
+    try {
+      await deleteSimulation.mutateAsync(id);
+
+      if (currentSimulationId === id) {
+        setCurrentSimulationId(null);
+        setCurrentSimulationName("");
+      }
+
+      toast({
+        title: "Simulation supprimée",
+        description: "La simulation a été supprimée."
+      });
+
+      setDeleteDialogSimId(null);
+    } catch (error) {
+      console.error('Error deleting simulation:', error);
+      toast({
+        title: "Erreur de suppression",
+        description: "Impossible de supprimer la simulation.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Nouvelle simulation
+  const handleNewSimulation = () => {
     form.reset(defaultTriInputs);
+    setCurrentSimulationId(null);
+    setCurrentSimulationName("");
+
     toast({
-      title: "Simulation réinitialisée",
-      description: "Les valeurs par défaut ont été restaurées."
+      title: "Nouvelle simulation",
+      description: "Les champs ont été réinitialisés."
     });
   };
+
+  const handleExportPDF = async () => {
+    if (!results) {
+      toast({
+        title: "Aucun résultat",
+        description: "Veuillez d'abord effectuer une simulation.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      toast({
+        title: "Génération en cours",
+        description: "Veuillez patienter..."
+      });
+
+      const pdfData = {
+        simulationName: currentSimulationName || "Simulation TRI",
+        generatedAt: new Date().toLocaleDateString('fr-FR', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+        inputs: watchedValues,
+        results: results
+      };
+
+      const blob = await pdf(<TRIPDFTemplate data={pdfData} />).toBlob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `TRI_${currentSimulationName || 'Simulation'}_${new Date().toISOString().split('T')[0]}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "PDF généré",
+        description: "Le fichier a été téléchargé avec succès."
+      });
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast({
+        title: "Erreur d'export",
+        description: "Impossible de générer le PDF.",
+        variant: "destructive"
+      });
+    }
+  };
+
 
   const getTRIBadgeVariant = (tri: number, discountRate: number) => {
     if (isNaN(tri)) return "outline";
@@ -157,17 +290,21 @@ export default function TRISimulator() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">TRI - Simulateur d'Investissement</h1>
           <p className="text-muted-foreground mt-1">
-            Calculez le taux de rendement interne et la rentabilité de votre projet immobilier
+            {currentSimulationName ? (
+              <>Simulation : <span className="font-semibold">{currentSimulationName}</span></>
+            ) : (
+              "Calculez le taux de rendement interne et la rentabilité de votre projet immobilier"
+            )}
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleReset}>
+          <Button variant="outline" size="sm" onClick={handleNewSimulation}>
             <RotateCcw className="w-4 h-4 mr-2" />
-            Réinitialiser
+            Nouvelle
           </Button>
-          <Button variant="outline" size="sm" onClick={handleSaveSimulation}>
+          <Button variant="outline" size="sm" onClick={handleOpenSaveDialog}>
             <Save className="w-4 h-4 mr-2" />
-            Sauvegarder
+            {currentSimulationId ? "Mettre à jour" : "Sauvegarder"}
           </Button>
           <Button size="sm" onClick={handleExportPDF}>
             <FileDown className="w-4 h-4 mr-2" />
@@ -176,22 +313,62 @@ export default function TRISimulator() {
         </div>
       </div>
 
+      {/* Liste des simulations sauvegardées */}
+      {simulations.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FolderOpen className="w-5 h-5" />
+              Simulations sauvegardées ({simulations.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {simulations.map((sim) => (
+                <div
+                  key={sim.id}
+                  className={`flex items-center justify-between p-3 rounded-lg border transition-colors ${
+                    currentSimulationId === sim.id
+                      ? 'bg-primary/10 border-primary'
+                      : 'hover:bg-muted/50'
+                  }`}
+                >
+                  <div className="flex-1">
+                    <p className="font-medium">{sim.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Créée le {new Date(sim.created_at).toLocaleDateString('fr-FR')}
+                      {sim.updated_at !== sim.created_at && (
+                        <> · Modifiée le {new Date(sim.updated_at).toLocaleDateString('fr-FR')}</>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleLoadSimulation(sim)}
+                      disabled={currentSimulationId === sim.id}
+                    >
+                      <Upload className="w-4 h-4 mr-1" />
+                      Charger
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setDeleteDialogSimId(sim.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Bannière des résultats */}
-      {isCalculating ? (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i}>
-              <CardHeader className="pb-3">
-                <Skeleton className="h-4 w-24" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-16 mb-2" />
-                <Skeleton className="h-3 w-20" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : results ? (
+      {results ? (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -999,10 +1176,75 @@ export default function TRISimulator() {
       <div className="text-center text-xs text-muted-foreground border-t pt-4">
         <p>
           <strong>Simulation indicative – non constitutive d'un conseil fiscal.</strong><br />
-          Les calculs sont basés sur les données saisies et les hypothèses retenues. 
+          Les calculs sont basés sur les données saisies et les hypothèses retenues.
           Consultez un conseiller fiscal pour votre situation personnelle.
         </p>
       </div>
+
+      {/* Dialog de sauvegarde */}
+      <Dialog open={isSaveDialogOpen} onOpenChange={setIsSaveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {currentSimulationId ? "Mettre à jour la simulation" : "Sauvegarder la simulation"}
+            </DialogTitle>
+            <DialogDescription>
+              {currentSimulationId
+                ? "Donnez un nouveau nom ou gardez le même pour mettre à jour cette simulation."
+                : "Donnez un nom à votre simulation pour pouvoir la retrouver facilement."
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="simulation-name">Nom de la simulation</Label>
+              <Input
+                id="simulation-name"
+                value={saveSimulationName}
+                onChange={(e) => setSaveSimulationName(e.target.value)}
+                placeholder="Ex: Appartement Paris 15ème"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSaveSimulation();
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSaveDialogOpen(false)}>
+              Annuler
+            </Button>
+            <Button onClick={handleSaveSimulation} disabled={!saveSimulationName.trim()}>
+              <Save className="w-4 h-4 mr-2" />
+              {currentSimulationId ? "Mettre à jour" : "Sauvegarder"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* AlertDialog de confirmation de suppression */}
+      <AlertDialog open={!!deleteDialogSimId} onOpenChange={() => setDeleteDialogSimId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer la simulation</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer cette simulation ? Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteDialogSimId && handleDeleteSimulation(deleteDialogSimId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
