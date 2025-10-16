@@ -277,6 +277,15 @@ export default function Maintenance() {
   console.log('[MAINTENANCE] Service Providers:', serviceProviders)
   console.log('[MAINTENANCE] Tickets:', tickets)
 
+  // Keep selectedTicket in sync with latest fetched data (e.g., after creating a work order)
+  useEffect(() => {
+    if (!selectedTicket) return
+    const updated = tickets.find(t => t.id === selectedTicket.id)
+    if (updated) {
+      setSelectedTicket(updated)
+    }
+  }, [tickets])
+
   // Open ticket dialog directly via URL param ?openTicket=<id>&openTab=messages|summary|provider|workorders
   useEffect(() => {
     const openId = searchParams.get('openTicket')
@@ -877,13 +886,13 @@ export default function Maintenance() {
                   </div>
                 </div>
 
-                {/* Tenant Selection */}
+                {/* Tenant Selection (stores tenant_user_id on form data; optional) */}
                 {ticketFormData.unit_id && ticketFormData.unit_id !== "none" && availableTenants.length > 0 && (
                   <div className="space-y-2">
-                    <Label htmlFor="tenant_id">Locataire concerné</Label>
+                    <Label htmlFor="tenant_user_id">Locataire concerné</Label>
                     <Select
-                      value={ticketFormData.tenant_id || "none"}
-                      onValueChange={(value) => setTicketFormData({ ...ticketFormData, tenant_id: value === "none" ? undefined : value })}
+                      value={(ticketFormData as any).tenant_user_id || "none"}
+                      onValueChange={(value) => setTicketFormData({ ...(ticketFormData as any), tenant_user_id: value === "none" ? undefined : value })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Sélectionner un locataire" />
