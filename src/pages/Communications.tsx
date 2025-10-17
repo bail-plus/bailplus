@@ -465,8 +465,7 @@ export default function Communications() {
   const filteredMessages = messages.filter(message => {
     const matchesSearch =
       (message.recipient_email && message.recipient_email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (message.subject && message.subject.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (message.content && message.content.toLowerCase().includes(searchTerm.toLowerCase()))
+      (message.subject && message.subject.toLowerCase().includes(searchTerm.toLowerCase()))
 
     const messageChannel = message.recipient_email ? "EMAIL" : "SMS"
     const matchesChannel = channelFilter === "all" || messageChannel === channelFilter
@@ -919,12 +918,11 @@ export default function Communications() {
 
                           <TableCell>
                             <div className="max-w-xs">
-                              {message.subject && (
+                              {message.subject ? (
                                 <div className="font-medium text-sm truncate">{message.subject}</div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
                               )}
-                              <div className="text-xs text-muted-foreground truncate">
-                                {message.content}
-                              </div>
                             </div>
                           </TableCell>
 

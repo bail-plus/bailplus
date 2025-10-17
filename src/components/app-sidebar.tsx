@@ -54,7 +54,7 @@ const allItems: NavigationItem[] = [
   { title: "Communications", url: "/app/communications", icon: MessageCircle, roles: ['LANDLORD', 'TENANT', 'SERVICE_PROVIDER'] },
   { title: "Rapports", url: "/app/reports", icon: TrendingUp, roles: ['LANDLORD'] },
   { title: "TRI (simulateur)", url: "/app/tools/tri", icon: Target, roles: ['LANDLORD'] },
-  { title: "Paramètres", url: "/app/settings", icon: Settings, roles: ['LANDLORD'] },
+  { title: "Paramètres", url: "/app/settings", icon: Settings, roles: ['LANDLORD', 'TENANT', 'SERVICE_PROVIDER'] },
 ]
 
 export function AppSidebar() {

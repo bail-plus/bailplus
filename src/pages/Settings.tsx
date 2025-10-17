@@ -15,6 +15,7 @@ import SubscriptionPanel from "@/components/dashboard/settings/payment/Subscript
 import { InvitationManager } from "@/components/settings/InvitationManager"
 import { supabase } from "@/integrations/supabase/client"
 import type { Database } from "@/integrations/supabase/types"
+import { useAuth } from "@/hooks/useAuth"
 
 type EntityType = Database["public"]["Enums"]["entity_type_enum"]
 
@@ -40,7 +41,28 @@ const MOCK_BANK_ACCOUNTS = [
 ]
 
 export default function Settings() {
-  const [activeTab, setActiveTab] = useState("organizations")
+  const { profile } = useAuth()
+  const userType = profile?.user_type
+
+  // Définir les onglets disponibles par rôle
+  const tabs = [
+    { value: "organizations", label: "Entités", roles: ['LANDLORD'] },
+    { value: "users", label: "Utilisateurs", roles: ['LANDLORD'] },
+    { value: "banking", label: "Banques", roles: ['LANDLORD'] },
+    { value: "templates", label: "Modèles", roles: ['LANDLORD'] },
+    { value: "rent-rules", label: "Règles loyers", roles: ['LANDLORD'] },
+    { value: "branding", label: "Branding", roles: ['LANDLORD'] },
+    { value: "privacy", label: "RGPD", roles: ['LANDLORD', 'TENANT', 'SERVICE_PROVIDER'] },
+    { value: "notifications", label: "Notifications", roles: ['LANDLORD', 'TENANT', 'SERVICE_PROVIDER'] },
+  ]
+
+  // Filtrer les onglets selon le rôle
+  const visibleTabs = tabs.filter(tab => tab.roles.includes(userType || 'LANDLORD'))
+
+  // Définir l'onglet actif par défaut selon le rôle
+  const defaultTab = (userType === 'TENANT' || userType === 'SERVICE_PROVIDER') ? 'privacy' : 'organizations'
+  const [activeTab, setActiveTab] = useState(defaultTab)
+
   const [entities, setEntities] = useState<Entity[]>([])
   const [loadingEntities, setLoadingEntities] = useState(true)
   const [newEntityOpen, setNewEntityOpen] = useState(false)
@@ -308,18 +330,24 @@ export default function Settings() {
 
       {/* Main Settings Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-8">
-          <TabsTrigger value="organizations">Entités</TabsTrigger>
-          <TabsTrigger value="users">Utilisateurs</TabsTrigger>
-          <TabsTrigger value="banking">Banques</TabsTrigger>
-          <TabsTrigger value="templates">Modèles</TabsTrigger>
-          <TabsTrigger value="rent-rules">Règles loyers</TabsTrigger>
-          <TabsTrigger value="branding">Branding</TabsTrigger>
-          <TabsTrigger value="privacy">RGPD</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+        <TabsList className={`grid w-full ${
+          visibleTabs.length === 2 ? 'grid-cols-2' :
+          visibleTabs.length === 3 ? 'grid-cols-3' :
+          visibleTabs.length === 4 ? 'grid-cols-4' :
+          visibleTabs.length === 5 ? 'grid-cols-5' :
+          visibleTabs.length === 6 ? 'grid-cols-6' :
+          visibleTabs.length === 7 ? 'grid-cols-7' :
+          'grid-cols-8'
+        }`}>
+          {visibleTabs.map((tab) => (
+            <TabsTrigger key={tab.value} value={tab.value}>
+              {tab.label}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
         {/* Organizations Tab */}
+        {userType === 'LANDLORD' && (
         <TabsContent value="organizations" className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -458,6 +486,7 @@ export default function Settings() {
             </div>
           )}
         </TabsContent>
+        )}
 
         {/* Notifications Tab */}
         <TabsContent value="notifications" className="space-y-4">
@@ -605,11 +634,14 @@ export default function Settings() {
         </TabsContent>
 
         {/* Users Tab */}
+        {userType === 'LANDLORD' && (
         <TabsContent value="users" className="space-y-4">
           <InvitationManager />
         </TabsContent>
+        )}
 
         {/* Banking Tab */}
+        {userType === 'LANDLORD' && (
         <TabsContent value="banking" className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -692,8 +724,10 @@ export default function Settings() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
         {/* Templates Tab */}
+        {userType === 'LANDLORD' && (
         <TabsContent value="templates" className="space-y-4">
           <div>
             <h3 className="text-lg font-semibold">Modèles de documents</h3>
@@ -770,8 +804,10 @@ export default function Settings() {
             </Card>
           </div>
         </TabsContent>
+        )}
 
         {/* Rent Rules Tab */}
+        {userType === 'LANDLORD' && (
         <TabsContent value="rent-rules" className="space-y-4">
           <div>
             <h3 className="text-lg font-semibold">Règles de loyers</h3>
@@ -864,8 +900,10 @@ export default function Settings() {
             </Card>
           </div>
         </TabsContent>
+        )}
 
         {/* Branding Tab */}
+        {userType === 'LANDLORD' && (
         <TabsContent value="branding" className="space-y-4">
           <div>
             <h3 className="text-lg font-semibold">Branding et apparence</h3>
@@ -1018,6 +1056,7 @@ export default function Settings() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
         {/* Privacy Tab */}
         <TabsContent value="privacy" className="space-y-4">
@@ -1102,36 +1141,41 @@ export default function Settings() {
             </Card>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Historique des traitements</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center p-3 bg-muted/20 rounded-lg">
-                  <div>
-                    <div className="font-medium text-sm">Création du compte</div>
-                    <div className="text-xs text-muted-foreground">15/01/2024 à 14:30</div>
-                  </div>
-                  <Badge variant="outline" className="text-xs">
-                    Accepté
-                  </Badge>
-                </div>
+          {/* Historique et abonnement - uniquement pour les propriétaires */}
+          {userType === 'LANDLORD' && (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Historique des traitements</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center p-3 bg-muted/20 rounded-lg">
+                      <div>
+                        <div className="font-medium text-sm">Création du compte</div>
+                        <div className="text-xs text-muted-foreground">15/01/2024 à 14:30</div>
+                      </div>
+                      <Badge variant="outline" className="text-xs">
+                        Accepté
+                      </Badge>
+                    </div>
 
-                <div className="flex justify-between items-center p-3 bg-muted/20 rounded-lg">
-                  <div>
-                    <div className="font-medium text-sm">Ajout de locataires</div>
-                    <div className="text-xs text-muted-foreground">15/01/2024 à 15:45</div>
+                    <div className="flex justify-between items-center p-3 bg-muted/20 rounded-lg">
+                      <div>
+                        <div className="font-medium text-sm">Ajout de locataires</div>
+                        <div className="text-xs text-muted-foreground">15/01/2024 à 15:45</div>
+                      </div>
+                      <Badge variant="outline" className="text-xs">
+                        Traité
+                      </Badge>
+                    </div>
                   </div>
-                  <Badge variant="outline" className="text-xs">
-                    Traité
-                  </Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          {/* payments */}
-          <SubscriptionPanel />
+                </CardContent>
+              </Card>
+              {/* payments */}
+              <SubscriptionPanel />
+            </>
+          )}
         </TabsContent>
       </Tabs>
     </div>
