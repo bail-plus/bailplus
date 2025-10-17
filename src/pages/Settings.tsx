@@ -60,7 +60,7 @@ export default function Settings() {
   const visibleTabs = tabs.filter(tab => tab.roles.includes(userType || 'LANDLORD'))
 
   // Définir l'onglet actif par défaut selon le rôle
-  const defaultTab = userType === 'SERVICE_PROVIDER' ? 'privacy' : 'organizations'
+  const defaultTab = (userType === 'TENANT' || userType === 'SERVICE_PROVIDER') ? 'privacy' : 'organizations'
   const [activeTab, setActiveTab] = useState(defaultTab)
 
   const [entities, setEntities] = useState<Entity[]>([])
