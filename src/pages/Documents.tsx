@@ -66,7 +66,10 @@ export default function Documents() {
         return
       }
 
-      // 1. Charger les documents depuis la table documents FILTRÉS PAR USER
+      // 1. Charger les documents depuis la table documents
+      // La RLS filtrera automatiquement les documents accessibles :
+      // - Propriétaires voient les documents qu'ils ont uploadés
+      // - Locataires voient les documents liés à leurs baux actifs/signés
       let docsQuery = supabase
         .from('documents')
         .select(`
@@ -89,8 +92,7 @@ export default function Documents() {
         `)
         .order('created_at', { ascending: false })
 
-      // Filtrer par user_id OU uploaded_by (pour gérer les anciens documents)
-      docsQuery = docsQuery.or(`user_id.eq.${user.id},uploaded_by.eq.${user.id}`)
+      // Note: Pas de filtre manuel ici, la RLS gère l'accès automatiquement
 
       const { data: docsData, error: docsError } = await docsQuery
 
@@ -181,11 +183,26 @@ export default function Documents() {
       const url = await getSignedUrl(document)
       if (!url) throw new Error('Impossible de générer le lien de téléchargement')
 
-      // Download the file
+      // Fetch the file as a blob to force download on PC
+      const response = await fetch(url)
+      if (!response.ok) throw new Error('Erreur lors du téléchargement')
+
+      const blob = await response.blob()
+      const blobUrl = window.URL.createObjectURL(blob)
+
+      // Create and trigger download link
       const link = window.document.createElement('a')
-      link.href = url
+      link.href = blobUrl
       link.download = document.name
+      link.style.display = 'none'
+      window.document.body.appendChild(link)
       link.click()
+
+      // Cleanup after a short delay
+      setTimeout(() => {
+        window.document.body.removeChild(link)
+        window.URL.revokeObjectURL(blobUrl)
+      }, 100)
     } catch (error) {
       console.error('Error downloading document:', error)
       alert('Erreur lors du téléchargement du document')
@@ -563,7 +580,10 @@ export default function Documents() {
                             size="sm"
                             variant="ghost"
                             className="gap-1"
-                            onClick={() => handlePreview(document)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handlePreview(document)
+                            }}
                           >
                             <Eye className="w-3 h-3" />
                             Voir
@@ -572,7 +592,10 @@ export default function Documents() {
                             size="sm"
                             variant="ghost"
                             className="gap-1"
-                            onClick={() => handleDownload(document)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDownload(document)
+                            }}
                             disabled={downloading === document.id}
                           >
                             {downloading === document.id ? (
