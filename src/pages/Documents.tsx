@@ -13,6 +13,7 @@ import LeaseGeneratorModal from "@/components/lease-generator-modal"
 import EDLGeneratorModal from "@/components/edl-generator-modal"
 import LetterGeneratorModal from "@/components/letter-generator-modal"
 import { useEntity } from "@/contexts/EntityContext"
+import { useAuth } from "@/hooks/useAuth"
 
 interface Document {
   id: string
@@ -36,6 +37,7 @@ const DOCUMENT_CATEGORIES = [
 ]
 
 export default function Documents() {
+  const { profile } = useAuth()
   const { selectedEntity, showAll } = useEntity()
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
@@ -50,6 +52,8 @@ export default function Documents() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [generatingBatch, setGeneratingBatch] = useState(false)
+
+  const isLandlord = profile?.user_type === 'LANDLORD'
 
   // Get current month and year
   const currentDate = new Date()
@@ -296,82 +300,86 @@ export default function Documents() {
         </div>
         
         <div className="flex items-center gap-2">
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="gap-2">
-                <Upload className="w-4 h-4" />
-                Importer
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Importer un document</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-4">
-                <p className="text-sm text-muted-foreground">
-                  Fonctionnalité d'import en cours de développement
-                </p>
-              </div>
-            </DialogContent>
-          </Dialog>
-          
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="w-4 h-4" />
-                Générer
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Générer un document</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-4">
-                <div className="grid grid-cols-1 gap-3">
-                  <Button
-                    variant="outline"
-                    className="justify-start gap-2"
-                    onClick={() => {
-                      setLeaseModalOpen(true)
-                    }}
-                  >
-                    <FileText className="w-4 h-4" />
-                    Bail de location
+          {isLandlord && (
+            <>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    <Upload className="w-4 h-4" />
+                    Importer
                   </Button>
-                  <Button
-                    variant="outline"
-                    className="justify-start gap-2"
-                    onClick={() => {
-                      setReceiptModalOpen(true)
-                    }}
-                  >
-                    <File className="w-4 h-4" />
-                    Quittance de loyer
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Importer un document</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-4">
+                    <p className="text-sm text-muted-foreground">
+                      Fonctionnalité d'import en cours de développement
+                    </p>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button className="gap-2">
+                    <Plus className="w-4 h-4" />
+                    Générer
                   </Button>
-                  <Button
-                    variant="outline"
-                    className="justify-start gap-2"
-                    onClick={() => {
-                      setEdlModalOpen(true)
-                    }}
-                  >
-                    <Folder className="w-4 h-4" />
-                    État des lieux
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="justify-start gap-2"
-                    onClick={() => {
-                      setLetterModalOpen(true)
-                    }}
-                  >
-                    <FileText className="w-4 h-4" />
-                    Lettre de relance
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Générer un document</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-4">
+                    <div className="grid grid-cols-1 gap-3">
+                      <Button
+                        variant="outline"
+                        className="justify-start gap-2"
+                        onClick={() => {
+                          setLeaseModalOpen(true)
+                        }}
+                      >
+                        <FileText className="w-4 h-4" />
+                        Bail de location
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="justify-start gap-2"
+                        onClick={() => {
+                          setReceiptModalOpen(true)
+                        }}
+                      >
+                        <File className="w-4 h-4" />
+                        Quittance de loyer
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="justify-start gap-2"
+                        onClick={() => {
+                          setEdlModalOpen(true)
+                        }}
+                      >
+                        <Folder className="w-4 h-4" />
+                        État des lieux
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="justify-start gap-2"
+                        onClick={() => {
+                          setLetterModalOpen(true)
+                        }}
+                      >
+                        <FileText className="w-4 h-4" />
+                        Lettre de relance
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </>
+          )}
         </div>
       </div>
 
@@ -402,116 +410,120 @@ export default function Documents() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Total</span>
-            </div>
-            <div className="text-2xl font-bold">{totalDocuments}</div>
-            <p className="text-xs text-muted-foreground mt-1">documents</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2">
-              <File className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Quittances</span>
-            </div>
-            <div className="text-2xl font-bold">{documentsByCategory.rent || 0}</div>
-            <p className="text-xs text-muted-foreground mt-1">générées</p>
-          </CardContent>
-        </Card>
+      {isLandlord && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Total</span>
+              </div>
+              <div className="text-2xl font-bold">{totalDocuments}</div>
+              <p className="text-xs text-muted-foreground mt-1">documents</p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2">
-              <Folder className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">États des lieux</span>
-            </div>
-            <div className="text-2xl font-bold">{documentsByCategory.edl || 0}</div>
-            <p className="text-xs text-muted-foreground mt-1">en stock</p>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2">
+                <File className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Quittances</span>
+              </div>
+              <div className="text-2xl font-bold">{documentsByCategory.rent || 0}</div>
+              <p className="text-xs text-muted-foreground mt-1">générées</p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Contrats</span>
-            </div>
-            <div className="text-2xl font-bold">{documentsByCategory.lease || 0}</div>
-            <p className="text-xs text-muted-foreground mt-1">actifs</p>
-          </CardContent>
-        </Card>
-      </div>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2">
+                <Folder className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">États des lieux</span>
+              </div>
+              <div className="text-2xl font-bold">{documentsByCategory.edl || 0}</div>
+              <p className="text-xs text-muted-foreground mt-1">en stock</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Contrats</span>
+              </div>
+              <div className="text-2xl font-bold">{documentsByCategory.lease || 0}</div>
+              <p className="text-xs text-muted-foreground mt-1">actifs</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Quick Generation */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base font-semibold">Génération rapide</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Button
-              variant="outline"
-              className="h-auto p-4 flex flex-col items-center gap-2"
-              onClick={handleGenerateMonthlyReceipts}
-              disabled={generatingBatch}
-            >
-              {generatingBatch ? (
-                <Loader2 className="w-6 h-6 animate-spin" />
-              ) : (
-                <FileText className="w-6 h-6" />
-              )}
-              <div className="text-center">
-                <div className="font-medium">Quittances du mois</div>
-                <div className="text-xs text-muted-foreground capitalize">
-                  {currentMonth} {currentYear}
+      {isLandlord && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">Génération rapide</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Button
+                variant="outline"
+                className="h-auto p-4 flex flex-col items-center gap-2"
+                onClick={handleGenerateMonthlyReceipts}
+                disabled={generatingBatch}
+              >
+                {generatingBatch ? (
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                ) : (
+                  <FileText className="w-6 h-6" />
+                )}
+                <div className="text-center">
+                  <div className="font-medium">Quittances du mois</div>
+                  <div className="text-xs text-muted-foreground capitalize">
+                    {currentMonth} {currentYear}
+                  </div>
                 </div>
-              </div>
-            </Button>
+              </Button>
 
-            <Button
-              variant="outline"
-              className="h-auto p-4 flex flex-col items-center gap-2"
-              onClick={() => setLeaseModalOpen(true)}
-            >
-              <FileText className="w-6 h-6" />
-              <div className="text-center">
-                <div className="font-medium">Bail de location</div>
-                <div className="text-xs text-muted-foreground">Nouveau contrat</div>
-              </div>
-            </Button>
+              <Button
+                variant="outline"
+                className="h-auto p-4 flex flex-col items-center gap-2"
+                onClick={() => setLeaseModalOpen(true)}
+              >
+                <FileText className="w-6 h-6" />
+                <div className="text-center">
+                  <div className="font-medium">Bail de location</div>
+                  <div className="text-xs text-muted-foreground">Nouveau contrat</div>
+                </div>
+              </Button>
 
-            <Button
-              variant="outline"
-              className="h-auto p-4 flex flex-col items-center gap-2"
-              onClick={() => setEdlModalOpen(true)}
-            >
-              <Folder className="w-6 h-6" />
-              <div className="text-center">
-                <div className="font-medium">État des lieux</div>
-                <div className="text-xs text-muted-foreground">Entrée/Sortie</div>
-              </div>
-            </Button>
+              <Button
+                variant="outline"
+                className="h-auto p-4 flex flex-col items-center gap-2"
+                onClick={() => setEdlModalOpen(true)}
+              >
+                <Folder className="w-6 h-6" />
+                <div className="text-center">
+                  <div className="font-medium">État des lieux</div>
+                  <div className="text-xs text-muted-foreground">Entrée/Sortie</div>
+                </div>
+              </Button>
 
-            <Button
-              variant="outline"
-              className="h-auto p-4 flex flex-col items-center gap-2"
-              onClick={() => setLetterModalOpen(true)}
-            >
-              <FileText className="w-6 h-6" />
-              <div className="text-center">
-                <div className="font-medium">Lettres de relance</div>
-                <div className="text-xs text-muted-foreground">Impayés</div>
-              </div>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+              <Button
+                variant="outline"
+                className="h-auto p-4 flex flex-col items-center gap-2"
+                onClick={() => setLetterModalOpen(true)}
+              >
+                <FileText className="w-6 h-6" />
+                <div className="text-center">
+                  <div className="font-medium">Lettres de relance</div>
+                  <div className="text-xs text-muted-foreground">Impayés</div>
+                </div>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Documents List */}
       <Card>
