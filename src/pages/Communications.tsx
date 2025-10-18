@@ -39,6 +39,7 @@ export default function Communications() {
   const [searchTerm, setSearchTerm] = useState("")
   const [channelFilter, setChannelFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [messageDirection, setMessageDirection] = useState<"sent" | "received">("sent")
   const [selectedMessage, setSelectedMessage] = useState<any>(null)
   const [selectedTemplate, setSelectedTemplate] = useState<CommunicationTemplate | null>(null)
 
@@ -60,6 +61,15 @@ export default function Communications() {
   const [templateType, setTemplateType] = useState<"EMAIL" | "SMS">("EMAIL")
   const [templateSubject, setTemplateSubject] = useState("")
   const [templateContent, setTemplateContent] = useState("")
+  const [currentUserId, setCurrentUserId] = useState<string>("")
+
+  // Get current user ID
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) setCurrentUserId(user.id)
+    })()
+  }, [])
 
   // Fetch data
   const { data: messages = [], isLoading: messagesLoading } = useCommunicationLogs()
@@ -471,7 +481,12 @@ export default function Communications() {
     const matchesChannel = channelFilter === "all" || messageChannel === channelFilter
     const matchesStatus = statusFilter === "all" || message.status === statusFilter
 
-    return matchesSearch && matchesChannel && matchesStatus
+    // Filter by direction (sent/received)
+    const matchesDirection =
+      (messageDirection === "sent" && message.sender_id === currentUserId) ||
+      (messageDirection === "received" && message.recipient_id === currentUserId)
+
+    return matchesSearch && matchesChannel && matchesStatus && matchesDirection
   })
 
   const getChannelIcon = (channel: string) => {
@@ -783,58 +798,68 @@ export default function Communications() {
 
         {/* Messages Tab */}
         <TabsContent value="messages" className="space-y-4">
-          {/* Filters */}
-          <div className="flex items-center gap-4">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input
-                placeholder="Rechercher un message..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
-            </div>
+          {/* Direction Tabs */}
+          <Tabs value={messageDirection} onValueChange={(value) => setMessageDirection(value as "sent" | "received")}>
+            <TabsList>
+              <TabsTrigger value="sent">Envoyés</TabsTrigger>
+              <TabsTrigger value="received">Reçus</TabsTrigger>
+            </TabsList>
 
-            <Select value={channelFilter} onValueChange={setChannelFilter}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="Canal" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous</SelectItem>
-                <SelectItem value="EMAIL">Email</SelectItem>
-                <SelectItem value="SMS">SMS</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="mt-4 space-y-4">
+              {/* Filters */}
+              <div className="flex items-center gap-4">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                  <Input
+                    placeholder="Rechercher un message..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
 
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-32">
-                <SelectValue placeholder="Statut" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tous</SelectItem>
-                <SelectItem value="DELIVERED">Livrés</SelectItem>
-                <SelectItem value="SENT">Livrés</SelectItem>
-                <SelectItem value="PENDING">En attente</SelectItem>
-                <SelectItem value="FAILED">Échecs</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+                <Select value={channelFilter} onValueChange={setChannelFilter}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="Canal" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous</SelectItem>
+                    <SelectItem value="EMAIL">Email</SelectItem>
+                    <SelectItem value="SMS">SMS</SelectItem>
+                  </SelectContent>
+                </Select>
 
-          {/* Messages List */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base font-semibold">Messages envoyés</CardTitle>
-            </CardHeader>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="Statut" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous</SelectItem>
+                    <SelectItem value="DELIVERED">Livrés</SelectItem>
+                    <SelectItem value="SENT">Livrés</SelectItem>
+                    <SelectItem value="PENDING">En attente</SelectItem>
+                    <SelectItem value="FAILED">Échecs</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Messages List */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base font-semibold">
+                    {messageDirection === "sent" ? "Messages envoyés" : "Messages reçus"}
+                  </CardTitle>
+                </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Destinataire</TableHead>
+                    <TableHead>{messageDirection === "sent" ? "Destinataire" : "Expéditeur"}</TableHead>
                     <TableHead>Canal</TableHead>
                     <TableHead>Sujet/Message</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Statut</TableHead>
-                    <TableHead>Envoyé le</TableHead>
+                    <TableHead>{messageDirection === "sent" ? "Envoyé le" : "Reçu le"}</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -978,6 +1003,8 @@ export default function Communications() {
               </Table>
             </CardContent>
           </Card>
+            </div>
+          </Tabs>
         </TabsContent>
 
         {/* Templates Tab */}
