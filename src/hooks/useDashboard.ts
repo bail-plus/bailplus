@@ -43,6 +43,7 @@ export interface DashboardStats {
     status: string;
     priority: string;
     created_at: string;
+    property_id: string;
     property?: {
       name: string;
     };
@@ -164,6 +165,7 @@ async function fetchDashboardData(entityId?: string | null, showAll?: boolean): 
         status,
         priority,
         created_at,
+        property_id,
         property:properties!maintenance_tickets_property_id_fkey (
           name
         )
