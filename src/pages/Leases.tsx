@@ -1,14 +1,6 @@
-import { useState, useRef, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
-import { FileText, Plus, Search, Calendar as CalendarIcon, Home, User, Edit, Trash2, Euro, AlertCircle } from "lucide-react"
+import { Plus } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { supabase } from "@/integrations/supabase/client"
 import {
@@ -19,67 +11,21 @@ import {
   type LeaseWithDetails,
   type LeaseInsert
 } from "@/hooks/useLeases"
-import { usePropertiesWithUnits, useCreateProperty } from "@/hooks/useProperties"
+import { usePropertiesWithUnits } from "@/hooks/useProperties"
 import { useContactsWithLeaseInfo } from "@/hooks/useContacts"
 import { useTenants } from "@/hooks/useUsers"
 import { useCreateUnit } from "@/hooks/useUnits"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useInvitations } from "@/hooks/useInvitations"
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover"
-import { Calendar } from "@/components/ui/calendar"
-import { fr } from "date-fns/locale"
+import { LeasesStats } from "@/components/leases/LeasesStats"
+import { LeasesSearch } from "@/components/leases/LeasesSearch"
+import { LeasesList } from "@/components/leases/LeasesList"
+import { LeaseFormDialog } from "@/components/leases/LeaseFormDialog"
 
 export default function Leases() {
-  const currentYear = new Date().getFullYear()
-  const dayPickerLabels = {
-    labelMonthDropdown: () => "Mois",
-    labelYearDropdown: () => "Année",
-    labelPrevious: () => "Mois précédent",
-    labelNext: () => "Mois suivant",
-  } as const
-  const [startPickerOpen, setStartPickerOpen] = useState(false)
-  const [endPickerOpen, setEndPickerOpen] = useState(false)
-  const renderCount = useRef(0);
-  renderCount.current += 1;
-  console.log('[PAGE/LEASES] Render #', renderCount.current);
-
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [selectedLease, setSelectedLease] = useState<LeaseWithDetails | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [isEditMode, setIsEditMode] = useState(false)
-  const [selectedPropertyId, setSelectedPropertyId] = useState<string>("")
-  const [isUnitDialogOpen, setIsUnitDialogOpen] = useState(false)
-  const [newUnitNumber, setNewUnitNumber] = useState("")
-  const [newUnitType, setNewUnitType] = useState("")
-  const [newUnitSurface, setNewUnitSurface] = useState<number | "">("")
-  const [newUnitFurnished, setNewUnitFurnished] = useState(false)
-  const [selectedGuarantors, setSelectedGuarantors] = useState<string[]>([])
-  const [selectedCoTenants, setSelectedCoTenants] = useState<string[]>([])
-  const [isInviteTenantDialogOpen, setIsInviteTenantDialogOpen] = useState(false)
-  const [inviteTenantEmail, setInviteTenantEmail] = useState("")
-  const [inviteTenantFirstName, setInviteTenantFirstName] = useState("")
-  const [inviteTenantLastName, setInviteTenantLastName] = useState("")
-  const [pendingInvitationId, setPendingInvitationId] = useState<string | null>(null)
-  const [formData, setFormData] = useState<LeaseInsert>({
-    unit_id: "",
-    tenant_id: "",
-    start_date: "",
-    end_date: "",
-    rent_amount: 0,
-    charges_amount: 0,
-    deposit_amount: 0,
-    status: "active",
-    contract_type: "empty",
-  })
-
-  // Fermer les calendriers lorsqu'on ferme la modale
-  useEffect(() => {
-    if (!isDialogOpen) {
-      setStartPickerOpen(false)
-      setEndPickerOpen(false)
-    }
-  }, [isDialogOpen])
 
   const { toast } = useToast()
   const { data: leases = [], isLoading, error } = useLeasesWithDetails()
@@ -92,233 +38,103 @@ export default function Leases() {
   const createUnit = useCreateUnit()
   const { createInvitation } = useInvitations()
 
-  console.log('[PAGE/LEASES]', {
-    isLoading,
-    hasError: !!error,
-    hasLeases: leases.length > 0,
-    leasesCount: leases.length,
-    hasProperties: properties.length > 0,
-    hasTenants: tenants.length > 0,
-    hasGuarantors: guarantors.length > 0
-  })
-
-  // Get units for selected property
-  const selectedProperty = properties.find(p => p.id === selectedPropertyId)
-  const availableUnits = selectedProperty?.units ?? []
-
-  const handleCreateUnit = async () => {
-    if (!selectedPropertyId || !newUnitNumber) {
-      toast({
-        title: "Erreur",
-        description: "Veuillez remplir le numéro de logement",
-        variant: "destructive",
-      })
-      return
-    }
-
-    try {
-      const newUnit = await createUnit.mutateAsync({
-        property_id: selectedPropertyId,
-        unit_number: newUnitNumber,
-        type: newUnitType || null,
-        surface: newUnitSurface || null,
-        furnished: newUnitFurnished,
-      })
-
-      setFormData({ ...formData, unit_id: newUnit.id })
-      setIsUnitDialogOpen(false)
-      setNewUnitNumber("")
-      setNewUnitType("")
-      setNewUnitSurface("")
-      setNewUnitFurnished(false)
-
-      toast({
-        title: "Succès",
-        description: "Logement créé avec succès",
-      })
-    } catch (error) {
-      toast({
-        title: "Erreur",
-        description: error instanceof Error ? error.message : "Erreur lors de la création du logement",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const handleInviteTenant = async () => {
-    if (!inviteTenantEmail) {
-      toast({
-        title: "Erreur",
-        description: "Veuillez renseigner l'email du locataire",
-        variant: "destructive",
-      })
-      return
-    }
-
-    try {
-      const invitation = await createInvitation({
-        email: inviteTenantEmail,
-        role: "TENANT",
-        invitation_context: "lease",
-        first_name: inviteTenantFirstName || undefined,
-        last_name: inviteTenantLastName || undefined,
-      })
-
-      setPendingInvitationId(invitation.id)
-      setIsInviteTenantDialogOpen(false)
-      setInviteTenantEmail("")
-      setInviteTenantFirstName("")
-      setInviteTenantLastName("")
-
-      toast({
-        title: "Succès",
-        description: "Invitation envoyée avec succès. Le locataire pourra accepter l'invitation pour créer son compte.",
-      })
-    } catch (error) {
-      toast({
-        title: "Erreur",
-        description: error instanceof Error ? error.message : "Erreur lors de l'envoi de l'invitation",
-        variant: "destructive",
-      })
-    }
-  }
-
-  const resetForm = () => {
-    setFormData({
-      unit_id: "",
-      tenant_id: "",
-      start_date: "",
-      end_date: "",
-      rent_amount: 0,
-      charges_amount: 0,
-      deposit_amount: 0,
-      status: "active",
-      contract_type: "empty",
-    })
-    setIsEditMode(false)
-    setSelectedLease(null)
-    setSelectedPropertyId("")
-    setSelectedGuarantors([])
-    setSelectedCoTenants([])
-    setPendingInvitationId(null)
-  }
-
   const handleOpenDialog = () => {
-    resetForm()
+    setSelectedLease(null)
     setIsDialogOpen(true)
   }
 
   const handleEditLease = (lease: LeaseWithDetails) => {
-    setFormData({
-      unit_id: lease.unit_id,
-      tenant_id: lease.tenant_id,
-      start_date: lease.start_date,
-      end_date: lease.end_date ?? "",
-      rent_amount: lease.rent_amount,
-      charges_amount: lease.charges_amount ?? 0,
-      deposit_amount: lease.deposit_amount ?? 0,
-      status: lease.status ?? "active",
-      contract_type: lease.contract_type ?? "empty",
-    })
     setSelectedLease(lease)
-    setIsEditMode(true)
     setIsDialogOpen(true)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleCreateUnit = async (data: { property_id: string; unit_number: string; type: string | null; surface: number | null; furnished: boolean }) => {
+    const newUnit = await createUnit.mutateAsync(data)
+    return { id: newUnit.id }
+  }
 
-    // Vérifier que soit un tenant_id soit une invitation en attente est fourni
-    if (!formData.unit_id || (!formData.tenant_id && !pendingInvitationId) || !formData.start_date || !formData.rent_amount) {
-      toast({
-        title: "Erreur",
-        description: "Veuillez remplir tous les champs requis (logement, locataire ou invitation, date de début, loyer)",
-        variant: "destructive",
+  const handleCreateInvitation = async (params: { email: string; role: string; first_name: string | null; last_name: string | null; property_id: string | null; lease_id: string | null }) => {
+    const invitation = await createInvitation(params as any)
+    return { id: invitation.id }
+  }
+
+  const handleSubmitLease = async (
+    formData: LeaseInsert,
+    selectedCoTenants: string[],
+    selectedGuarantors: string[],
+    pendingInvitationId: string | null
+  ) => {
+    if (selectedLease) {
+      await updateLease.mutateAsync({
+        id: selectedLease.id,
+        ...formData,
       })
-      return
-    }
+      toast({
+        title: "Succès",
+        description: "Bail modifié avec succès",
+      })
+    } else {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Non authentifié')
 
-    try {
-      if (isEditMode && selectedLease) {
-        await updateLease.mutateAsync({
-          id: selectedLease.id,
-          ...formData,
-        })
-        toast({
-          title: "Succès",
-          description: "Bail modifié avec succès",
-        })
-      } else {
-        // Si une invitation est en attente et qu'aucun tenant n'est sélectionné, utiliser l'ID du propriétaire temporairement
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('Non authentifié');
+      const leaseData = {
+        ...formData,
+        tenant_id: formData.tenant_id || (pendingInvitationId ? user.id : ""),
+      }
 
-        const leaseData = {
-          ...formData,
-          // Si pas de tenant_id mais une invitation en attente, on met l'id du propriétaire temporairement
-          // Le tenant sera mis à jour quand il acceptera l'invitation
-          tenant_id: formData.tenant_id || (pendingInvitationId ? user.id : ""),
-        };
+      const newLease = await createLease.mutateAsync(leaseData)
 
-        const newLease = await createLease.mutateAsync(leaseData)
+      if (newLease) {
+        if (pendingInvitationId) {
+          const unitData = await supabase
+            .from('units')
+            .select('property_id')
+            .eq('id', formData.unit_id)
+            .single()
 
-        if (newLease) {
-          // Si une invitation en attente existe, la lier au bail
-          if (pendingInvitationId) {
-            await supabase
-              .from('user_invitations')
-              .update({
-                lease_id: newLease.id,
-                property_id: selectedPropertyId || null
-              })
-              .eq('id', pendingInvitationId);
-          }
-
-          // Créer les colocataires si sélectionnés
-          if (selectedCoTenants.length > 0) {
-            await Promise.all(
-              selectedCoTenants.map(coTenantUserId =>
-                supabase.from('lease_tenants').insert({
-                  lease_id: newLease.id,
-                  user_id: coTenantUserId,
-                  role: 'co-tenant',
-                })
-              )
-            )
-          }
-
-          // Créer les garanties si des garants ont été sélectionnés
-          if (selectedGuarantors.length > 0) {
-            await Promise.all(
-              selectedGuarantors.map(guarantorId =>
-                supabase.from('lease_guarantors').insert({
-                  lease_id: newLease.id,
-                  guarantor_contact_id: guarantorId,
-                  tenant_contact_id: null, // On ne lie plus le garant à un contact locataire
-                  user_id: user.id,
-                })
-              )
-            )
-          }
+          await supabase
+            .from('user_invitations')
+            .update({
+              lease_id: newLease.id,
+              property_id: unitData.data?.property_id || null
+            })
+            .eq('id', pendingInvitationId)
         }
 
-        toast({
-          title: "Succès",
-          description: "Bail créé avec succès",
-        })
+        if (selectedCoTenants.length > 0) {
+          await Promise.all(
+            selectedCoTenants.map(coTenantUserId =>
+              supabase.from('lease_tenants').insert({
+                lease_id: newLease.id,
+                user_id: coTenantUserId,
+                role: 'co-tenant',
+              })
+            )
+          )
+        }
+
+        if (selectedGuarantors.length > 0) {
+          await Promise.all(
+            selectedGuarantors.map(guarantorId =>
+              supabase.from('lease_guarantors').insert({
+                lease_id: newLease.id,
+                guarantor_contact_id: guarantorId,
+                tenant_contact_id: null,
+                user_id: user.id,
+              })
+            )
+          )
+        }
       }
-      setIsDialogOpen(false)
-      resetForm()
-    } catch (error) {
+
       toast({
-        title: "Erreur",
-        description: error instanceof Error ? error.message : "Une erreur est survenue",
-        variant: "destructive",
+        title: "Succès",
+        description: "Bail créé avec succès",
       })
     }
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDeleteLease = async (id: string) => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer ce bail ?")) return
 
     try {
@@ -347,21 +163,6 @@ export default function Leases() {
 
     return matchesSearch && matchesStatus
   })
-
-  const activeLeases = leases.filter(l => l.status === "active").length
-  const totalRentAmount = leases
-    .filter(l => l.status === "active")
-    .reduce((sum, l) => sum + l.rent_amount, 0)
-
-  const getStatusBadge = (status?: string | null) => {
-    const statusMap = {
-      "draft": { label: "Brouillon", variant: "secondary" as const },
-      "signed": { label: "Signé", variant: "secondary" as const },
-      "active": { label: "Actif", variant: "default" as const },
-      "terminated": { label: "Terminé", variant: "destructive" as const },
-    }
-    return statusMap[status as keyof typeof statusMap] || { label: status || "Inconnu", variant: "secondary" as const }
-  }
 
   if (error) {
     return (
@@ -399,668 +200,43 @@ export default function Leases() {
           </p>
         </div>
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2" onClick={handleOpenDialog}>
-              <Plus className="w-4 h-4" />
-              Nouveau bail
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {isEditMode ? "Modifier le bail" : "Créer un nouveau bail"}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-              {/* Property and Unit Selection */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="property">Propriété *</Label>
-                  <Select
-                    value={selectedPropertyId}
-                    onValueChange={(value) => {
-                      setSelectedPropertyId(value)
-                      setFormData({ ...formData, unit_id: "" })
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner une propriété" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {properties.map((property) => (
-                        <SelectItem key={property.id} value={property.id}>
-                          {property.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="unit_id">Logement *</Label>
-                  <div className="flex gap-2">
-                    <Select
-                      value={formData.unit_id}
-                      onValueChange={(value) => setFormData({ ...formData, unit_id: value })}
-                      disabled={!selectedPropertyId}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner un logement" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableUnits.length === 0 && selectedPropertyId ? (
-                          <div className="p-2 text-sm text-muted-foreground text-center">
-                            Aucun logement disponible
-                          </div>
-                        ) : (
-                          availableUnits.map((unit) => (
-                            <SelectItem key={unit.id} value={unit.id}>
-                              {unit.unit_number} {unit.type ? `- ${unit.type}` : ""}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    {selectedPropertyId && (
-                      <Dialog open={isUnitDialogOpen} onOpenChange={setIsUnitDialogOpen}>
-                        <DialogTrigger asChild>
-                          <Button type="button" variant="outline" size="icon">
-                            <Plus className="w-4 h-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Créer un logement</DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-4 pt-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="new_unit_number">N° de logement *</Label>
-                              <Input
-                                id="new_unit_number"
-                                placeholder="Ex: Appt 3B, Studio 1, etc."
-                                value={newUnitNumber}
-                                onChange={(e) => setNewUnitNumber(e.target.value)}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="new_unit_type">Type de logement</Label>
-                              <Input
-                                id="new_unit_type"
-                                placeholder="Ex: T2, T3, Studio, etc."
-                                value={newUnitType}
-                                onChange={(e) => setNewUnitType(e.target.value)}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="new_unit_surface">Surface (m²)</Label>
-                              <Input
-                                id="new_unit_surface"
-                                type="number"
-                                placeholder="Ex: 45"
-                                value={newUnitSurface}
-                                onChange={(e) => setNewUnitSurface(e.target.value ? Number(e.target.value) : "")}
-                              />
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox
-                                id="new_unit_furnished"
-                                checked={newUnitFurnished}
-                                onCheckedChange={(checked) => setNewUnitFurnished(checked as boolean)}
-                              />
-                              <Label htmlFor="new_unit_furnished" className="cursor-pointer">
-                                Logement meublé
-                              </Label>
-                            </div>
-                            <div className="flex gap-2">
-                              <Button
-                                type="button"
-                                className="flex-1"
-                                onClick={handleCreateUnit}
-                                disabled={createUnit.isPending}
-                              >
-                                Créer
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setIsUnitDialogOpen(false)}
-                              >
-                                Annuler
-                              </Button>
-                            </div>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Tenant Selection */}
-              <div className="space-y-2">
-                <Label htmlFor="tenant_id">Locataire principal *</Label>
-                <div className="flex items-center gap-2">
-                  <Select
-                    value={formData.tenant_id}
-                    onValueChange={(value) => setFormData({ ...formData, tenant_id: value })}
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Sélectionner un locataire" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {tenants.length === 0 ? (
-                        <div className="p-2 text-sm text-muted-foreground text-center">
-                          Aucun locataire invité. Utilisez le bouton + pour inviter.
-                        </div>
-                      ) : (
-                        tenants.map((tenant) => (
-                          <SelectItem key={tenant.user_id} value={tenant.user_id}>
-                            {tenant.first_name} {tenant.last_name} {tenant.email && `(${tenant.email})`}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                  <Dialog open={isInviteTenantDialogOpen} onOpenChange={setIsInviteTenantDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        aria-label="Inviter un locataire"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Inviter un nouveau locataire</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4 pt-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="invite_tenant_email">Email *</Label>
-                          <Input
-                            id="invite_tenant_email"
-                            type="email"
-                            placeholder="locataire@example.com"
-                            value={inviteTenantEmail}
-                            onChange={(e) => setInviteTenantEmail(e.target.value)}
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="invite_tenant_first_name">Prénom</Label>
-                            <Input
-                              id="invite_tenant_first_name"
-                              placeholder="Jean"
-                              value={inviteTenantFirstName}
-                              onChange={(e) => setInviteTenantFirstName(e.target.value)}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="invite_tenant_last_name">Nom</Label>
-                            <Input
-                              id="invite_tenant_last_name"
-                              placeholder="Dupont"
-                              value={inviteTenantLastName}
-                              onChange={(e) => setInviteTenantLastName(e.target.value)}
-                            />
-                          </div>
-                        </div>
-                        <Alert>
-                          <AlertCircle className="h-4 w-4" />
-                          <AlertDescription className="text-xs">
-                            Une invitation sera envoyée à cette adresse email. Le locataire pourra créer son compte et sera automatiquement lié à ce bail une fois l'invitation acceptée.
-                          </AlertDescription>
-                        </Alert>
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            className="flex-1"
-                            onClick={handleInviteTenant}
-                          >
-                            Envoyer l'invitation
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setIsInviteTenantDialogOpen(false)}
-                          >
-                            Annuler
-                          </Button>
-                        </div>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-
-                {/* Lien alternatif conservé si besoin */}
-                <Button type="button" variant="link" className="h-auto p-0 text-xs text-muted-foreground hover:text-primary" onClick={() => setIsInviteTenantDialogOpen(true)}>
-                  Aucun locataire ? Inviter un nouveau locataire
-                </Button>
-
-                {pendingInvitationId && (
-                  <Alert className="mt-2">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription className="text-xs">
-                      Une invitation a été envoyée. Le locataire sera automatiquement lié à ce bail une fois qu'il aura accepté l'invitation.
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </div>
-
-              {/* Co-Tenants Selection */}
-              <div className="space-y-2">
-                <Label>Colocataires (optionnel)</Label>
-                <div className="border rounded-lg p-3 space-y-2 max-h-40 overflow-y-auto">
-                  {tenants.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Aucun locataire disponible</p>
-                  ) : (
-                    tenants
-                      .filter(tenant => tenant.user_id !== formData.tenant_id)
-                      .map((tenant) => (
-                        <div key={tenant.user_id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`cotenant-${tenant.user_id}`}
-                            checked={selectedCoTenants.includes(tenant.user_id)}
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setSelectedCoTenants([...selectedCoTenants, tenant.user_id])
-                              } else {
-                                setSelectedCoTenants(selectedCoTenants.filter(id => id !== tenant.user_id))
-                              }
-                            }}
-                          />
-                          <Label htmlFor={`cotenant-${tenant.user_id}`} className="cursor-pointer text-sm">
-                            {tenant.first_name} {tenant.last_name} {tenant.email && `(${tenant.email})`}
-                          </Label>
-                        </div>
-                      ))
-                  )}
-                </div>
-                {selectedCoTenants.length > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    {selectedCoTenants.length} colocataire(s) sélectionné(s)
-                  </p>
-                )}
-              </div>
-
-              {/* Guarantors Selection */}
-              <div className="space-y-2">
-                <Label>Garants (optionnel)</Label>
-                <div className="border rounded-lg p-3 space-y-2 max-h-40 overflow-y-auto">
-                  {guarantors.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Aucun garant disponible. Allez dans Garants pour en créer.</p>
-                  ) : (
-                    guarantors.map((guarantor) => (
-                      <div key={guarantor.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`guarantor-${guarantor.id}`}
-                          checked={selectedGuarantors.includes(guarantor.id)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedGuarantors([...selectedGuarantors, guarantor.id])
-                            } else {
-                              setSelectedGuarantors(selectedGuarantors.filter(id => id !== guarantor.id))
-                            }
-                          }}
-                        />
-                        <Label htmlFor={`guarantor-${guarantor.id}`} className="cursor-pointer text-sm">
-                          {guarantor.first_name} {guarantor.last_name}
-                        </Label>
-                      </div>
-                    ))
-                  )}
-                </div>
-                {selectedGuarantors.length > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    {selectedGuarantors.length} garant(s) sélectionné(s)
-                  </p>
-                )}
-              </div>
-
-              {/* Dates */}
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Date de début *</Label>
-                    <Popover open={startPickerOpen} onOpenChange={setStartPickerOpen}>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start text-left font-normal">
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {formData.start_date
-                            ? new Date(formData.start_date + "T00:00:00").toLocaleDateString("fr-FR")
-                            : "Choisir une date"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="p-0 w-auto" align="start">
-                        <Calendar
-                          mode="single"
-                          locale={fr}
-                          selected={formData.start_date ? new Date(formData.start_date + "T00:00:00") : undefined}
-                          onSelect={(d) => {
-                            if (!d) return
-                            const iso = d.toISOString().slice(0, 10)
-                            setFormData({ ...formData, start_date: iso })
-                            setStartPickerOpen(false)
-                          }}
-                          captionLayout="dropdown-buttons"
-                          fromYear={currentYear - 50}
-                          toYear={currentYear + 10}
-                          labels={dayPickerLabels}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Date de fin (optionnelle)</Label>
-                    <Popover open={endPickerOpen} onOpenChange={setEndPickerOpen}>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start text-left font-normal">
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {formData.end_date
-                            ? new Date(formData.end_date + "T00:00:00").toLocaleDateString("fr-FR")
-                            : "Choisir une date"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="p-0 w-auto" align="start">
-                        <Calendar
-                          mode="single"
-                          locale={fr}
-                          selected={formData.end_date ? new Date(formData.end_date + "T00:00:00") : undefined}
-                          onSelect={(d) => {
-                            if (!d) {
-                              setFormData({ ...formData, end_date: "" })
-                              setEndPickerOpen(false)
-                              return
-                            }
-                            const iso = d.toISOString().slice(0, 10)
-                            setFormData({ ...formData, end_date: iso })
-                            setEndPickerOpen(false)
-                          }}
-                          captionLayout="dropdown-buttons"
-                          fromYear={currentYear - 50}
-                          toYear={currentYear + 10}
-                          labels={dayPickerLabels}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription className="text-xs">
-                    Laissez la date de fin vide pour un bail renouvelable tacitement. Vous pourrez y mettre fin ultérieurement en changeant le statut.
-                  </AlertDescription>
-                </Alert>
-              </div>
-
-              {/* Amounts */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="rent_amount">Loyer *</Label>
-                  <Input
-                    id="rent_amount"
-                    type="number"
-                    placeholder="800"
-                    value={formData.rent_amount === 0 ? "" : formData.rent_amount}
-                    onChange={(e) => {
-                      const v = e.target.value
-                      setFormData({ ...formData, rent_amount: v === "" ? 0 : Number(v) })
-                    }}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="charges_amount">Charges</Label>
-                  <Input
-                    id="charges_amount"
-                    type="number"
-                    placeholder="100"
-                    value={!formData.charges_amount ? "" : formData.charges_amount}
-                    onChange={(e) => {
-                      const v = e.target.value
-                      setFormData({ ...formData, charges_amount: v === "" ? 0 : Number(v) })
-                    }}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="deposit_amount">Dépôt de garantie</Label>
-                  <Input
-                    id="deposit_amount"
-                    type="number"
-                    placeholder="800"
-                    value={!formData.deposit_amount ? "" : formData.deposit_amount}
-                    onChange={(e) => {
-                      const v = e.target.value
-                      setFormData({ ...formData, deposit_amount: v === "" ? 0 : Number(v) })
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Contract Type and Status */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="contract_type">Type de contrat</Label>
-                  <Select
-                    value={formData.contract_type ?? "empty"}
-                    onValueChange={(value) => setFormData({ ...formData, contract_type: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Sélectionner un type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="furnished">Meublé</SelectItem>
-                      <SelectItem value="empty">Vide</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="status">Statut</Label>
-                  <Select
-                    value={formData.status ?? "active"}
-                    onValueChange={(value) => setFormData({ ...formData, status: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Statut" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="draft">Brouillon</SelectItem>
-                      <SelectItem value="signed">Signé</SelectItem>
-                      <SelectItem value="active">Actif</SelectItem>
-                      <SelectItem value="terminated">Terminé</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-4">
-                <Button type="submit" className="flex-1" disabled={createLease.isPending || updateLease.isPending}>
-                  {isEditMode ? "Modifier" : "Créer"}
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Annuler
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button className="gap-2" onClick={handleOpenDialog}>
+          <Plus className="w-4 h-4" />
+          Nouveau bail
+        </Button>
       </div>
 
       {/* Search and Filters */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-          <Input
-            placeholder="Rechercher un bail..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Statut" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Tous</SelectItem>
-            <SelectItem value="draft">Brouillons</SelectItem>
-            <SelectItem value="signed">Signés</SelectItem>
-            <SelectItem value="active">Actifs</SelectItem>
-            <SelectItem value="terminated">Terminés</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      <LeasesSearch
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
+      />
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Total Baux</span>
-            </div>
-            <div className="text-2xl font-bold">{leases.length}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Baux Actifs</span>
-            </div>
-            <div className="text-2xl font-bold">{activeLeases}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2">
-              <Euro className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Loyers Mensuels</span>
-            </div>
-            <div className="text-2xl font-bold">{totalRentAmount} €</div>
-          </CardContent>
-        </Card>
-      </div>
+      <LeasesStats leases={leases} />
 
       {/* Leases List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Liste des baux</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Logement</TableHead>
-                <TableHead>Locataire</TableHead>
-                <TableHead>Période</TableHead>
-                <TableHead>Loyer</TableHead>
-                <TableHead>Statut</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredLeases.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
-                    <div className="text-center">
-                      <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">Aucun bail trouvé</h3>
-                      <p className="text-muted-foreground">
-                        Commencez par créer votre premier bail.
-                      </p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredLeases.map((lease) => (
-                  <TableRow key={lease.id} className="hover:bg-muted/50">
-                    <TableCell>
-                      <div>
-                        <div className="font-medium flex items-center gap-1">
-                          <Home className="w-3 h-3" />
-                          {lease.unit?.unit_number}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {lease.unit?.property.name}
-                        </div>
-                      </div>
-                    </TableCell>
+      <LeasesList
+        leases={filteredLeases}
+        onEditLease={handleEditLease}
+        onDeleteLease={handleDeleteLease}
+      />
 
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <User className="w-3 h-3" />
-                        {lease.tenant?.first_name} {lease.tenant?.last_name}
-                      </div>
-                      {lease.coTenants && lease.coTenants.length > 0 && (
-                        <div className="text-xs text-muted-foreground mt-1">
-                          +{lease.coTenants.length} co-locataire(s)
-                        </div>
-                      )}
-                    </TableCell>
-
-                    <TableCell>
-                      <div className="text-sm">
-                        <div className="flex items-center gap-1">
-                          <CalendarIcon className="w-3 h-3" />
-                          {new Date(lease.start_date).toLocaleDateString()}
-                        </div>
-                        {lease.end_date && (
-                          <div className="text-muted-foreground">
-                            → {new Date(lease.end_date).toLocaleDateString()}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-
-                    <TableCell>
-                      <div className="font-medium">{lease.rent_amount} €</div>
-                      {lease.charges_amount && lease.charges_amount > 0 && (
-                        <div className="text-xs text-muted-foreground">
-                          +{lease.charges_amount} € charges
-                        </div>
-                      )}
-                    </TableCell>
-
-                    <TableCell>
-                      <Badge variant={getStatusBadge(lease.status).variant}>
-                        {getStatusBadge(lease.status).label}
-                      </Badge>
-                    </TableCell>
-
-                    <TableCell className="text-right">
-                      <div className="flex gap-1 justify-end">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditLease(lease)}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(lease.id)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {/* Lease Form Dialog */}
+      <LeaseFormDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        lease={selectedLease}
+        properties={properties}
+        tenants={tenants}
+        guarantors={guarantors}
+        onSubmit={handleSubmitLease}
+        onCreateUnit={handleCreateUnit}
+        onCreateInvitation={handleCreateInvitation}
+        isSubmitting={createLease.isPending || updateLease.isPending}
+      />
     </div>
   )
 }

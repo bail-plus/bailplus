@@ -16,6 +16,7 @@ export type LeaseWithDetails = Lease & {
     unit_number: string;
     type?: string;
     property: {
+      id: string;
       name: string;
       address: string;
     };
@@ -92,7 +93,7 @@ async function fetchLeasesWithDetails(entityId?: string | null, showAll?: boolea
         .select(`
           unit_number,
           type,
-          property:properties(name, address)
+          property:properties(id, name, address)
         `)
         .eq('id', lease.unit_id)
         .single();
