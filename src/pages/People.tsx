@@ -1,13 +1,6 @@
 import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Label } from "@/components/ui/label"
-import { Users, Plus, Search, Phone, Mail, MapPin, User, ShieldCheck, Edit, Trash2 } from "lucide-react"
+import { Plus } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import {
   useContactsWithLeaseInfo,
@@ -17,19 +10,15 @@ import {
   type ContactWithLeaseInfo,
   type ContactInsert
 } from "@/hooks/useContacts"
+import { PeopleStats } from "@/components/people/PeopleStats"
+import { PeopleSearch } from "@/components/people/PeopleSearch"
+import { PeopleList } from "@/components/people/PeopleList"
+import { PersonFormDialog } from "@/components/people/PersonFormDialog"
 
 export default function People() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedPerson, setSelectedPerson] = useState<ContactWithLeaseInfo | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [isEditMode, setIsEditMode] = useState(false)
-  const [formData, setFormData] = useState<ContactInsert>({
-    first_name: "",
-    last_name: "",
-    email: "",
-    phone: "",
-    address: "",
-  })
 
   const { toast } = useToast()
   const { data: contacts = [], isLoading, error } = useContactsWithLeaseInfo()
@@ -37,77 +26,36 @@ export default function People() {
   const updateContact = useUpdateContact()
   const deleteContact = useDeleteContact()
 
-  const resetForm = () => {
-    setFormData({
-      first_name: "",
-      last_name: "",
-      email: "",
-      phone: "",
-      address: "",
-    })
-    setIsEditMode(false)
-    setSelectedPerson(null)
-  }
-
   const handleOpenDialog = () => {
-    resetForm()
+    setSelectedPerson(null)
     setIsDialogOpen(true)
   }
 
   const handleEditPerson = (person: ContactWithLeaseInfo) => {
-    setFormData({
-      first_name: person.first_name,
-      last_name: person.last_name,
-      email: person.email ?? "",
-      phone: person.phone ?? "",
-      address: person.address ?? "",
-    })
     setSelectedPerson(person)
-    setIsEditMode(true)
     setIsDialogOpen(true)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!formData.first_name || !formData.last_name) {
-      toast({
-        title: "Erreur",
-        description: "Le prénom et le nom sont requis",
-        variant: "destructive",
+  const handleSubmit = async (formData: ContactInsert) => {
+    if (selectedPerson) {
+      await updateContact.mutateAsync({
+        id: selectedPerson.id,
+        ...formData,
       })
-      return
-    }
-
-    try {
-      if (isEditMode && selectedPerson) {
-        await updateContact.mutateAsync({
-          id: selectedPerson.id,
-          ...formData,
-        })
-        toast({
-          title: "Succès",
-          description: "Contact modifié avec succès",
-        })
-      } else {
-        await createContact.mutateAsync(formData)
-        toast({
-          title: "Succès",
-          description: "Contact créé avec succès",
-        })
-      }
-      setIsDialogOpen(false)
-      resetForm()
-    } catch (error) {
       toast({
-        title: "Erreur",
-        description: error instanceof Error ? error.message : "Une erreur est survenue",
-        variant: "destructive",
+        title: "Succès",
+        description: "Contact modifié avec succès",
+      })
+    } else {
+      await createContact.mutateAsync(formData)
+      toast({
+        title: "Succès",
+        description: "Contact créé avec succès",
       })
     }
   }
 
-  const handleDelete = async (id: string) => {
+  const handleDeletePerson = async (id: string) => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer ce contact ?")) return
 
     try {
@@ -125,7 +73,6 @@ export default function People() {
     }
   }
 
-  // Ne filtrer que par recherche (tous les contacts sont des garants potentiels)
   const filteredPeople = contacts.filter(person => {
     const matchesSearch =
       person.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -170,205 +117,34 @@ export default function People() {
             Gestion des garants pour vos locataires
           </p>
         </div>
-        
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2" onClick={handleOpenDialog}>
-              <Plus className="w-4 h-4" />
-              Nouveau garant
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>
-                {isEditMode ? "Modifier le garant" : "Ajouter un garant"}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="first_name">Prénom *</Label>
-                  <Input
-                    id="first_name"
-                    value={formData.first_name}
-                    onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="last_name">Nom *</Label>
-                  <Input
-                    id="last_name"
-                    value={formData.last_name}
-                    onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                    required
-                  />
-                </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email ?? ""}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="phone">Téléphone</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={formData.phone ?? ""}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="address">Adresse</Label>
-                <Input
-                  id="address"
-                  value={formData.address ?? ""}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                />
-              </div>
-
-              <div className="flex gap-2 pt-4">
-                <Button type="submit" className="flex-1" disabled={createContact.isPending || updateContact.isPending}>
-                  {isEditMode ? "Modifier" : "Créer"}
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Annuler
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        <Button className="gap-2" onClick={handleOpenDialog}>
+          <Plus className="w-4 h-4" />
+          Nouveau garant
+        </Button>
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-          <Input
-            placeholder="Rechercher un garant..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-      </div>
+      {/* Search */}
+      <PeopleSearch searchTerm={searchTerm} onSearchChange={setSearchTerm} />
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Total Garants</span>
-            </div>
-            <div className="text-2xl font-bold">{contacts.length}</div>
-          </CardContent>
-        </Card>
-      </div>
+      <PeopleStats contacts={contacts} />
 
-      {/* Guarantors List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Liste des garants</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nom</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Adresse</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredPeople.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center py-8">
-                    <div className="text-center">
-                      <ShieldCheck className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold mb-2">Aucun garant trouvé</h3>
-                      <p className="text-muted-foreground">
-                        Vous n'avez pas encore ajouté de garants.
-                      </p>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredPeople.map((person) => {
-                  return (
-                    <TableRow key={person.id} className="hover:bg-muted/50">
-                      <TableCell>
-                        <div>
-                          <div className="font-medium">
-                            {person.first_name} {person.last_name}
-                          </div>
-                        </div>
-                      </TableCell>
+      {/* People List */}
+      <PeopleList
+        people={filteredPeople}
+        onEditPerson={handleEditPerson}
+        onDeletePerson={handleDeletePerson}
+      />
 
-                      <TableCell>
-                        <div className="text-sm space-y-1">
-                          {person.email && (
-                            <div className="flex items-center gap-1">
-                              <Mail className="w-3 h-3" />
-                              {person.email}
-                            </div>
-                          )}
-                          {person.phone && (
-                            <div className="flex items-center gap-1">
-                              <Phone className="w-3 h-3" />
-                              {person.phone}
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-
-                      <TableCell>
-                        <div className="text-sm">
-                          {person.address && (
-                            <div className="flex items-center gap-1">
-                              <MapPin className="w-3 h-3" />
-                              {person.address}
-                            </div>
-                          )}
-                        </div>
-                      </TableCell>
-
-                      <TableCell className="text-right">
-                        <div className="flex gap-1 justify-end">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditPerson(person)}
-                          >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(person.id)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
+      {/* Person Form Dialog */}
+      <PersonFormDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        person={selectedPerson}
+        onSubmit={handleSubmit}
+        isSubmitting={createContact.isPending || updateContact.isPending}
+      />
     </div>
   )
 }
