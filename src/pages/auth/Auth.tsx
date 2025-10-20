@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useAuth, useSignIn, useSignUp, useSignInWithGoogle, Gender, Role } from '@/hooks/useAuth';
+import { useAuth, useSignIn, useSignUp, useSignInWithGoogle, Gender, Role } from '@/hooks/auth/useAuth';
 
 export default function Auth() {
   const { user, loading } = useAuth();

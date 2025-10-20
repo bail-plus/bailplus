@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Building2, Home, MapPin } from "lucide-react"
-import type { PropertyWithUnits } from "@/hooks/useProperties"
+import type { PropertyWithUnits } from "@/hooks/properties/useProperties"
 
 interface PropertiesStatsProps {
   properties: PropertyWithUnits[]

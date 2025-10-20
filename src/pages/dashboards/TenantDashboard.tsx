@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
-import { useAuth } from "@/hooks/useAuth"
-import { useMaintenanceTicketsWithDetails } from "@/hooks/useMaintenance"
-import { useTenantData } from "@/hooks/useTenantData"
+import { useAuth } from "@/hooks/auth/useAuth"
+import { useMaintenanceTicketsWithDetails } from "@/hooks/maintenance/useMaintenance"
+import { useTenantData } from "@/hooks/leasing/useTenantData"
 import { TenantKPIs } from "@/components/dashboard/TenantKPIs"
 import {
   MyHomeInfo,

@@ -1,4 +1,4 @@
-import { useTicketUnread } from "@/hooks/useTicketUnread"
+import { useTicketUnread } from "@/hooks/maintenance/useTicketUnread"
 
 interface MessagesTabLabelProps {
   ticketId: string

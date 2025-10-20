@@ -1,15 +1,15 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/hooks/ui/use-toast"
 import {
   useServiceProviders,
   useUpdateServiceProvider,
   useDeleteServiceProvider,
   type ServiceProvider
-} from "@/hooks/useServiceProviders"
-import { useServiceProviderUsers, type User as ProviderUser } from "@/hooks/useUsers"
-import { useInvitations } from "@/hooks/useInvitations"
+} from "@/hooks/providers/useServiceProviders"
+import { useServiceProviderUsers, type User as ProviderUser } from "@/hooks/account/useUsers"
+import { useInvitations } from "@/hooks/account/useInvitations"
 import { ProvidersStats } from "@/components/providers/ProvidersStats"
 import { ProvidersSearch } from "@/components/providers/ProvidersSearch"
 import { ProvidersList } from "@/components/providers/ProvidersList"

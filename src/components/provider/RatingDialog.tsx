@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { useCreateRating, useUpdateRating, useCheckUserRating } from '@/hooks/useProviderRatings';
+import { useCreateRating, useUpdateRating, useCheckUserRating } from '@/hooks/providers/useProviderRatings';
 
 interface RatingDialogProps {
   open: boolean;

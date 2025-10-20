@@ -1,5 +1,5 @@
-import { useToast } from "@/hooks/use-toast"
-import { useUpdateRentInvoice } from "@/hooks/useAccounting"
+import { useToast } from "@/hooks/ui/use-toast"
+import { useUpdateRentInvoice } from "@/hooks/accounting/useAccounting"
 import { supabase } from "@/integrations/supabase/client"
 import { downloadInvoiceReceipt, generateAndUploadReceipt } from "@/services/receiptGenerator.tsx"
 

@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Send } from "lucide-react"
 import { getRecipientTypeLabel } from "@/lib/communication-utils"
-import type { CommunicationTemplate } from "@/hooks/useCommunications"
+import type { CommunicationTemplate } from "@/hooks/communications/useCommunications"
 import type { Tables } from "@/integrations/supabase/types"
 
 type ProfileSummary = Pick<

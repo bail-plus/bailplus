@@ -9,14 +9,14 @@ import {
   defaultTriInputs,
 } from "@/lib/tri-schemas";
 import { computeTri, type TriResult } from "@/lib/tri-calculator";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/ui/use-toast";
 import {
   useCreateTRISimulation,
   useUpdateTRISimulation,
   useTRISimulations,
   useDeleteTRISimulation,
   type TRISimulationWithData,
-} from "@/hooks/useTRISimulations";
+} from "@/hooks/tri/useTRISimulations";
 import { TRIPDFTemplate } from "@/components/tri-pdf-template";
 
 export type TRISimulatorController = ReturnType<

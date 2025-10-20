@@ -1,12 +1,12 @@
 import { useState } from "react"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/hooks/ui/use-toast"
 import {
   useUpdateMaintenanceTicket,
   useDeleteMaintenanceTicket,
   type MaintenanceTicketWithDetails,
-} from "@/hooks/useMaintenance"
-import { addServiceProviderToTicket } from "@/hooks/useTicketParticipants"
-import { notifyProviderAssignment } from "@/hooks/useNotifications"
+} from "@/hooks/maintenance/useMaintenance"
+import { addServiceProviderToTicket } from "@/hooks/maintenance/useTicketParticipants"
+import { notifyProviderAssignment } from "@/hooks/notifications/useNotifications"
 
 export function useTicketActions(tickets: MaintenanceTicketWithDetails[]) {
   const { toast } = useToast()

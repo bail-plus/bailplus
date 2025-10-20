@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { FileText, Download, Eye, Loader2 } from "lucide-react"
-import type { Document } from "@/hooks/useDocuments"
+import type { Document } from "@/hooks/documents/useDocuments"
 import { getDocumentBadge, getCategoryLabel, formatDate } from "@/lib/document-utils"
 
 interface DocumentPreviewModalProps {

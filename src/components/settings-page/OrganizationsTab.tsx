@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, Building, Users, Trash2 } from "lucide-react";
 
-import type { Entity, EntityType } from "@/hooks/useSettingsController";
+import type { Entity, EntityType } from "@/hooks/account/useSettingsController";
 
 type OrganizationsTabProps = {
   entities: Entity[];

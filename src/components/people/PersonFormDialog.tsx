@@ -3,8 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useToast } from "@/hooks/use-toast"
-import type { ContactWithLeaseInfo, ContactInsert } from "@/hooks/useContacts"
+import { useToast } from "@/hooks/ui/use-toast"
+import type { ContactWithLeaseInfo, ContactInsert } from "@/hooks/properties/useContacts"
 
 interface PersonFormDialogProps {
   open: boolean

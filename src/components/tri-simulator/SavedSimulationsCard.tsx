@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { TRISimulationWithData } from "@/hooks/useTRISimulations";
+import type { TRISimulationWithData } from "@/hooks/tri/useTRISimulations";
 
 type SavedSimulationsCardProps = {
   simulations: TRISimulationWithData[];

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CreditCard, Building2, Plus, CheckCircle, AlertCircle, Loader2 } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/hooks/ui/use-toast"
 
 const SUPPORTED_BANKS = [
   { id: "bnp", name: "BNP Paribas", logo: "🏦" },

@@ -4,8 +4,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import { useToast } from "@/hooks/use-toast"
-import type { ServiceProvider } from "@/hooks/useServiceProviders"
+import { useToast } from "@/hooks/ui/use-toast"
+import type { ServiceProvider } from "@/hooks/providers/useServiceProviders"
 
 const SPECIALTIES = [
   "Plomberie",

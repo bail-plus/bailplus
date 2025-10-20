@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, ArrowLeft } from 'lucide-react';
-import { useResetPasswordRequest } from '@/hooks/useAuth';
+import { useResetPasswordRequest } from '@/hooks/auth/useAuth';
 
 export default function ForgotPassword() {
   const navigate = useNavigate();

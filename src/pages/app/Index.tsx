@@ -1,4 +1,4 @@
-import { useAuth } from "@/hooks/useAuth"
+import { useAuth } from "@/hooks/auth/useAuth"
 import LandlordDashboard from "../dashboards/LandlordDashboard"
 import TenantDashboard from "../dashboards/TenantDashboard"
 import ProviderDashboard from "../dashboards/ProviderDashboard"

@@ -10,7 +10,7 @@ import { MessagesTabLabel } from "./MessagesTabLabel"
 import { TicketMessagesPanel } from "./TicketMessagesPanel"
 import { ProviderRatingSection } from "./ProviderRatingSection"
 import { getPriorityBadge, getStatusBadge, getWorkOrderStatusBadge, formatDate } from "./maintenance-utils"
-import type { MaintenanceTicketWithDetails, WorkOrder } from "@/hooks/useMaintenance"
+import type { MaintenanceTicketWithDetails, WorkOrder } from "@/hooks/maintenance/useMaintenance"
 
 interface TicketDetailModalProps {
   selectedTicket: MaintenanceTicketWithDetails | null

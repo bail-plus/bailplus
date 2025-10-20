@@ -13,7 +13,7 @@ import { NotificationsTab } from "@/components/settings-page/NotificationsTab";
 import {
   useSettingsController,
   type EntityType,
-} from "@/hooks/useSettingsController";
+} from "@/hooks/account/useSettingsController";
 import type { SettingsTab } from "@/components/settings-page/SettingsTabsNav";
 
 export default function Settings() {

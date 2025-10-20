@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { ShieldCheck } from "lucide-react"
-import type { ContactWithLeaseInfo } from "@/hooks/useContacts"
+import type { ContactWithLeaseInfo } from "@/hooks/properties/useContacts"
 
 interface PeopleStatsProps {
   contacts: ContactWithLeaseInfo[]

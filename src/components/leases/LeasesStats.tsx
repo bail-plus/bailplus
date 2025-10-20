@@ -1,6 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { FileText, Euro } from "lucide-react"
-import type { LeaseWithDetails } from "@/hooks/useLeases"
+import type { LeaseWithDetails } from "@/hooks/leasing/useLeases"
 
 interface LeasesStatsProps {
   leases: LeaseWithDetails[]

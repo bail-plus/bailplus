@@ -1,4 +1,4 @@
-import type { Entity, EntityType, NotificationPreferences } from "@/hooks/useSettingsController";
+import type { Entity, EntityType, NotificationPreferences } from "@/hooks/account/useSettingsController";
 
 export type { Entity, EntityType, NotificationPreferences };
 

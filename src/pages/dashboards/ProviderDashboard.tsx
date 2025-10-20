@@ -1,7 +1,7 @@
-import { useAuth } from "@/hooks/useAuth"
-import { useMaintenanceTicketsWithDetails } from "@/hooks/useMaintenance"
-import { useProviderData } from "@/hooks/useProviderData"
-import { useMyProviderRatings } from "@/hooks/useProviderRatings"
+import { useAuth } from "@/hooks/auth/useAuth"
+import { useMaintenanceTicketsWithDetails } from "@/hooks/maintenance/useMaintenance"
+import { useProviderData } from "@/hooks/providers/useProviderData"
+import { useMyProviderRatings } from "@/hooks/providers/useProviderRatings"
 import { ProviderKPIs } from "@/components/dashboard/ProviderKPIs"
 import {
   RatingsCard,

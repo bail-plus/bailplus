@@ -1,9 +1,9 @@
 import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { useTicketMessages, useSendTicketMessage } from "@/hooks/useTicketChat"
-import { useMarkTicketRead, useMarkTicketNotificationsRead } from "@/hooks/useTicketUnread"
-import type { MaintenanceTicketWithDetails } from "@/hooks/useMaintenance"
+import { useTicketMessages, useSendTicketMessage } from "@/hooks/maintenance/useTicketChat"
+import { useMarkTicketRead, useMarkTicketNotificationsRead } from "@/hooks/maintenance/useTicketUnread"
+import type { MaintenanceTicketWithDetails } from "@/hooks/maintenance/useMaintenance"
 
 interface TicketMessagesPanelProps {
   ticket: MaintenanceTicketWithDetails

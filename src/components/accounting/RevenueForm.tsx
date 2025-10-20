@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Plus } from "lucide-react"
-import { type BankTransactionInsert } from "@/hooks/useAccounting"
+import { type BankTransactionInsert } from "@/hooks/accounting/useAccounting"
 
 interface RevenueFormProps {
   isOpen: boolean

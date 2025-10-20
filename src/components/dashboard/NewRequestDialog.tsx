@@ -5,8 +5,8 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useToast } from "@/hooks/use-toast"
-import { useCreateMaintenanceTicket, type MaintenanceTicketInsert } from "@/hooks/useMaintenance"
+import { useToast } from "@/hooks/ui/use-toast"
+import { useCreateMaintenanceTicket, type MaintenanceTicketInsert } from "@/hooks/maintenance/useMaintenance"
 
 interface NewRequestDialogProps {
   trigger: React.ReactNode

@@ -4,7 +4,7 @@ import { TRIResultsSection } from "@/components/tri-simulator/TRIResultsSection"
 import { TRIParametersForm } from "@/components/tri-simulator/TRIParametersForm";
 import { TRISaveSimulationDialog } from "@/components/tri-simulator/TRISaveSimulationDialog";
 import { TRIDeleteSimulationDialog } from "@/components/tri-simulator/TRIDeleteSimulationDialog";
-import { useTRISimulatorController } from "@/hooks/useTRISimulatorController";
+import { useTRISimulatorController } from "@/hooks/tri/useTRISimulatorController";
 
 export default function TRISimulator() {
   const {

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Plus } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/hooks/ui/use-toast"
 import {
   useCreateCommunicationLog,
   useCreateCommunicationTemplate,
@@ -13,8 +13,8 @@ import {
   type CommunicationLogInsert,
   type CommunicationTemplateInsert,
   type CommunicationTemplate,
-} from "@/hooks/useCommunications"
-import { useCommunicationData } from "@/hooks/useCommunicationData"
+} from "@/hooks/communications/useCommunications"
+import { useCommunicationData } from "@/hooks/communications/useCommunicationData"
 import { CommunicationsStats } from "@/components/communications/CommunicationsStats"
 import { calculateCommunicationStats, mapRecipientTypeForLog } from "@/lib/communication-utils"
 import { MessageFormDialog } from "@/components/communications/MessageFormDialog"

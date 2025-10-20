@@ -11,12 +11,12 @@ import { Button } from "@/components/ui/button"
 import { Plus, Calendar as CalendarIcon, AlertCircle } from "lucide-react"
 import { fr } from "date-fns/locale"
 import { supabase } from "@/integrations/supabase/client"
-import { useToast } from "@/hooks/use-toast"
-import type { LeaseWithDetails, LeaseInsert } from "@/hooks/useLeases"
-import type { PropertyWithUnits } from "@/hooks/useProperties"
-import type { Tenant } from "@/hooks/useUsers"
-import type { ContactWithLeaseInfo } from "@/hooks/useContacts"
-import type { UnitInsert } from "@/hooks/useUnits"
+import { useToast } from "@/hooks/ui/use-toast"
+import type { LeaseWithDetails, LeaseInsert } from "@/hooks/leasing/useLeases"
+import type { PropertyWithUnits } from "@/hooks/properties/useProperties"
+import type { Tenant } from "@/hooks/account/useUsers"
+import type { ContactWithLeaseInfo } from "@/hooks/properties/useContacts"
+import type { UnitInsert } from "@/hooks/leasing/useUnits"
 
 interface LeaseFormDialogProps {
   open: boolean

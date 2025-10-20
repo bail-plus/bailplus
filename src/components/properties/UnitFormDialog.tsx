@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import type { Unit, UnitInsert } from "@/hooks/useUnits"
+import type { Unit, UnitInsert } from "@/hooks/leasing/useUnits"
 
 interface UnitFormDialogProps {
   open: boolean

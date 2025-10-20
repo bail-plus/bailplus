@@ -1,6 +1,6 @@
 import { Bell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useInAppNotifications } from '@/hooks/useInAppNotifications'
+import { useInAppNotifications } from '@/hooks/notifications/useInAppNotifications'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'

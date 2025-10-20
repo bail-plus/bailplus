@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Upload, X, FileIcon, Image as ImageIcon, Loader2 } from 'lucide-react'
-import { useToast } from '@/hooks/use-toast'
+import { useToast } from '@/hooks/ui/use-toast'
 import { supabase } from '@/integrations/supabase/client'
 import { cn } from '@/lib/utils'
 

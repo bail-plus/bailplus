@@ -7,12 +7,12 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
 import { Wrench, Star, TrendingUp, Users, Save } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
-import { useAuth } from "@/hooks/useAuth"
+import { useToast } from "@/hooks/ui/use-toast"
+import { useAuth } from "@/hooks/auth/useAuth"
 import { supabase } from "@/integrations/supabase/client"
-import { useMyProviderRatings, useMyProviderRatingStats } from "@/hooks/useProviderRatings"
+import { useMyProviderRatings, useMyProviderRatingStats } from "@/hooks/providers/useProviderRatings"
 import { Progress } from "@/components/ui/progress"
-import type { ServiceProvider } from "@/hooks/useServiceProviders"
+import type { ServiceProvider } from "@/hooks/providers/useServiceProviders"
 
 const SPECIALTIES = [
   "Plomberie",

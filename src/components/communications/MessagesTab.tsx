@@ -7,7 +7,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Search, Eye, Mail } from "lucide-react"
 import { getChannelIcon, getChannelBadge, getStatusBadge, formatDate, getRecipientTypeLabel } from "@/lib/communication-utils"
-import type { ContactWithLeaseInfo } from "@/hooks/useContacts"
+import type { ContactWithLeaseInfo } from "@/hooks/properties/useContacts"
 import type { Tables } from "@/integrations/supabase/types"
 
 type ProfileSummary = Pick<

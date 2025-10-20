@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Mail, Plus, Edit, Copy, Trash2 } from "lucide-react"
 import { getChannelIcon, getChannelBadge } from "@/lib/communication-utils"
-import { extractVariables, type CommunicationTemplate } from "@/hooks/useCommunications"
+import { extractVariables, type CommunicationTemplate } from "@/hooks/communications/useCommunications"
 
 interface TemplatesTabProps {
   templates: CommunicationTemplate[]

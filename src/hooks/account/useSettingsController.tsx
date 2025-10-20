@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/auth/useAuth";
 
 export type EntityType = Database["public"]["Enums"]["entity_type_enum"];
 

@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Building2, MapPin, Home, Edit, Trash2 } from "lucide-react"
-import type { PropertyWithUnits } from "@/hooks/useProperties"
+import type { PropertyWithUnits } from "@/hooks/properties/useProperties"
 
 interface PropertiesListProps {
   properties: PropertyWithUnits[]

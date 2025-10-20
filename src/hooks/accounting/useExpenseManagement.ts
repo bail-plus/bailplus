@@ -1,12 +1,12 @@
 import { useState } from "react"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/hooks/ui/use-toast"
 import {
   useCreateExpense,
   useUpdateExpense,
   useDeleteExpense,
   type ExpenseWithDetails,
   type ExpenseInsert,
-} from "@/hooks/useAccounting"
+} from "@/hooks/accounting/useAccounting"
 
 export function useExpenseManagement() {
   const { toast } = useToast()

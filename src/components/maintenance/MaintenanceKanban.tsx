@@ -1,7 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { AlertTriangle, Clock, CheckCircle } from "lucide-react"
-import type { MaintenanceTicketWithDetails } from "@/hooks/useMaintenance"
+import type { MaintenanceTicketWithDetails } from "@/hooks/maintenance/useMaintenance"
 
 const KANBAN_COLUMNS = [
   { id: "NOUVEAU", title: "Nouveau", color: "bg-red-50", icon: AlertTriangle },

@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/hooks/ui/use-toast"
 import { supabase } from "@/integrations/supabase/client"
 import {
   useLeasesWithDetails,
@@ -10,12 +10,12 @@ import {
   useDeleteLease,
   type LeaseWithDetails,
   type LeaseInsert
-} from "@/hooks/useLeases"
-import { usePropertiesWithUnits } from "@/hooks/useProperties"
-import { useContactsWithLeaseInfo } from "@/hooks/useContacts"
-import { useTenants } from "@/hooks/useUsers"
-import { useCreateUnit } from "@/hooks/useUnits"
-import { useInvitations } from "@/hooks/useInvitations"
+} from "@/hooks/leasing/useLeases"
+import { usePropertiesWithUnits } from "@/hooks/properties/useProperties"
+import { useContactsWithLeaseInfo } from "@/hooks/properties/useContacts"
+import { useTenants } from "@/hooks/account/useUsers"
+import { useCreateUnit } from "@/hooks/leasing/useUnits"
+import { useInvitations } from "@/hooks/account/useInvitations"
 import { LeasesStats } from "@/components/leases/LeasesStats"
 import { LeasesSearch } from "@/components/leases/LeasesSearch"
 import { LeasesList } from "@/components/leases/LeasesList"

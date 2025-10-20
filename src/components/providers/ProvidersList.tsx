@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Wrench, Edit, Trash2, Euro, Star } from "lucide-react"
-import type { ServiceProvider } from "@/hooks/useServiceProviders"
+import type { ServiceProvider } from "@/hooks/providers/useServiceProviders"
 
 interface ProvidersListProps {
   providers: any[]

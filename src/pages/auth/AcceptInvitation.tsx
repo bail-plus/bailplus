@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useInvitations, type Invitation } from '@/hooks/useInvitations';
+import { useInvitations, type Invitation } from '@/hooks/account/useInvitations';
 import { Loader2, AlertCircle, CheckCircle2, Mail, User, Shield } from 'lucide-react';
 
 export default function AcceptInvitation() {

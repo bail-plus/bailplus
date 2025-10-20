@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 
-import type { NotificationPreferences } from "@/hooks/useSettingsController";
+import type { NotificationPreferences } from "@/hooks/account/useSettingsController";
 
 type NotificationsTabProps = {
   prefs: NotificationPreferences;

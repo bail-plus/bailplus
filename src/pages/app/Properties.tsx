@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/hooks/ui/use-toast"
 import {
   usePropertiesWithUnits,
   useCreateProperty,
@@ -9,7 +9,7 @@ import {
   useDeleteProperty,
   type PropertyWithUnits,
   type PropertyInsert
-} from "@/hooks/useProperties"
+} from "@/hooks/properties/useProperties"
 import {
   useUnitsByProperty,
   useCreateUnit,
@@ -17,7 +17,7 @@ import {
   useDeleteUnit,
   type Unit,
   type UnitInsert
-} from "@/hooks/useUnits"
+} from "@/hooks/leasing/useUnits"
 import { PropertiesStats } from "@/components/properties/PropertiesStats"
 import { PropertiesSearch } from "@/components/properties/PropertiesSearch"
 import { PropertiesList } from "@/components/properties/PropertiesList"

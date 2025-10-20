@@ -1,5 +1,5 @@
 import { Mail, MessageSquare, Clock, CheckCircle, AlertCircle } from "lucide-react"
-import type { ContactWithLeaseInfo } from "@/hooks/useContacts"
+import type { ContactWithLeaseInfo } from "@/hooks/properties/useContacts"
 import type { Tables } from "@/integrations/supabase/types"
 
 type ProfileSummary = Pick<

@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/layout";
-import { AuthProvider } from "@/hooks/useAuth";
+import { AuthProvider } from "@/hooks/auth/useAuth";
 import { RequireAuth, RequireSubscription } from "@/guards";
 
 // App pages (protected)

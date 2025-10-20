@@ -1,12 +1,12 @@
 import { useState } from "react"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/hooks/ui/use-toast"
 import {
   useCreateBankTransaction,
   useUpdateBankTransaction,
   useDeleteBankTransaction,
   type BankTransactionWithDetails,
   type BankTransactionInsert,
-} from "@/hooks/useAccounting"
+} from "@/hooks/accounting/useAccounting"
 
 export function useTransactionManagement() {
   const { toast } = useToast()

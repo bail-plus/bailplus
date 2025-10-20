@@ -1,9 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/hooks/auth/useAuth';
 import { useEntity } from '@/contexts/EntityContext';
-import { autoCreateTicketParticipants } from '@/hooks/useTicketParticipants';
+import { autoCreateTicketParticipants } from '@/hooks/maintenance/useTicketParticipants';
 
 export type MaintenanceTicket = Tables<'maintenance_tickets'>;
 export type MaintenanceTicketInsert = TablesInsert<'maintenance_tickets'>;
@@ -242,7 +242,7 @@ async function fetchTicketById(id: string): Promise<MaintenanceTicket> {
 }
 
 // Create a new maintenance ticket
-import { notifyNewTicket, notifyProviderAssignment, notifyTicketStatusChange } from '@/hooks/useNotifications'
+import { notifyNewTicket, notifyProviderAssignment, notifyTicketStatusChange } from '@/hooks/notifications/useNotifications'
 
 async function createMaintenanceTicket(ticket: MaintenanceTicketInsert): Promise<MaintenanceTicket> {
   const { data: { user } } = await supabase.auth.getUser();

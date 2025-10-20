@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Mail, Phone, MapPin, ShieldCheck, Edit, Trash2 } from "lucide-react"
-import type { ContactWithLeaseInfo } from "@/hooks/useContacts"
+import type { ContactWithLeaseInfo } from "@/hooks/properties/useContacts"
 
 interface PeopleListProps {
   people: ContactWithLeaseInfo[]

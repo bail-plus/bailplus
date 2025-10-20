@@ -4,8 +4,8 @@ import {
   useExpenses,
   useRentInvoices,
   useBankTransactions,
-} from "@/hooks/useAccounting"
-import { usePropertiesWithUnits } from "@/hooks/useProperties"
+} from "@/hooks/accounting/useAccounting"
+import { usePropertiesWithUnits } from "@/hooks/properties/useProperties"
 import { useQueryClient } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
 import { FinancialStats } from "@/components/accounting/FinancialStats"

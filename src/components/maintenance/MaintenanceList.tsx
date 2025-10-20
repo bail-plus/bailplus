@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Wrench, Edit, Trash2 } from "lucide-react"
-import type { MaintenanceTicketWithDetails } from "@/hooks/useMaintenance"
+import type { MaintenanceTicketWithDetails } from "@/hooks/maintenance/useMaintenance"
 
 interface MaintenanceListProps {
   tickets: MaintenanceTicketWithDetails[]

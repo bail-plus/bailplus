@@ -5,7 +5,7 @@ import { GlobalSearch } from "@/components/global-search"
 import { CreateButton } from "@/components/create-button"
 import { Button } from "@/components/ui/button"
 import { LogOut, User } from "lucide-react"
-import { useAuth, useSignOut } from "@/hooks/useAuth"
+import { useAuth, useSignOut } from "@/hooks/auth/useAuth"
 import { NotificationBell } from "@/components/notifications/NotificationBell"
 import {
   DropdownMenu,

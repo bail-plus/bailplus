@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Euro, Edit, Trash2 } from "lucide-react"
-import { type ExpenseWithDetails } from "@/hooks/useAccounting"
+import { type ExpenseWithDetails } from "@/hooks/accounting/useAccounting"
 
 interface ExpensesListProps {
   expenses: ExpenseWithDetails[]

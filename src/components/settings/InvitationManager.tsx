@@ -7,11 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useInvitations, type Invitation } from '@/hooks/useInvitations';
+import { useInvitations, type Invitation } from '@/hooks/account/useInvitations';
 import { generateInvitationUrl } from '@/lib/invitation-token';
 import { Plus, Copy, RefreshCw, X, Loader2, CheckCircle2, Clock, XCircle, AlertCircle, Users, Trash2, Edit, Search, ChevronLeft, ChevronRight, UserCheck, UserCog } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
 export function InvitationManager() {

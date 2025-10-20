@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { FileText, Home, User, Calendar as CalendarIcon, Edit, Trash2 } from "lucide-react"
-import type { LeaseWithDetails } from "@/hooks/useLeases"
+import type { LeaseWithDetails } from "@/hooks/leasing/useLeases"
 
 interface LeasesListProps {
   leases: LeaseWithDetails[]

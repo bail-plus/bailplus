@@ -1,5 +1,5 @@
-import { useDashboard } from "@/hooks/useDashboard"
-import { useServiceProviders } from "@/hooks/useServiceProviders"
+import { useDashboard } from "@/hooks/analytics/useDashboard"
+import { useServiceProviders } from "@/hooks/providers/useServiceProviders"
 import { getCurrentMonth } from "@/utils/formatters"
 import { DashboardKPIs } from "@/components/dashboard/DashboardKPIs"
 import { DashboardFinancialOverview } from "@/components/dashboard/DashboardFinancialOverview"

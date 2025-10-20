@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { FileText, Download, Eye, Loader2 } from "lucide-react"
-import type { Document } from "@/hooks/useDocuments"
+import type { Document } from "@/hooks/documents/useDocuments"
 import { getDocumentIcon, getDocumentBadge, getCategoryLabel, formatDate } from "@/lib/document-utils"
 
 interface DocumentsTableProps {

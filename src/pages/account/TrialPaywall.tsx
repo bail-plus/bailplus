@@ -1,10 +1,10 @@
 // src/pages/TrialPaywall.tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ArrowRight, Check, Loader2 } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/hooks/auth/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useOffers } from '@/hooks/useOffers';
+import { useOffers } from '@/hooks/marketing/useOffers';
 import { Badge } from "@/components/ui/badge";
 import { useCheckout } from "@/components/offers/useCheckout";
 

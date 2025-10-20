@@ -1,7 +1,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/hooks/ui/use-toast"
 import {
   useContactsWithLeaseInfo,
   useCreateContact,
@@ -9,7 +9,7 @@ import {
   useDeleteContact,
   type ContactWithLeaseInfo,
   type ContactInsert
-} from "@/hooks/useContacts"
+} from "@/hooks/properties/useContacts"
 import { PeopleStats } from "@/components/people/PeopleStats"
 import { PeopleSearch } from "@/components/people/PeopleSearch"
 import { PeopleList } from "@/components/people/PeopleList"

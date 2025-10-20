@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { supabase } from "@/integrations/supabase/client"
-import { useCommunicationLogs, useCommunicationTemplates } from "@/hooks/useCommunications"
-import { useContactsWithLeaseInfo, type ContactWithLeaseInfo } from "@/hooks/useContacts"
+import { useCommunicationLogs, useCommunicationTemplates } from "@/hooks/communications/useCommunications"
+import { useContactsWithLeaseInfo, type ContactWithLeaseInfo } from "@/hooks/properties/useContacts"
 import type { Tables } from "@/integrations/supabase/types"
 
 type ProfileSummary = Pick<

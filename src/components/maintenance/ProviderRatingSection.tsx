@@ -2,8 +2,8 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { User, Star } from "lucide-react"
-import { useCheckUserRating } from "@/hooks/useProviderRatings"
-import type { MaintenanceTicketWithDetails } from "@/hooks/useMaintenance"
+import { useCheckUserRating } from "@/hooks/providers/useProviderRatings"
+import type { MaintenanceTicketWithDetails } from "@/hooks/maintenance/useMaintenance"
 
 interface ProviderRatingSectionProps {
   selectedTicket: MaintenanceTicketWithDetails

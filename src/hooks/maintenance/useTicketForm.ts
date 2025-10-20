@@ -1,14 +1,14 @@
 import { useState } from "react"
-import { useToast } from "@/hooks/use-toast"
+import { useToast } from "@/hooks/ui/use-toast"
 import {
   useCreateMaintenanceTicket,
   useUpdateMaintenanceTicket,
   type MaintenanceTicketWithDetails,
   type MaintenanceTicketInsert,
-} from "@/hooks/useMaintenance"
-import { useFileUpload } from "@/hooks/useFileUpload"
-import { addServiceProviderToTicket } from "@/hooks/useTicketParticipants"
-import { notifyProviderAssignment } from "@/hooks/useNotifications"
+} from "@/hooks/maintenance/useMaintenance"
+import { useFileUpload } from "@/hooks/documents/useFileUpload"
+import { addServiceProviderToTicket } from "@/hooks/maintenance/useTicketParticipants"
+import { notifyProviderAssignment } from "@/hooks/notifications/useNotifications"
 import { resolveLeaseTenantInfo } from "@/lib/tenant-resolver"
 
 export function useTicketForm() {
