@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { supabase } from "@/integrations/supabase/client"
-import { Folder, Loader2 } from "lucide-react"
+import { FileText, Loader2 } from "lucide-react"
 import { pdf } from '@react-pdf/renderer'
-import { EDLPDFTemplate } from "./edl-pdf-template"
+import { ReceiptPDFTemplate } from "./ReceiptPdfTemplateQuittance"
 import { useEntity } from "@/contexts/EntityContext"
 
 interface Property {
@@ -26,6 +26,8 @@ interface Unit {
 interface Lease {
   id: string
   tenant_id: string
+  rent_amount: number
+  charges_amount: number
   contact: {
     first_name: string | null
     last_name: string | null
@@ -33,11 +35,26 @@ interface Lease {
   }
 }
 
-interface EDLGeneratorModalProps {
+interface ReceiptGeneratorModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onGenerate?: () => void
 }
+
+const MONTHS = [
+  { value: "1", label: "Janvier" },
+  { value: "2", label: "Février" },
+  { value: "3", label: "Mars" },
+  { value: "4", label: "Avril" },
+  { value: "5", label: "Mai" },
+  { value: "6", label: "Juin" },
+  { value: "7", label: "Juillet" },
+  { value: "8", label: "Août" },
+  { value: "9", label: "Septembre" },
+  { value: "10", label: "Octobre" },
+  { value: "11", label: "Novembre" },
+  { value: "12", label: "Décembre" }
+]
 
 interface LandlordProfile {
   first_name: string | null
@@ -47,7 +64,7 @@ interface LandlordProfile {
   postal_code: number | null
 }
 
-export default function EDLGeneratorModal({ open, onOpenChange, onGenerate }: EDLGeneratorModalProps) {
+export default function ReceiptGeneratorModal({ open, onOpenChange, onGenerate }: ReceiptGeneratorModalProps) {
   const { selectedEntity, showAll } = useEntity()
   const [properties, setProperties] = useState<Property[]>([])
   const [units, setUnits] = useState<Unit[]>([])
@@ -58,7 +75,8 @@ export default function EDLGeneratorModal({ open, onOpenChange, onGenerate }: ED
 
   const [selectedProperty, setSelectedProperty] = useState<string>("")
   const [selectedUnit, setSelectedUnit] = useState<string>("")
-  const [edlType, setEdlType] = useState<"ENTREE" | "SORTIE">("ENTREE")
+  const [selectedMonth, setSelectedMonth] = useState<string>(String(new Date().getMonth() + 1))
+  const [selectedYear, setSelectedYear] = useState<string>(String(new Date().getFullYear()))
 
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -158,10 +176,10 @@ export default function EDLGeneratorModal({ open, onOpenChange, onGenerate }: ED
   const loadLease = async (unitId: string) => {
     setLoading(true)
     try {
-      // Get active lease
+      // First get the lease
       const { data: leaseData, error: leaseError } = await supabase
         .from('leases')
-        .select('id, tenant_id')
+        .select('id, tenant_id, rent_amount, charges_amount')
         .eq('unit_id', unitId)
         .eq('status', 'active')
         .maybeSingle()
@@ -173,7 +191,7 @@ export default function EDLGeneratorModal({ open, onOpenChange, onGenerate }: ED
         return
       }
 
-      // Get contact info
+      // Then get the contact (tenant) info
       const { data: contactData, error: contactError } = await supabase
         .from('contacts')
         .select('first_name, last_name, address')
@@ -182,6 +200,7 @@ export default function EDLGeneratorModal({ open, onOpenChange, onGenerate }: ED
 
       if (contactError) throw contactError
 
+      // Combine the data
       setLease({
         ...leaseData,
         contact: contactData
@@ -195,12 +214,31 @@ export default function EDLGeneratorModal({ open, onOpenChange, onGenerate }: ED
   }
 
   const handleGenerate = async () => {
-    if (!lease || !selectedPropertyData || !selectedUnitData) return
+    if (!lease || !selectedMonth || !selectedYear || !selectedPropertyData || !selectedUnitData) return
 
     setGenerating(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Utilisateur non connecté')
+      // Check if receipt already exists
+      const { data: existing } = await supabase
+        .from('rent_invoices')
+        .select('id')
+        .eq('lease_id', lease.id)
+        .eq('period_month', parseInt(selectedMonth))
+        .eq('period_year', parseInt(selectedYear))
+        .single()
+
+      if (existing) {
+        alert('Une quittance existe déjà pour cette période')
+        return
+      }
+
+      // Prepare receipt data
+      const totalAmount = lease.rent_amount + (lease.charges_amount || 0)
+      const monthName = MONTHS.find(m => m.value === selectedMonth)?.label || ''
+
+      const periodStart = new Date(parseInt(selectedYear), parseInt(selectedMonth) - 1, 1)
+      const periodEnd = new Date(parseInt(selectedYear), parseInt(selectedMonth), 0)
+      const issueDate = new Date().toLocaleDateString('fr-FR')
 
       // Prepare landlord info
       const landlordName = landlordProfile
@@ -214,28 +252,34 @@ export default function EDLGeneratorModal({ open, onOpenChange, onGenerate }: ED
           ].filter(Boolean).join(', ')
         : 'Adresse non renseignée'
 
-      const edlData = {
-        type: edlType,
+      const receiptData = {
+        month: monthName,
+        year: selectedYear,
         landlordName: landlordName,
         landlordAddress: landlordAddress,
         tenantName: `${lease.contact.first_name || ''} ${lease.contact.last_name || ''}`.trim(),
-        tenantAddress: lease.contact.address || 'Non renseignée',
+        tenantAddress: lease.contact.address || 'N/A',
         propertyAddress: selectedPropertyData.address,
         unitNumber: selectedUnitData.unit_number,
-        unitType: selectedUnitData.type,
-        surface: selectedUnitData.surface,
-        inspectionDate: new Date().toLocaleDateString('fr-FR'),
-        issueDate: new Date().toLocaleDateString('fr-FR'),
+        rentAmount: lease.rent_amount,
+        chargesAmount: lease.charges_amount || 0,
+        totalAmount: totalAmount,
+        issueDate: issueDate,
+        periodStart: periodStart.toLocaleDateString('fr-FR'),
+        periodEnd: periodEnd.toLocaleDateString('fr-FR'),
       }
 
       // Generate PDF
-      const pdfDoc = <EDLPDFTemplate data={edlData} />
+      const pdfDoc = <ReceiptPDFTemplate data={receiptData} />
       const blob = await pdf(pdfDoc).toBlob()
 
-      // Upload PDF to Supabase Storage
-      const typeLabel = edlType === 'ENTREE' ? 'entree' : 'sortie'
-      const fileName = `edl_${typeLabel}_${lease.contact.last_name}_${selectedUnitData.unit_number}_${Date.now()}.pdf`
-      const filePath = `ETAT-DES-LIEUX/${user.id}/${fileName}`
+      // Get current user ID for storage path
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Utilisateur non connecté')
+
+      // Upload PDF to Supabase Storage with user_id in path
+      const fileName = `quittance_${selectedYear}_${selectedMonth.padStart(2, '0')}_${lease.contact.last_name}_${Date.now()}.pdf`
+      const filePath = `QUITTANCES/${user.id}/${fileName}`
 
       const { error: uploadError } = await supabase.storage
         .from('PRIVATE')
@@ -257,32 +301,32 @@ export default function EDLGeneratorModal({ open, onOpenChange, onGenerate }: ED
       link.click()
       URL.revokeObjectURL(url)
 
-      // Create document record in database
-      const { data: docData, error: docError } = await supabase
-        .from('documents')
+      // Create rent invoice in database with pdf_url
+      const dueDate = new Date(parseInt(selectedYear), parseInt(selectedMonth) - 1, 5)
+
+      const { data, error } = await supabase
+        .from('rent_invoices')
         .insert({
-          name: `EDL ${edlType === 'ENTREE' ? 'Entrée' : 'Sortie'} - ${lease.contact.first_name} ${lease.contact.last_name} - ${selectedUnitData.unit_number}`,
-          type: 'EDL',
-          category: 'États des lieux',
-          file_url: filePath,
-          property_id: selectedPropertyData.id,
           lease_id: lease.id,
-          uploaded_by: user.id
+          period_month: parseInt(selectedMonth),
+          period_year: parseInt(selectedYear),
+          rent_amount: lease.rent_amount,
+          charges_amount: lease.charges_amount || 0,
+          total_amount: totalAmount,
+          status: 'pending',
+          due_date: dueDate.toISOString().split('T')[0],
+          pdf_url: filePath // Stocker le chemin complet
         })
         .select()
         .single()
 
-      if (docError) {
-        console.error('Error creating document record:', docError)
-        alert(`Erreur lors de l'enregistrement du document: ${docError.message}`)
-        throw docError
-      }
+      if (error) throw error
 
-      console.log('EDL PDF created:', filePath)
-      console.log('Document record created:', docData)
+      console.log('Receipt created:', data)
+      console.log('PDF uploaded to:', filePath)
 
       // Success
-      alert('État des lieux généré et téléchargé avec succès!')
+      alert('Quittance générée et téléchargée avec succès!')
       onOpenChange(false)
       if (onGenerate) onGenerate()
 
@@ -292,42 +336,31 @@ export default function EDLGeneratorModal({ open, onOpenChange, onGenerate }: ED
       setLease(null)
       setSelectedPropertyData(null)
       setSelectedUnitData(null)
-      setEdlType("ENTREE")
     } catch (error) {
-      console.error('Error generating EDL:', error)
-      alert('Erreur lors de la génération de l\'état des lieux')
+      console.error('Error generating receipt:', error)
+      alert('Erreur lors de la génération de la quittance')
     } finally {
       setGenerating(false)
     }
   }
 
-  const canGenerate = selectedProperty && selectedUnit && lease
+  const canGenerate = selectedProperty && selectedUnit && lease && selectedMonth && selectedYear
+
+  // Generate years array (current year +/- 2 years)
+  const currentYear = new Date().getFullYear()
+  const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Folder className="w-5 h-5" />
-            Générer un état des lieux
+            <FileText className="w-5 h-5" />
+            Générer une quittance de loyer
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {/* Type Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="type">Type d'état des lieux</Label>
-            <Select value={edlType} onValueChange={(value) => setEdlType(value as "ENTREE" | "SORTIE")}>
-              <SelectTrigger id="type">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ENTREE">État des lieux d'entrée</SelectItem>
-                <SelectItem value="SORTIE">État des lieux de sortie</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
           {/* Property Selection */}
           <div className="space-y-2">
             <Label htmlFor="property">Bien immobilier</Label>
@@ -388,8 +421,16 @@ export default function EDLGeneratorModal({ open, onOpenChange, onGenerate }: ED
                   {lease.contact.first_name} {lease.contact.last_name}
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Adresse actuelle:</span>{" "}
-                  {lease.contact.address || 'Non renseignée'}
+                  <span className="text-muted-foreground">Loyer:</span>{" "}
+                  {lease.rent_amount.toFixed(2)} €
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Charges:</span>{" "}
+                  {lease.charges_amount ? lease.charges_amount.toFixed(2) : '0.00'} €
+                </div>
+                <div className="font-medium pt-1 border-t">
+                  <span className="text-muted-foreground">Total:</span>{" "}
+                  {(lease.rent_amount + (lease.charges_amount || 0)).toFixed(2)} €
                 </div>
               </div>
             </div>
@@ -400,6 +441,41 @@ export default function EDLGeneratorModal({ open, onOpenChange, onGenerate }: ED
               Aucun bail actif trouvé pour ce logement
             </div>
           )}
+
+          {/* Period Selection */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="month">Mois</Label>
+              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                <SelectTrigger id="month">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MONTHS.map((month) => (
+                    <SelectItem key={month.value} value={month.value}>
+                      {month.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="year">Année</Label>
+              <Select value={selectedYear} onValueChange={setSelectedYear}>
+                <SelectTrigger id="year">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {years.map((year) => (
+                    <SelectItem key={year} value={String(year)}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
 
         <DialogFooter>
@@ -411,7 +487,7 @@ export default function EDLGeneratorModal({ open, onOpenChange, onGenerate }: ED
             disabled={!canGenerate || generating}
           >
             {generating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            {generating ? "Génération..." : "Générer l'état des lieux"}
+            {generating ? "Génération..." : "Générer la quittance"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { FileText } from "lucide-react"
-import BatchReceiptGenerator from "@/components/batch-receipt-generator"
+import BatchReceiptGenerator from "@/components/receipts/BatchReceiptGenerator"
 
 interface Tenant {
   first_name: string

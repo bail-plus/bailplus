@@ -4,9 +4,9 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { supabase } from "@/integrations/supabase/client"
-import { FileText, Loader2 } from "lucide-react"
+import { Folder, Loader2 } from "lucide-react"
 import { pdf } from '@react-pdf/renderer'
-import { LeasePDFTemplate } from "./lease-pdf-template"
+import { EDLPDFTemplate } from "./EdlPdfTemplate"
 import { useEntity } from "@/contexts/EntityContext"
 
 interface Property {
@@ -26,11 +26,6 @@ interface Unit {
 interface Lease {
   id: string
   tenant_id: string
-  rent_amount: number
-  charges_amount: number
-  deposit_amount: number
-  start_date: string
-  end_date: string | null
   contact: {
     first_name: string | null
     last_name: string | null
@@ -38,7 +33,7 @@ interface Lease {
   }
 }
 
-interface LeaseGeneratorModalProps {
+interface EDLGeneratorModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onGenerate?: () => void
@@ -52,7 +47,7 @@ interface LandlordProfile {
   postal_code: number | null
 }
 
-export default function LeaseGeneratorModal({ open, onOpenChange, onGenerate }: LeaseGeneratorModalProps) {
+export default function EDLGeneratorModal({ open, onOpenChange, onGenerate }: EDLGeneratorModalProps) {
   const { selectedEntity, showAll } = useEntity()
   const [properties, setProperties] = useState<Property[]>([])
   const [units, setUnits] = useState<Unit[]>([])
@@ -63,6 +58,7 @@ export default function LeaseGeneratorModal({ open, onOpenChange, onGenerate }: 
 
   const [selectedProperty, setSelectedProperty] = useState<string>("")
   const [selectedUnit, setSelectedUnit] = useState<string>("")
+  const [edlType, setEdlType] = useState<"ENTREE" | "SORTIE">("ENTREE")
 
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -162,10 +158,10 @@ export default function LeaseGeneratorModal({ open, onOpenChange, onGenerate }: 
   const loadLease = async (unitId: string) => {
     setLoading(true)
     try {
-      // First get the lease
+      // Get active lease
       const { data: leaseData, error: leaseError } = await supabase
         .from('leases')
-        .select('id, tenant_id, rent_amount, charges_amount, deposit_amount, start_date, end_date')
+        .select('id, tenant_id')
         .eq('unit_id', unitId)
         .eq('status', 'active')
         .maybeSingle()
@@ -177,7 +173,7 @@ export default function LeaseGeneratorModal({ open, onOpenChange, onGenerate }: 
         return
       }
 
-      // Then get the contact (tenant) info
+      // Get contact info
       const { data: contactData, error: contactError } = await supabase
         .from('contacts')
         .select('first_name, last_name, address')
@@ -186,7 +182,6 @@ export default function LeaseGeneratorModal({ open, onOpenChange, onGenerate }: 
 
       if (contactError) throw contactError
 
-      // Combine the data
       setLease({
         ...leaseData,
         contact: contactData
@@ -204,7 +199,6 @@ export default function LeaseGeneratorModal({ open, onOpenChange, onGenerate }: 
 
     setGenerating(true)
     try {
-      // Check if lease PDF already exists
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Utilisateur non connecté')
 
@@ -220,14 +214,8 @@ export default function LeaseGeneratorModal({ open, onOpenChange, onGenerate }: 
           ].filter(Boolean).join(', ')
         : 'Adresse non renseignée'
 
-      // Calculate duration
-      const startDate = new Date(lease.start_date)
-      const endDate = lease.end_date ? new Date(lease.end_date) : null
-      const duration = endDate
-        ? `${Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 365))} ans`
-        : '3 ans (reconduction tacite)'
-
-      const leaseData = {
+      const edlData = {
+        type: edlType,
         landlordName: landlordName,
         landlordAddress: landlordAddress,
         tenantName: `${lease.contact.first_name || ''} ${lease.contact.last_name || ''}`.trim(),
@@ -236,21 +224,18 @@ export default function LeaseGeneratorModal({ open, onOpenChange, onGenerate }: 
         unitNumber: selectedUnitData.unit_number,
         unitType: selectedUnitData.type,
         surface: selectedUnitData.surface,
-        startDate: new Date(lease.start_date).toLocaleDateString('fr-FR'),
-        duration: duration,
-        rentAmount: lease.rent_amount,
-        chargesAmount: lease.charges_amount || 0,
-        depositAmount: lease.deposit_amount || 0,
+        inspectionDate: new Date().toLocaleDateString('fr-FR'),
         issueDate: new Date().toLocaleDateString('fr-FR'),
       }
 
       // Generate PDF
-      const pdfDoc = <LeasePDFTemplate data={leaseData} />
+      const pdfDoc = <EDLPDFTemplate data={edlData} />
       const blob = await pdf(pdfDoc).toBlob()
 
-      // Upload PDF to Supabase Storage with user_id in path
-      const fileName = `bail_${lease.contact.last_name}_${selectedUnitData.unit_number}_${Date.now()}.pdf`
-      const filePath = `BAUX/${user.id}/${fileName}`
+      // Upload PDF to Supabase Storage
+      const typeLabel = edlType === 'ENTREE' ? 'entree' : 'sortie'
+      const fileName = `edl_${typeLabel}_${lease.contact.last_name}_${selectedUnitData.unit_number}_${Date.now()}.pdf`
+      const filePath = `ETAT-DES-LIEUX/${user.id}/${fileName}`
 
       const { error: uploadError } = await supabase.storage
         .from('PRIVATE')
@@ -276,9 +261,9 @@ export default function LeaseGeneratorModal({ open, onOpenChange, onGenerate }: 
       const { data: docData, error: docError } = await supabase
         .from('documents')
         .insert({
-          name: `Bail - ${lease.contact.first_name} ${lease.contact.last_name} - ${selectedUnitData.unit_number}`,
-          type: 'LEASE',
-          category: 'Contrats',
+          name: `EDL ${edlType === 'ENTREE' ? 'Entrée' : 'Sortie'} - ${lease.contact.first_name} ${lease.contact.last_name} - ${selectedUnitData.unit_number}`,
+          type: 'EDL',
+          category: 'États des lieux',
           file_url: filePath,
           property_id: selectedPropertyData.id,
           lease_id: lease.id,
@@ -293,11 +278,11 @@ export default function LeaseGeneratorModal({ open, onOpenChange, onGenerate }: 
         throw docError
       }
 
-      console.log('Lease PDF created:', filePath)
+      console.log('EDL PDF created:', filePath)
       console.log('Document record created:', docData)
 
       // Success
-      alert('Bail généré et téléchargé avec succès!')
+      alert('État des lieux généré et téléchargé avec succès!')
       onOpenChange(false)
       if (onGenerate) onGenerate()
 
@@ -307,9 +292,10 @@ export default function LeaseGeneratorModal({ open, onOpenChange, onGenerate }: 
       setLease(null)
       setSelectedPropertyData(null)
       setSelectedUnitData(null)
+      setEdlType("ENTREE")
     } catch (error) {
-      console.error('Error generating lease:', error)
-      alert('Erreur lors de la génération du bail')
+      console.error('Error generating EDL:', error)
+      alert('Erreur lors de la génération de l\'état des lieux')
     } finally {
       setGenerating(false)
     }
@@ -322,12 +308,26 @@ export default function LeaseGeneratorModal({ open, onOpenChange, onGenerate }: 
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FileText className="w-5 h-5" />
-            Générer un bail de location
+            <Folder className="w-5 h-5" />
+            Générer un état des lieux
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Type Selection */}
+          <div className="space-y-2">
+            <Label htmlFor="type">Type d'état des lieux</Label>
+            <Select value={edlType} onValueChange={(value) => setEdlType(value as "ENTREE" | "SORTIE")}>
+              <SelectTrigger id="type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ENTREE">État des lieux d'entrée</SelectItem>
+                <SelectItem value="SORTIE">État des lieux de sortie</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Property Selection */}
           <div className="space-y-2">
             <Label htmlFor="property">Bien immobilier</Label>
@@ -388,20 +388,8 @@ export default function LeaseGeneratorModal({ open, onOpenChange, onGenerate }: 
                   {lease.contact.first_name} {lease.contact.last_name}
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Loyer HC:</span>{" "}
-                  {lease.rent_amount.toFixed(2)} €
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Charges:</span>{" "}
-                  {lease.charges_amount ? lease.charges_amount.toFixed(2) : '0.00'} €
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Dépôt de garantie:</span>{" "}
-                  {lease.deposit_amount ? lease.deposit_amount.toFixed(2) : '0.00'} €
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Date de début:</span>{" "}
-                  {new Date(lease.start_date).toLocaleDateString('fr-FR')}
+                  <span className="text-muted-foreground">Adresse actuelle:</span>{" "}
+                  {lease.contact.address || 'Non renseignée'}
                 </div>
               </div>
             </div>
@@ -423,7 +411,7 @@ export default function LeaseGeneratorModal({ open, onOpenChange, onGenerate }: 
             disabled={!canGenerate || generating}
           >
             {generating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            {generating ? "Génération..." : "Générer le bail"}
+            {generating ? "Génération..." : "Générer l'état des lieux"}
           </Button>
         </DialogFooter>
       </DialogContent>

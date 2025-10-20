@@ -11,10 +11,10 @@ import { DocumentsStats } from "@/components/documents/DocumentsStats"
 import { QuickGenerationCard } from "@/components/documents/QuickGenerationCard"
 import { DocumentsTable } from "@/components/documents/DocumentsTable"
 import { DocumentPreviewModal } from "@/components/documents/DocumentPreviewModal"
-import ReceiptGeneratorModal from "@/components/receipt-generator-modal"
-import LeaseGeneratorModal from "@/components/lease-generator-modal"
-import EDLGeneratorModal from "@/components/edl-generator-modal"
-import LetterGeneratorModal from "@/components/letter-generator-modal"
+import ReceiptGeneratorModal from "@/components/receipts/ReceiptGeneratorModal"
+import LeaseGeneratorModal from "@/components/leases/LeaseGeneratorModal"
+import EDLGeneratorModal from "@/components/inspections/EdlGeneratorModal"
+import LetterGeneratorModal from "@/components/letters/LetterGeneratorModal"
 
 export default function Documents() {
   const { profile } = useAuth()

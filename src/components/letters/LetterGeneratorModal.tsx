@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { supabase } from "@/integrations/supabase/client"
 import { FileText, Loader2, AlertTriangle } from "lucide-react"
 import { pdf } from '@react-pdf/renderer'
-import { LetterPDFTemplate } from "./letter-pdf-template"
+import { LetterPDFTemplate } from "./LetterPdfTemplate"
 import { useEntity } from "@/contexts/EntityContext"
 
 interface Property {

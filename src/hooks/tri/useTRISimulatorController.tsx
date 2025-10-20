@@ -17,7 +17,7 @@ import {
   useDeleteTRISimulation,
   type TRISimulationWithData,
 } from "@/hooks/tri/useTRISimulations";
-import { TRIPDFTemplate } from "@/components/tri-pdf-template";
+import { TRIPDFTemplate } from "@/components/tri-simulator/TriPdfTemplate";
 
 export type TRISimulatorController = ReturnType<
   typeof useTRISimulatorController

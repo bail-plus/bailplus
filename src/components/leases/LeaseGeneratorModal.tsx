@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label"
 import { supabase } from "@/integrations/supabase/client"
 import { FileText, Loader2 } from "lucide-react"
 import { pdf } from '@react-pdf/renderer'
-import { ReceiptPDFTemplate } from "./receipt-pdf-template-quittance"
+import { LeasePDFTemplate } from "./LeasePdfTemplate"
 import { useEntity } from "@/contexts/EntityContext"
 
 interface Property {
@@ -28,6 +28,9 @@ interface Lease {
   tenant_id: string
   rent_amount: number
   charges_amount: number
+  deposit_amount: number
+  start_date: string
+  end_date: string | null
   contact: {
     first_name: string | null
     last_name: string | null
@@ -35,26 +38,11 @@ interface Lease {
   }
 }
 
-interface ReceiptGeneratorModalProps {
+interface LeaseGeneratorModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onGenerate?: () => void
 }
-
-const MONTHS = [
-  { value: "1", label: "Janvier" },
-  { value: "2", label: "Février" },
-  { value: "3", label: "Mars" },
-  { value: "4", label: "Avril" },
-  { value: "5", label: "Mai" },
-  { value: "6", label: "Juin" },
-  { value: "7", label: "Juillet" },
-  { value: "8", label: "Août" },
-  { value: "9", label: "Septembre" },
-  { value: "10", label: "Octobre" },
-  { value: "11", label: "Novembre" },
-  { value: "12", label: "Décembre" }
-]
 
 interface LandlordProfile {
   first_name: string | null
@@ -64,7 +52,7 @@ interface LandlordProfile {
   postal_code: number | null
 }
 
-export default function ReceiptGeneratorModal({ open, onOpenChange, onGenerate }: ReceiptGeneratorModalProps) {
+export default function LeaseGeneratorModal({ open, onOpenChange, onGenerate }: LeaseGeneratorModalProps) {
   const { selectedEntity, showAll } = useEntity()
   const [properties, setProperties] = useState<Property[]>([])
   const [units, setUnits] = useState<Unit[]>([])
@@ -75,8 +63,6 @@ export default function ReceiptGeneratorModal({ open, onOpenChange, onGenerate }
 
   const [selectedProperty, setSelectedProperty] = useState<string>("")
   const [selectedUnit, setSelectedUnit] = useState<string>("")
-  const [selectedMonth, setSelectedMonth] = useState<string>(String(new Date().getMonth() + 1))
-  const [selectedYear, setSelectedYear] = useState<string>(String(new Date().getFullYear()))
 
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -179,7 +165,7 @@ export default function ReceiptGeneratorModal({ open, onOpenChange, onGenerate }
       // First get the lease
       const { data: leaseData, error: leaseError } = await supabase
         .from('leases')
-        .select('id, tenant_id, rent_amount, charges_amount')
+        .select('id, tenant_id, rent_amount, charges_amount, deposit_amount, start_date, end_date')
         .eq('unit_id', unitId)
         .eq('status', 'active')
         .maybeSingle()
@@ -214,31 +200,13 @@ export default function ReceiptGeneratorModal({ open, onOpenChange, onGenerate }
   }
 
   const handleGenerate = async () => {
-    if (!lease || !selectedMonth || !selectedYear || !selectedPropertyData || !selectedUnitData) return
+    if (!lease || !selectedPropertyData || !selectedUnitData) return
 
     setGenerating(true)
     try {
-      // Check if receipt already exists
-      const { data: existing } = await supabase
-        .from('rent_invoices')
-        .select('id')
-        .eq('lease_id', lease.id)
-        .eq('period_month', parseInt(selectedMonth))
-        .eq('period_year', parseInt(selectedYear))
-        .single()
-
-      if (existing) {
-        alert('Une quittance existe déjà pour cette période')
-        return
-      }
-
-      // Prepare receipt data
-      const totalAmount = lease.rent_amount + (lease.charges_amount || 0)
-      const monthName = MONTHS.find(m => m.value === selectedMonth)?.label || ''
-
-      const periodStart = new Date(parseInt(selectedYear), parseInt(selectedMonth) - 1, 1)
-      const periodEnd = new Date(parseInt(selectedYear), parseInt(selectedMonth), 0)
-      const issueDate = new Date().toLocaleDateString('fr-FR')
+      // Check if lease PDF already exists
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Utilisateur non connecté')
 
       // Prepare landlord info
       const landlordName = landlordProfile
@@ -252,34 +220,37 @@ export default function ReceiptGeneratorModal({ open, onOpenChange, onGenerate }
           ].filter(Boolean).join(', ')
         : 'Adresse non renseignée'
 
-      const receiptData = {
-        month: monthName,
-        year: selectedYear,
+      // Calculate duration
+      const startDate = new Date(lease.start_date)
+      const endDate = lease.end_date ? new Date(lease.end_date) : null
+      const duration = endDate
+        ? `${Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 365))} ans`
+        : '3 ans (reconduction tacite)'
+
+      const leaseData = {
         landlordName: landlordName,
         landlordAddress: landlordAddress,
         tenantName: `${lease.contact.first_name || ''} ${lease.contact.last_name || ''}`.trim(),
-        tenantAddress: lease.contact.address || 'N/A',
+        tenantAddress: lease.contact.address || 'Non renseignée',
         propertyAddress: selectedPropertyData.address,
         unitNumber: selectedUnitData.unit_number,
+        unitType: selectedUnitData.type,
+        surface: selectedUnitData.surface,
+        startDate: new Date(lease.start_date).toLocaleDateString('fr-FR'),
+        duration: duration,
         rentAmount: lease.rent_amount,
         chargesAmount: lease.charges_amount || 0,
-        totalAmount: totalAmount,
-        issueDate: issueDate,
-        periodStart: periodStart.toLocaleDateString('fr-FR'),
-        periodEnd: periodEnd.toLocaleDateString('fr-FR'),
+        depositAmount: lease.deposit_amount || 0,
+        issueDate: new Date().toLocaleDateString('fr-FR'),
       }
 
       // Generate PDF
-      const pdfDoc = <ReceiptPDFTemplate data={receiptData} />
+      const pdfDoc = <LeasePDFTemplate data={leaseData} />
       const blob = await pdf(pdfDoc).toBlob()
 
-      // Get current user ID for storage path
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('Utilisateur non connecté')
-
       // Upload PDF to Supabase Storage with user_id in path
-      const fileName = `quittance_${selectedYear}_${selectedMonth.padStart(2, '0')}_${lease.contact.last_name}_${Date.now()}.pdf`
-      const filePath = `QUITTANCES/${user.id}/${fileName}`
+      const fileName = `bail_${lease.contact.last_name}_${selectedUnitData.unit_number}_${Date.now()}.pdf`
+      const filePath = `BAUX/${user.id}/${fileName}`
 
       const { error: uploadError } = await supabase.storage
         .from('PRIVATE')
@@ -301,32 +272,32 @@ export default function ReceiptGeneratorModal({ open, onOpenChange, onGenerate }
       link.click()
       URL.revokeObjectURL(url)
 
-      // Create rent invoice in database with pdf_url
-      const dueDate = new Date(parseInt(selectedYear), parseInt(selectedMonth) - 1, 5)
-
-      const { data, error } = await supabase
-        .from('rent_invoices')
+      // Create document record in database
+      const { data: docData, error: docError } = await supabase
+        .from('documents')
         .insert({
+          name: `Bail - ${lease.contact.first_name} ${lease.contact.last_name} - ${selectedUnitData.unit_number}`,
+          type: 'LEASE',
+          category: 'Contrats',
+          file_url: filePath,
+          property_id: selectedPropertyData.id,
           lease_id: lease.id,
-          period_month: parseInt(selectedMonth),
-          period_year: parseInt(selectedYear),
-          rent_amount: lease.rent_amount,
-          charges_amount: lease.charges_amount || 0,
-          total_amount: totalAmount,
-          status: 'pending',
-          due_date: dueDate.toISOString().split('T')[0],
-          pdf_url: filePath // Stocker le chemin complet
+          uploaded_by: user.id
         })
         .select()
         .single()
 
-      if (error) throw error
+      if (docError) {
+        console.error('Error creating document record:', docError)
+        alert(`Erreur lors de l'enregistrement du document: ${docError.message}`)
+        throw docError
+      }
 
-      console.log('Receipt created:', data)
-      console.log('PDF uploaded to:', filePath)
+      console.log('Lease PDF created:', filePath)
+      console.log('Document record created:', docData)
 
       // Success
-      alert('Quittance générée et téléchargée avec succès!')
+      alert('Bail généré et téléchargé avec succès!')
       onOpenChange(false)
       if (onGenerate) onGenerate()
 
@@ -337,18 +308,14 @@ export default function ReceiptGeneratorModal({ open, onOpenChange, onGenerate }
       setSelectedPropertyData(null)
       setSelectedUnitData(null)
     } catch (error) {
-      console.error('Error generating receipt:', error)
-      alert('Erreur lors de la génération de la quittance')
+      console.error('Error generating lease:', error)
+      alert('Erreur lors de la génération du bail')
     } finally {
       setGenerating(false)
     }
   }
 
-  const canGenerate = selectedProperty && selectedUnit && lease && selectedMonth && selectedYear
-
-  // Generate years array (current year +/- 2 years)
-  const currentYear = new Date().getFullYear()
-  const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i)
+  const canGenerate = selectedProperty && selectedUnit && lease
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -356,7 +323,7 @@ export default function ReceiptGeneratorModal({ open, onOpenChange, onGenerate }
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5" />
-            Générer une quittance de loyer
+            Générer un bail de location
           </DialogTitle>
         </DialogHeader>
 
@@ -421,16 +388,20 @@ export default function ReceiptGeneratorModal({ open, onOpenChange, onGenerate }
                   {lease.contact.first_name} {lease.contact.last_name}
                 </div>
                 <div>
-                  <span className="text-muted-foreground">Loyer:</span>{" "}
+                  <span className="text-muted-foreground">Loyer HC:</span>{" "}
                   {lease.rent_amount.toFixed(2)} €
                 </div>
                 <div>
                   <span className="text-muted-foreground">Charges:</span>{" "}
                   {lease.charges_amount ? lease.charges_amount.toFixed(2) : '0.00'} €
                 </div>
-                <div className="font-medium pt-1 border-t">
-                  <span className="text-muted-foreground">Total:</span>{" "}
-                  {(lease.rent_amount + (lease.charges_amount || 0)).toFixed(2)} €
+                <div>
+                  <span className="text-muted-foreground">Dépôt de garantie:</span>{" "}
+                  {lease.deposit_amount ? lease.deposit_amount.toFixed(2) : '0.00'} €
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Date de début:</span>{" "}
+                  {new Date(lease.start_date).toLocaleDateString('fr-FR')}
                 </div>
               </div>
             </div>
@@ -441,41 +412,6 @@ export default function ReceiptGeneratorModal({ open, onOpenChange, onGenerate }
               Aucun bail actif trouvé pour ce logement
             </div>
           )}
-
-          {/* Period Selection */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="month">Mois</Label>
-              <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger id="month">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MONTHS.map((month) => (
-                    <SelectItem key={month.value} value={month.value}>
-                      {month.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="year">Année</Label>
-              <Select value={selectedYear} onValueChange={setSelectedYear}>
-                <SelectTrigger id="year">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {years.map((year) => (
-                    <SelectItem key={year} value={String(year)}>
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
         </div>
 
         <DialogFooter>
@@ -487,7 +423,7 @@ export default function ReceiptGeneratorModal({ open, onOpenChange, onGenerate }
             disabled={!canGenerate || generating}
           >
             {generating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            {generating ? "Génération..." : "Générer la quittance"}
+            {generating ? "Génération..." : "Générer le bail"}
           </Button>
         </DialogFooter>
       </DialogContent>

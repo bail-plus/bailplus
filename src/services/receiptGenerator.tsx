@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client"
 import { pdf } from '@react-pdf/renderer'
-import { ReceiptPDFTemplate } from "@/components/receipt-pdf-template-quittance"
+import { ReceiptPDFTemplate } from "@/components/receipts/ReceiptPdfTemplateQuittance"
 
 interface RentInvoice {
   id: string
