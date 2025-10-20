@@ -1,7 +1,7 @@
 import { useAuth } from "@/hooks/useAuth"
-import LandlordDashboard from "./dashboards/LandlordDashboard"
-import TenantDashboard from "./dashboards/TenantDashboard"
-import ProviderDashboard from "./dashboards/ProviderDashboard"
+import LandlordDashboard from "../dashboards/LandlordDashboard"
+import TenantDashboard from "../dashboards/TenantDashboard"
+import ProviderDashboard from "../dashboards/ProviderDashboard"
 
 /**
  * Dashboard Router - Redirige vers le bon dashboard selon le rôle de l'utilisateur
