@@ -24,7 +24,7 @@ Dropdown dans le header permettant de :
 - Choisir "Toutes les entités" (icône Globe)
 - Afficher l'entité courante avec son icône et description
 
-### 3. useEntityFilter (`src/hooks/useEntityFilter.ts`)
+### 3. useEntityFilter (`src/hooks/properties/useEntityFilter.ts`)
 Hook helper pour faciliter le filtrage dans les requêtes Supabase
 
 ## Comment utiliser le filtre dans vos pages
@@ -32,7 +32,7 @@ Hook helper pour faciliter le filtrage dans les requêtes Supabase
 ### Méthode simple avec le hook
 
 ```tsx
-import { useEntityFilter } from "@/hooks/useEntityFilter"
+import { useEntityFilter } from "@/hooks/properties/useEntityFilter"
 import { supabase } from "@/integrations/supabase/client"
 
 function MyComponent() {

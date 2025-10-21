@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Check, ArrowRight, Loader2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
-import { useOffers } from '@/hooks/useOffers';
+import { useOffers } from '@/hooks/marketing/useOffers';
 
 
 

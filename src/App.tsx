@@ -4,37 +4,37 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Layout } from "@/components/layout";
-import { AuthProvider } from "@/hooks/useAuth";
+import { Layout } from "@/components/layout/AppLayout";
+import { AuthProvider } from "@/hooks/auth/useAuth";
 import { RequireAuth, RequireSubscription } from "@/guards";
 
 // App pages (protected)
-import Index from "./pages/Index";
-import Calendar from "./pages/Calendar";
-import Properties from "./pages/Properties";
-import Leases from "./pages/Leases";
-import LeaseDetail from "./pages/LeaseDetail";
-import People from "./pages/People";
-import Providers from "./pages/Providers";
-import ProviderProfile from "./pages/ProviderProfile";
-import Maintenance from "./pages/Maintenance";
-import Accounting from "./pages/Accounting";
-import Documents from "./pages/Documents";
-import Communications from "./pages/Communications";
-import Reports from "./pages/Reports";
-import Settings from "./pages/Settings";
-import TRISimulator from "./pages/TRISimulator";
-import TrialPaywall from "./pages/TrialPaywall";
+import Index from "./pages/app/Index";
+import Calendar from "./pages/app/Calendar";
+import Properties from "./pages/app/Properties";
+import Leases from "./pages/app/Leases";
+import LeaseDetail from "./pages/app/LeaseDetail";
+import People from "./pages/app/People";
+import Providers from "./pages/app/Providers";
+import ProviderProfile from "./pages/app/ProviderProfile";
+import Maintenance from "./pages/app/Maintenance";
+import Accounting from "./pages/app/Accounting";
+import Documents from "./pages/app/Documents";
+import Communications from "./pages/app/Communications";
+import Reports from "./pages/app/Reports";
+import Settings from "./pages/account/Settings";
+import TRISimulator from "./pages/app/tools/TRISimulator";
+import TrialPaywall from "./pages/account/TrialPaywall";
 
 // Auth pages
-import Signup from "./pages/Signup";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import ChangeEmail from "./pages/ChangeEmail";
-import LostEmailAccess from "./pages/LostEmailAccess";
-import AcceptInvitation from "./pages/AcceptInvitation";
+import Signup from "./pages/auth/Signup";
+import ForgotPassword from "./pages/auth/ForgotPassword";
+import ResetPassword from "./pages/auth/ResetPassword";
+import ChangeEmail from "./pages/account/ChangeEmail";
+import LostEmailAccess from "./pages/auth/LostEmailAccess";
+import AcceptInvitation from "./pages/auth/AcceptInvitation";
 import Offers from "./pages/marketing/Offers";
-import Auth from "./pages/Auth";
+import Auth from "./pages/auth/Auth";
 
 // Public/Marketing pages
 import Landing from "./pages/marketing/Landing";
