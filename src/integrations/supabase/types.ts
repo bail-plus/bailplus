@@ -1276,6 +1276,75 @@ export type Database = {
           },
         ]
       }
+      receipt_templates: {
+        Row: {
+          accent_color: string | null
+          created_at: string | null
+          declaration_text: string | null
+          footer_text: string | null
+          id: string
+          is_default: boolean | null
+          landlord_address: string | null
+          landlord_city: string | null
+          landlord_name: string | null
+          logo_url: string | null
+          primary_color: string | null
+          secondary_color: string | null
+          show_logo: boolean | null
+          show_signature: boolean | null
+          show_stamp: boolean | null
+          signature_url: string | null
+          stamp_url: string | null
+          template_name: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          accent_color?: string | null
+          created_at?: string | null
+          declaration_text?: string | null
+          footer_text?: string | null
+          id?: string
+          is_default?: boolean | null
+          landlord_address?: string | null
+          landlord_city?: string | null
+          landlord_name?: string | null
+          logo_url?: string | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          show_logo?: boolean | null
+          show_signature?: boolean | null
+          show_stamp?: boolean | null
+          signature_url?: string | null
+          stamp_url?: string | null
+          template_name?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          accent_color?: string | null
+          created_at?: string | null
+          declaration_text?: string | null
+          footer_text?: string | null
+          id?: string
+          is_default?: boolean | null
+          landlord_address?: string | null
+          landlord_city?: string | null
+          landlord_name?: string | null
+          logo_url?: string | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          show_logo?: boolean | null
+          show_signature?: boolean | null
+          show_stamp?: boolean | null
+          signature_url?: string | null
+          stamp_url?: string | null
+          template_name?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       rent_invoices: {
         Row: {
           auto_receipt_sent: boolean | null
