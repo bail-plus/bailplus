@@ -14,47 +14,165 @@ export type Database = {
   }
   public: {
     Tables: {
+      bank_connections: {
+        Row: {
+          account_id: string
+          account_name: string | null
+          consent_expires_at: string
+          consent_status: string | null
+          created_at: string | null
+          currency: string | null
+          iban: string | null
+          id: string
+          institution_id: string
+          institution_name: string
+          last_sync_at: string | null
+          last_sync_error: string | null
+          last_sync_status: string | null
+          last_transaction_sync_at: string | null
+          requisition_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          account_name?: string | null
+          consent_expires_at: string
+          consent_status?: string | null
+          created_at?: string | null
+          currency?: string | null
+          iban?: string | null
+          id?: string
+          institution_id: string
+          institution_name: string
+          last_sync_at?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          last_transaction_sync_at?: string | null
+          requisition_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          account_name?: string | null
+          consent_expires_at?: string
+          consent_status?: string | null
+          created_at?: string | null
+          currency?: string | null
+          iban?: string | null
+          id?: string
+          institution_id?: string
+          institution_name?: string
+          last_sync_at?: string | null
+          last_sync_error?: string | null
+          last_sync_status?: string | null
+          last_transaction_sync_at?: string | null
+          requisition_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       bank_transactions: {
         Row: {
+          account_id: string | null
           amount: number
+          bank_connection_id: string | null
+          booking_date: string | null
+          bridge_updated_at: string | null
+          category_id: number | null
+          clean_description: string | null
           created_at: string
+          creditor_name: string | null
+          currency_code: string | null
           date: string
+          debtor_name: string | null
+          deleted: boolean | null
+          external_transaction_id: string | null
+          future: boolean | null
           id: string
           label: string
           match_score: number | null
           matched_expense_id: string | null
           matched_rent_invoice_id: string | null
+          operation_type: string | null
+          provider_description: string | null
+          raw_data: Json | null
           status: string | null
+          transaction_date: string | null
           updated_at: string
           user_id: string | null
+          value_date: string | null
         }
         Insert: {
+          account_id?: string | null
           amount: number
+          bank_connection_id?: string | null
+          booking_date?: string | null
+          bridge_updated_at?: string | null
+          category_id?: number | null
+          clean_description?: string | null
           created_at?: string
+          creditor_name?: string | null
+          currency_code?: string | null
           date: string
+          debtor_name?: string | null
+          deleted?: boolean | null
+          external_transaction_id?: string | null
+          future?: boolean | null
           id?: string
           label: string
           match_score?: number | null
           matched_expense_id?: string | null
           matched_rent_invoice_id?: string | null
+          operation_type?: string | null
+          provider_description?: string | null
+          raw_data?: Json | null
           status?: string | null
+          transaction_date?: string | null
           updated_at?: string
           user_id?: string | null
+          value_date?: string | null
         }
         Update: {
+          account_id?: string | null
           amount?: number
+          bank_connection_id?: string | null
+          booking_date?: string | null
+          bridge_updated_at?: string | null
+          category_id?: number | null
+          clean_description?: string | null
           created_at?: string
+          creditor_name?: string | null
+          currency_code?: string | null
           date?: string
+          debtor_name?: string | null
+          deleted?: boolean | null
+          external_transaction_id?: string | null
+          future?: boolean | null
           id?: string
           label?: string
           match_score?: number | null
           matched_expense_id?: string | null
           matched_rent_invoice_id?: string | null
+          operation_type?: string | null
+          provider_description?: string | null
+          raw_data?: Json | null
           status?: string | null
+          transaction_date?: string | null
           updated_at?: string
           user_id?: string | null
+          value_date?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "bank_transactions_bank_connection_id_fkey"
+            columns: ["bank_connection_id"]
+            isOneToOne: false
+            referencedRelation: "bank_connections"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "bank_transactions_matched_expense_id_fkey"
             columns: ["matched_expense_id"]
@@ -965,6 +1083,7 @@ export type Database = {
         Row: {
           adress: string | null
           birthdate: string | null
+          bridge_user_uuid: string | null
           city: string | null
           company_name: string | null
           created_at: string
@@ -994,6 +1113,7 @@ export type Database = {
         Insert: {
           adress?: string | null
           birthdate?: string | null
+          bridge_user_uuid?: string | null
           city?: string | null
           company_name?: string | null
           created_at?: string
@@ -1023,6 +1143,7 @@ export type Database = {
         Update: {
           adress?: string | null
           birthdate?: string | null
+          bridge_user_uuid?: string | null
           city?: string | null
           company_name?: string | null
           created_at?: string
@@ -1155,14 +1276,87 @@ export type Database = {
           },
         ]
       }
+      receipt_templates: {
+        Row: {
+          accent_color: string | null
+          created_at: string | null
+          declaration_text: string | null
+          footer_text: string | null
+          id: string
+          is_default: boolean | null
+          landlord_address: string | null
+          landlord_city: string | null
+          landlord_name: string | null
+          logo_url: string | null
+          primary_color: string | null
+          secondary_color: string | null
+          show_logo: boolean | null
+          show_signature: boolean | null
+          show_stamp: boolean | null
+          signature_url: string | null
+          stamp_url: string | null
+          template_name: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          accent_color?: string | null
+          created_at?: string | null
+          declaration_text?: string | null
+          footer_text?: string | null
+          id?: string
+          is_default?: boolean | null
+          landlord_address?: string | null
+          landlord_city?: string | null
+          landlord_name?: string | null
+          logo_url?: string | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          show_logo?: boolean | null
+          show_signature?: boolean | null
+          show_stamp?: boolean | null
+          signature_url?: string | null
+          stamp_url?: string | null
+          template_name?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          accent_color?: string | null
+          created_at?: string | null
+          declaration_text?: string | null
+          footer_text?: string | null
+          id?: string
+          is_default?: boolean | null
+          landlord_address?: string | null
+          landlord_city?: string | null
+          landlord_name?: string | null
+          logo_url?: string | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          show_logo?: boolean | null
+          show_signature?: boolean | null
+          show_stamp?: boolean | null
+          signature_url?: string | null
+          stamp_url?: string | null
+          template_name?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       rent_invoices: {
         Row: {
+          auto_receipt_sent: boolean | null
+          auto_receipt_sent_at: string | null
           charges_amount: number | null
           created_at: string
           due_date: string
           id: string
+          last_payment_check_at: string | null
           lease_id: string
           paid_date: string | null
+          payment_check_attempts: number | null
           pdf_url: string | null
           period_month: number
           period_year: number
@@ -1173,12 +1367,16 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          auto_receipt_sent?: boolean | null
+          auto_receipt_sent_at?: string | null
           charges_amount?: number | null
           created_at?: string
           due_date: string
           id?: string
+          last_payment_check_at?: string | null
           lease_id: string
           paid_date?: string | null
+          payment_check_attempts?: number | null
           pdf_url?: string | null
           period_month: number
           period_year: number
@@ -1189,12 +1387,16 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          auto_receipt_sent?: boolean | null
+          auto_receipt_sent_at?: string | null
           charges_amount?: number | null
           created_at?: string
           due_date?: string
           id?: string
+          last_payment_check_at?: string | null
           lease_id?: string
           paid_date?: string | null
+          payment_check_attempts?: number | null
           pdf_url?: string | null
           period_month?: number
           period_year?: number
@@ -1707,22 +1909,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      is_landlord: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      is_service_provider: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      is_tenant: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      is_ticket_participant: {
-        Args: { p_ticket_id: string }
-        Returns: boolean
-      }
+      is_landlord: { Args: never; Returns: boolean }
+      is_service_provider: { Args: never; Returns: boolean }
+      is_tenant: { Args: never; Returns: boolean }
+      is_ticket_participant: { Args: { p_ticket_id: string }; Returns: boolean }
     }
     Enums: {
       communication_context_enum: "ticket" | "lease" | "general"

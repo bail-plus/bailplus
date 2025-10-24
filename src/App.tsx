@@ -23,6 +23,7 @@ import Documents from "./pages/app/Documents";
 import Communications from "./pages/app/Communications";
 import Reports from "./pages/app/Reports";
 import Settings from "./pages/account/Settings";
+import BankCallback from "./pages/settings/BankCallback";
 import TRISimulator from "./pages/app/tools/TRISimulator";
 import TrialPaywall from "./pages/account/TrialPaywall";
 
@@ -105,6 +106,9 @@ function App() {
 
               {/* Change email - accessible pour tous les utilisateurs authentifiés */}
               <Route path="/app/change-email" element={<ChangeEmail />} />
+
+              {/* Bank callback - page de transition après connexion bancaire */}
+              <Route path="/settings/bank-callback" element={<BankCallback />} />
 
               {/* Routes protégées par l'abonnement */}
               <Route element={<RequireSubscription />}>
