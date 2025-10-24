@@ -262,6 +262,9 @@ serve(async (req) => {
           } else {
             console.log('Bank connection saved/updated successfully for user:', accountProfile.id);
           }
+
+          // Note: Les transactions seront récupérées automatiquement le 5 et le 10 de chaque mois
+          // lors de la vérification des paiements de loyer
         }
         break;
 

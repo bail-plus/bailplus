@@ -29,6 +29,7 @@ export type Database = {
           last_sync_at: string | null
           last_sync_error: string | null
           last_sync_status: string | null
+          last_transaction_sync_at: string | null
           requisition_id: string
           updated_at: string | null
           user_id: string
@@ -47,6 +48,7 @@ export type Database = {
           last_sync_at?: string | null
           last_sync_error?: string | null
           last_sync_status?: string | null
+          last_transaction_sync_at?: string | null
           requisition_id: string
           updated_at?: string | null
           user_id: string
@@ -65,6 +67,7 @@ export type Database = {
           last_sync_at?: string | null
           last_sync_error?: string | null
           last_sync_status?: string | null
+          last_transaction_sync_at?: string | null
           requisition_id?: string
           updated_at?: string | null
           user_id?: string
@@ -73,58 +76,94 @@ export type Database = {
       }
       bank_transactions: {
         Row: {
+          account_id: string | null
           amount: number
           bank_connection_id: string | null
+          booking_date: string | null
+          bridge_updated_at: string | null
+          category_id: number | null
+          clean_description: string | null
           created_at: string
           creditor_name: string | null
+          currency_code: string | null
           date: string
           debtor_name: string | null
+          deleted: boolean | null
           external_transaction_id: string | null
+          future: boolean | null
           id: string
           label: string
           match_score: number | null
           matched_expense_id: string | null
           matched_rent_invoice_id: string | null
+          operation_type: string | null
+          provider_description: string | null
           raw_data: Json | null
           status: string | null
+          transaction_date: string | null
           updated_at: string
           user_id: string | null
+          value_date: string | null
         }
         Insert: {
+          account_id?: string | null
           amount: number
           bank_connection_id?: string | null
+          booking_date?: string | null
+          bridge_updated_at?: string | null
+          category_id?: number | null
+          clean_description?: string | null
           created_at?: string
           creditor_name?: string | null
+          currency_code?: string | null
           date: string
           debtor_name?: string | null
+          deleted?: boolean | null
           external_transaction_id?: string | null
+          future?: boolean | null
           id?: string
           label: string
           match_score?: number | null
           matched_expense_id?: string | null
           matched_rent_invoice_id?: string | null
+          operation_type?: string | null
+          provider_description?: string | null
           raw_data?: Json | null
           status?: string | null
+          transaction_date?: string | null
           updated_at?: string
           user_id?: string | null
+          value_date?: string | null
         }
         Update: {
+          account_id?: string | null
           amount?: number
           bank_connection_id?: string | null
+          booking_date?: string | null
+          bridge_updated_at?: string | null
+          category_id?: number | null
+          clean_description?: string | null
           created_at?: string
           creditor_name?: string | null
+          currency_code?: string | null
           date?: string
           debtor_name?: string | null
+          deleted?: boolean | null
           external_transaction_id?: string | null
+          future?: boolean | null
           id?: string
           label?: string
           match_score?: number | null
           matched_expense_id?: string | null
           matched_rent_invoice_id?: string | null
+          operation_type?: string | null
+          provider_description?: string | null
           raw_data?: Json | null
           status?: string | null
+          transaction_date?: string | null
           updated_at?: string
           user_id?: string | null
+          value_date?: string | null
         }
         Relationships: [
           {
@@ -1044,6 +1083,7 @@ export type Database = {
         Row: {
           adress: string | null
           birthdate: string | null
+          bridge_user_uuid: string | null
           city: string | null
           company_name: string | null
           created_at: string
@@ -1073,6 +1113,7 @@ export type Database = {
         Insert: {
           adress?: string | null
           birthdate?: string | null
+          bridge_user_uuid?: string | null
           city?: string | null
           company_name?: string | null
           created_at?: string
@@ -1102,6 +1143,7 @@ export type Database = {
         Update: {
           adress?: string | null
           birthdate?: string | null
+          bridge_user_uuid?: string | null
           city?: string | null
           company_name?: string | null
           created_at?: string
@@ -1798,22 +1840,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      is_landlord: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      is_service_provider: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      is_tenant: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      is_ticket_participant: {
-        Args: { p_ticket_id: string }
-        Returns: boolean
-      }
+      is_landlord: { Args: never; Returns: boolean }
+      is_service_provider: { Args: never; Returns: boolean }
+      is_tenant: { Args: never; Returns: boolean }
+      is_ticket_participant: { Args: { p_ticket_id: string }; Returns: boolean }
     }
     Enums: {
       communication_context_enum: "ticket" | "lease" | "general"
