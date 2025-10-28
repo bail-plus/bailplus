@@ -32,7 +32,23 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build -t bailogenius-front:latest .
+          docker build -t bailogenius-front:latest \
+            --build-arg VITE_SUPABASE_PROJECT_ID="${{ secrets.VITE_SUPABASE_PROJECT_ID }}" \
+            --build-arg VITE_SUPABASE_PUBLISHABLE_KEY="${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}" \
+            --build-arg VITE_SUPABASE_URL="${{ secrets.VITE_SUPABASE_URL }}" \
+            --build-arg VITE_SUPABASE_FUNCTIONS_URL="${{ secrets.VITE_SUPABASE_FUNCTIONS_URL }}" \
+            --build-arg VITE_STRIPE_PUBLISHABLE_KEY="${{ secrets.VITE_STRIPE_PUBLISHABLE_KEY }}" \
+            --build-arg VITE_STRIPE_PRICE_MONTHLY_STARTER="${{ secrets.VITE_STRIPE_PRICE_MONTHLY_STARTER }}" \
+            --build-arg VITE_STRIPE_PRODUCT_KEY_STARTER="${{ secrets.VITE_STRIPE_PRODUCT_KEY_STARTER }}" \
+            --build-arg VITE_STRIPE_PRICE_MONTHLY_STANDARD="${{ secrets.VITE_STRIPE_PRICE_MONTHLY_STANDARD }}" \
+            --build-arg VITE_STRIPE_PRODUCT_KEY_STANDARD="${{ secrets.VITE_STRIPE_PRODUCT_KEY_STANDARD }}" \
+            --build-arg VITE_STRIPE_PRICE_MONTHLY_PREMIUM="${{ secrets.VITE_STRIPE_PRICE_MONTHLY_PREMIUM }}" \
+            --build-arg VITE_STRIPE_PRODUCT_KEY_PREMIUM="${{ secrets.VITE_STRIPE_PRODUCT_KEY_PREMIUM }}" \
+            --build-arg VITE_BRIDGE_CLIENT_ID="${{ secrets.VITE_BRIDGE_CLIENT_ID }}" \
+            --build-arg VITE_BRIDGE_CLIENT_SECRET="${{ secrets.VITE_BRIDGE_CLIENT_SECRET }}" \
+            --build-arg VITE_BRIDGE_BASE_URL="${{ secrets.VITE_BRIDGE_BASE_URL }}" \
+            --build-arg VITE_BRIDGE_ENV="${{ secrets.VITE_BRIDGE_ENV }}" \
+            .
 
       - name: Save Docker image
         run: |
