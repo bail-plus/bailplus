@@ -1,0 +1,11 @@
+tunnel: bailogenius
+credentials-file: /home/gaignerot/.cloudflared/b160e405-a950-4c2a-bb34-8fb6df60114e.json
+
+ingress:
+  # Route pour bailogenius.gaignerot.com et www.bailogenius.gaignerot.com
+  - hostname: bailogenius.gaignerot.com
+    service: http://localhost:3000
+  - hostname: www.bailogenius.gaignerot.com
+    service: http://localhost:3000
+  # Route par défaut (obligatoire)
+  - service: http_status:404
