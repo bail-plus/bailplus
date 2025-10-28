@@ -26,24 +26,28 @@ jobs:
       - name: Build application
         run: npm run build
 
+      - name: Create deployment directory
+        run: |
+          mkdir -p /home/gaignerot/bailogenius-front
+
       - name: Build Docker image
         run: |
           docker build -t bailogenius-front:latest .
 
       - name: Save Docker image
         run: |
-          docker save bailogenius-front:latest -o /home/ubuntu/bailogenius-front/bailogenius-front.tar
+          docker save bailogenius-front:latest -o /home/gaignerot/bailogenius-front/bailogenius-front.tar
 
-      - name: Copy docker-compose.yml to server
+      - name: Copy deployment files
         run: |
-          mkdir -p /home/ubuntu/bailogenius-front
-          cp docker-compose.yml /home/ubuntu/bailogenius-front/
-          cp deploy.sh /home/ubuntu/bailogenius-front/
-          chmod +x /home/ubuntu/bailogenius-front/deploy.sh
+          cp docker-compose.yml /home/gaignerot/bailogenius-front/
+          cp deploy.sh /home/gaignerot/bailogenius-front/
+          cp cloudflared-config.yml /home/gaignerot/bailogenius-front/
+          chmod +x /home/gaignerot/bailogenius-front/deploy.sh
 
       - name: Deploy application
         run: |
-          cd /home/ubuntu/bailogenius-front
+          cd /home/gaignerot/bailogenius-front
           ./deploy.sh
 
       - name: Verify deployment
@@ -55,4 +59,4 @@ jobs:
         if: success()
         run: |
           echo "✅ Deployment successful!"
-          echo "🌐 Application is live at https://bailogenius.gaignerot.fr"
+          echo "🌐 Application is live at https://bailogenius.gaignerot.com"
