@@ -300,8 +300,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setInitialized(true);
       }
 
-      // Créer le profil automatiquement lors de la connexion OAuth
-      if (newUser?.id && event === 'SIGNED_IN' && !hydrated) {
+      // Créer le profil automatiquement lors de la connexion
+      if (newUser?.id && event === 'SIGNED_IN') {
         try {
           await upsertProfileFromUser(newUser);
           queryClient.invalidateQueries({ queryKey: ['profile', newUser.id] });
