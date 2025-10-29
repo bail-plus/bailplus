@@ -4,7 +4,8 @@
 
 ```
 Emails personnels (recevoir + envoyer)
-  → Zoho Mail (gratuit, 5 utilisateurs)
+  → Cloudflare Email Routing (recevoir) - GRATUIT
+  → Gmail (lire et envoyer) - GRATUIT
   → edouard.gaignerot@gaignerot.com
   → contact@gaignerot.com
 
@@ -14,117 +15,118 @@ Emails d'application (envoi uniquement)
   → notifications@gaignerot.com
 ```
 
+**💰 Coût total : 0€/mois**
+
 ---
 
-## Partie 1 : Zoho Mail (Emails personnels)
+## Partie 1 : Cloudflare Email Routing (Recevoir des emails)
 
-### Étape 1 : Créer un compte Zoho Mail
+### Étape 1 : Activer Email Routing
 
-1. Va sur : https://www.zoho.com/mail/
-2. Clique sur **Sign Up Now**
-3. Choisis **Forever Free Plan** (5 utilisateurs max)
-4. Inscris-toi avec ton email perso (Gmail, etc.)
+1. Va sur : https://dash.clookudflare.com
+2. Sélectionne ton domaine **gaignerot.com**
+3. Dans le menu de gauche, clique sur **Email** → **Email Routing**
+4. Clique sur **Get started** (ou **Enable Email Routing**)
 
-### Étape 2 : Ajouter ton domaine
+### Étape 2 : Configurer les enregistrements DNS
 
-1. Une fois connecté, va dans **Admin Console**
-2. Clique sur **Add Domain**
-3. Entre : `gaignerot.com`
-4. Choisis **I have a domain**
-
-### Étape 3 : Vérifier le domaine
-
-Zoho va te demander d'ajouter un enregistrement TXT dans Cloudflare :
-
-1. **Va dans Cloudflare** : https://dash.cloudflare.com
-2. Sélectionne **gaignerot.com**
-3. Va dans **DNS** → **Records**
-4. Clique sur **Add record**
-5. Ajoute l'enregistrement TXT que Zoho te donne :
+Cloudflare va automatiquement ajouter les enregistrements MX nécessaires :
 
 ```
-Type: TXT
-Name: @ (ou gaignerot.com)
-Content: zoho-verification=zb123456789.zmverify.zoho.com
-TTL: Auto
+Type: MX, Priority: 86, Name: @, Content: isaac.mx.cloudflare.net
+Type: MX, Priority: 4, Name: @, Content: amir.mx.cloudflare.net
+Type: MX, Priority: 17, Name: @, Content: linda.mx.cloudflare.net
 ```
 
-6. Retourne sur Zoho et clique sur **Verify**
-
-### Étape 4 : Configurer les enregistrements MX
-
-Dans Cloudflare, ajoute ces enregistrements MX :
+Et un enregistrement TXT pour SPF :
 
 ```
-Type: MX
-Name: @ (ou gaignerot.com)
-Priority: 10
-Content: mx.zoho.com
-TTL: Auto
-
-Type: MX
-Name: @ (ou gaignerot.com)
-Priority: 20
-Content: mx2.zoho.com
-TTL: Auto
-
-Type: MX
-Name: @ (ou gaignerot.com)
-Priority: 50
-Content: mx3.zoho.com
-TTL: Auto
+Type: TXT, Name: @, Content: v=spf1 include:_spf.mx.cloudflare.net ~all
 ```
 
-### Étape 5 : Configurer SPF, DKIM, DMARC (Important pour la délivrabilité)
+**Ces enregistrements sont ajoutés automatiquement**, vérifie juste qu'ils sont bien là dans **DNS** → **Records**.
 
-**SPF** (permet à Zoho d'envoyer des emails pour ton domaine) :
-```
-Type: TXT
-Name: @ (ou gaignerot.com)
-Content: v=spf1 include:zoho.com ~all
-TTL: Auto
-```
+### Étape 3 : Créer des adresses de redirection
 
-**DKIM** (Zoho te donnera cet enregistrement) :
-```
-Type: TXT
-Name: zmail._domainkey
-Content: [Zoho te donnera cette valeur]
-TTL: Auto
-```
+1. Dans **Email Routing**, clique sur **Destination addresses**
+2. Clique sur **Add destination address**
+3. Entre ton email Gmail personnel (ex: `ton-email@gmail.com`)
+4. **Vérifie l'email** que tu reçois pour confirmer
 
-**DMARC** (politique anti-spam) :
-```
-Type: TXT
-Name: _dmarc
-Content: v=DMARC1; p=quarantine; rua=mailto:postmaster@gaignerot.com
-TTL: Auto
-```
+Ensuite, crée les alias :
 
-### Étape 6 : Créer tes adresses email
-
-1. Dans Zoho Admin Console
-2. Va dans **Users** → **Add User**
+1. Clique sur **Routing rules**
+2. Clique sur **Create address**
 3. Crée tes adresses :
-   - `edouard.gaignerot@gaignerot.com`
-   - `contact@gaignerot.com`
-   - `support@gaignerot.com` (si besoin)
 
-### Étape 7 : Accéder à ta boîte mail
+```
+edouard.gaignerot@gaignerot.com → ton-email@gmail.com
+contact@gaignerot.com → ton-email@gmail.com
+support@gaignerot.com → ton-email@gmail.com (optionnel)
+```
 
-**Webmail** : https://mail.zoho.com
+### Étape 4 : Tester la réception
 
-**Application mobile** : Zoho Mail (iOS/Android)
+Envoie un email de test à `edouard.gaignerot@gaignerot.com` depuis un autre compte.
 
-**Configurer dans Gmail/Outlook** :
-- **IMAP** : `imap.zoho.com:993` (SSL)
-- **SMTP** : `smtp.zoho.com:465` (SSL)
-- **Username** : ton email complet
-- **Password** : ton mot de passe Zoho
+Tu devrais le recevoir dans ton Gmail ! ✅
 
 ---
 
-## Partie 2 : Resend (Emails d'application)
+## Partie 2 : Gmail (Envoyer des emails avec ton domaine)
+
+### Étape 1 : Configurer "Send mail as" dans Gmail
+
+1. Ouvre Gmail : https://mail.google.com
+2. Clique sur **⚙️ Paramètres** (en haut à droite)
+3. Va dans **Comptes et importation**
+4. Dans **Envoyer des e-mails en tant que**, clique sur **Ajouter une autre adresse e-mail**
+5. Entre :
+   - **Nom** : Edouard Gaignerot (ou ton nom)
+   - **Adresse e-mail** : `edouard.gaignerot@gaignerot.com`
+   - Décoche **Traiter comme un alias**
+6. Clique sur **Étape suivante**
+
+### Étape 2 : Configurer le SMTP
+
+Tu as deux options :
+
+#### Option A : Utiliser le SMTP de Gmail (simple mais limité)
+
+1. Choisis **Envoyer via les serveurs Gmail**
+2. Clique sur **Ajouter un compte**
+
+**Avantage** : Simple et rapide
+**Inconvénient** : L'email peut afficher "via gmail.com"
+
+#### Option B : Utiliser Resend SMTP (recommandé, professionnel)
+
+Tu configureras ça après avoir configuré Resend (voir Partie 3).
+
+SMTP Configuration :
+- **Serveur SMTP** : `smtp.resend.com`
+- **Port** : `465` (SSL) ou `587` (TLS)
+- **Nom d'utilisateur** : `resend`
+- **Mot de passe** : Ta clé API Resend
+
+### Étape 3 : Vérifier l'adresse
+
+Gmail va envoyer un code de vérification à `edouard.gaignerot@gaignerot.com`.
+
+Grâce à Cloudflare Email Routing, tu vas recevoir ce code dans ton Gmail !
+
+Entre le code pour valider.
+
+### Étape 4 : Définir comme adresse par défaut (optionnel)
+
+1. Dans **Comptes et importation**
+2. À côté de `edouard.gaignerot@gaignerot.com`, clique sur **définir par défaut**
+
+Maintenant, tous tes emails sortiront avec ton adresse @gaignerot.com ! 🎉
+
+---
+
+## Partie 3 : Resend (Emails d'application)
 
 ### Étape 1 : Créer un compte Resend
 
@@ -194,9 +196,9 @@ await resend.emails.send({
 
 ---
 
-## Partie 3 : Alternative - Brevo (ex-Sendinblue)
+## Alternative : Brevo (ex-Sendinblue) - Plus d'emails gratuits
 
-Si tu veux plus de 100 emails/jour gratuits :
+Si tu dépasses les 100 emails/jour de Resend :
 
 **Brevo** : 300 emails/jour gratuits
 1. Va sur : https://www.brevo.com
@@ -205,23 +207,32 @@ Si tu veux plus de 100 emails/jour gratuits :
 
 ---
 
+## Alternative : Improvmx - Service email complet gratuit
+
+Si tu veux une vraie boîte email sans Gmail :
+
+**Improvmx** : Totalement gratuit
+1. Va sur : https://improvmx.com
+2. Ajoute ton domaine
+3. Configure les MX records
+4. Reçois ET envoie des emails
+
+---
+
 ## Récapitulatif de la configuration DNS
 
-Voici tous les enregistrements DNS à ajouter dans Cloudflare :
+Voici tous les enregistrements DNS dans Cloudflare :
 
-### Pour Zoho Mail (recevoir/envoyer emails personnels)
+### Pour Cloudflare Email Routing (recevoir emails personnels)
 
 ```
-# MX Records (pour recevoir)
-Type: MX, Priority: 10, Name: @, Content: mx.zoho.com
-Type: MX, Priority: 20, Name: @, Content: mx2.zoho.com
-Type: MX, Priority: 50, Name: @, Content: mx3.zoho.com
+# MX Records (ajoutés automatiquement par Cloudflare)
+Type: MX, Priority: 86, Name: @, Content: isaac.mx.cloudflare.net
+Type: MX, Priority: 4, Name: @, Content: amir.mx.cloudflare.net
+Type: MX, Priority: 17, Name: @, Content: linda.mx.cloudflare.net
 
-# Vérification Zoho
-Type: TXT, Name: @, Content: zoho-verification=zb123456789.zmverify.zoho.com
-
-# DKIM Zoho
-Type: TXT, Name: zmail._domainkey, Content: [valeur donnée par Zoho]
+# SPF (ajouté automatiquement)
+Type: TXT, Name: @, Content: v=spf1 include:_spf.mx.cloudflare.net ~all
 ```
 
 ### Pour Resend (envoyer emails d'application)
@@ -234,11 +245,11 @@ Type: TXT, Name: _resend, Content: [valeur donnée par Resend]
 Type: TXT, Name: resend._domainkey, Content: [valeur donnée par Resend]
 ```
 
-### Enregistrements communs (SPF + DMARC)
+### Enregistrements de sécurité (recommandés)
 
 ```
-# SPF (combine Zoho + Resend)
-Type: TXT, Name: @, Content: v=spf1 include:zoho.com include:_spf.resend.com ~all
+# SPF combiné (si tu utilises Resend pour envoyer)
+Type: TXT, Name: @, Content: v=spf1 include:_spf.mx.cloudflare.net include:_spf.resend.com ~all
 
 # DMARC (politique anti-spam)
 Type: TXT, Name: _dmarc, Content: v=DMARC1; p=quarantine; rua=mailto:postmaster@gaignerot.com
@@ -248,10 +259,12 @@ Type: TXT, Name: _dmarc, Content: v=DMARC1; p=quarantine; rua=mailto:postmaster@
 
 ## Utilisation recommandée
 
-### Emails personnels (Zoho Mail)
-- ✉️ `edouard.gaignerot@gaignerot.com` - Ton email principal
-- ✉️ `contact@gaignerot.com` - Contact public
-- ✉️ `support@gaignerot.com` - Support client
+### Emails personnels (Cloudflare Email Routing → Gmail)
+- ✉️ `edouard.gaignerot@gaignerot.com` → Ton Gmail
+- ✉️ `contact@gaignerot.com` → Ton Gmail
+- ✉️ `support@gaignerot.com` → Ton Gmail (optionnel)
+
+**Tu lis et envoies tout depuis Gmail avec ton adresse @gaignerot.com**
 
 ### Emails d'application (Resend)
 - 📧 `noreply@gaignerot.com` - Notifications automatiques
@@ -288,18 +301,18 @@ serve(async (req) => {
 });
 ```
 
-### Option 2 : Configurer Supabase Auth avec Resend/SMTP
+### Option 2 : Configurer Supabase Auth avec Resend SMTP
 
 Dans ton dashboard Supabase :
 1. Va dans **Authentication** → **Email Templates**
-2. Configure le SMTP avec Zoho ou Resend
+2. Configure le SMTP avec Resend
 
-**Avec Zoho SMTP** :
+**Avec Resend SMTP** :
 ```
-SMTP Host: smtp.zoho.com
-SMTP Port: 465
-SMTP Username: noreply@gaignerot.com
-SMTP Password: [ton mot de passe Zoho]
+SMTP Host: smtp.resend.com
+SMTP Port: 465 (SSL) ou 587 (TLS)
+SMTP Username: resend
+SMTP Password: [ta clé API Resend]
 Sender email: noreply@gaignerot.com
 Sender name: BailoGenius
 ```
@@ -308,9 +321,9 @@ Sender name: BailoGenius
 
 ## Test de configuration
 
-### Tester la réception (Zoho)
-1. Envoie un email à `edouard.gaignerot@gaignerot.com` depuis Gmail
-2. Vérifie dans https://mail.zoho.com
+### Tester la réception (Cloudflare Email Routing)
+1. Envoie un email à `edouard.gaignerot@gaignerot.com` depuis un autre compte
+2. Vérifie dans ton Gmail, tu devrais le recevoir !
 
 ### Tester l'envoi (Resend)
 ```bash
@@ -332,16 +345,17 @@ Teste ton domaine sur : https://www.mail-tester.com
 
 ## Coûts
 
-- ✅ **Zoho Mail** : Gratuit (5 utilisateurs, 5 Go/utilisateur)
+- ✅ **Cloudflare Email Routing** : Gratuit illimité
+- ✅ **Gmail** : Gratuit
 - ✅ **Resend** : Gratuit (100 emails/jour, 3000/mois)
 - ✅ **Cloudflare DNS** : Gratuit
-- 💰 **Total** : 0€/mois
+- 💰 **Total** : **0€/mois**
 
 ### Si tu dépasses les limites gratuites
 
-- **Zoho Mail** : 1€/utilisateur/mois pour plus de stockage
 - **Resend** : 20$/mois pour 50 000 emails/mois
-- **Brevo** : Gratuit jusqu'à 300 emails/jour (alternative)
+- **Brevo** : Gratuit jusqu'à 300 emails/jour (alternative gratuite)
+- **Improvmx** : 9$/mois pour emails illimités avec boîte IMAP
 
 ---
 
@@ -350,18 +364,29 @@ Teste ton domaine sur : https://www.mail-tester.com
 Si tu as des problèmes :
 1. Vérifie les DNS avec : https://mxtoolbox.com
 2. Teste la délivrabilité : https://www.mail-tester.com
-3. Vérifie les logs Resend/Zoho
+3. Vérifie les logs dans Cloudflare Email Routing
+4. Vérifie les logs Resend
 
 ## Checklist
 
-- [ ] Compte Zoho Mail créé
-- [ ] Domaine vérifié dans Zoho
-- [ ] Enregistrements MX ajoutés dans Cloudflare
-- [ ] SPF/DKIM/DMARC configurés
-- [ ] Adresses email créées dans Zoho
+- [ ] Cloudflare Email Routing activé
+- [ ] Adresses de redirection configurées (vers Gmail)
 - [ ] Test de réception OK
+- [ ] Gmail configuré pour envoyer avec @gaignerot.com
+- [ ] Test d'envoi depuis Gmail OK
 - [ ] Compte Resend créé
 - [ ] Domaine vérifié dans Resend
 - [ ] Clé API Resend créée
-- [ ] Test d'envoi OK
+- [ ] Test d'envoi API Resend OK
 - [ ] Configuration Supabase (optionnel)
+
+## Résumé : Pourquoi cette solution ?
+
+✅ **100% Gratuite** - Aucun coût
+✅ **Simple** - Cloudflare fait tout automatiquement
+✅ **Interface connue** - Tu utilises Gmail
+✅ **Professionnel** - Ton adresse @gaignerot.com
+✅ **Fiable** - Infrastructure Cloudflare + Google
+✅ **Pas de maintenance** - Tout est géré pour toi
+
+Tu as maintenant des emails professionnels sans rien payer ! 🎉
