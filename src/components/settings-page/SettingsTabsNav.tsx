@@ -20,30 +20,17 @@ export function SettingsTabsNav({
   onChange,
   children,
 }: SettingsTabsNavProps) {
-  const gridClass =
-    tabs.length === 2
-      ? "grid-cols-2"
-      : tabs.length === 3
-      ? "grid-cols-3"
-      : tabs.length === 4
-      ? "grid-cols-4"
-      : tabs.length === 5
-      ? "grid-cols-5"
-      : tabs.length === 6
-      ? "grid-cols-6"
-      : tabs.length === 7
-      ? "grid-cols-7"
-      : "grid-cols-8";
-
   return (
     <Tabs value={activeTab} onValueChange={onChange}>
-      <TabsList className={`grid w-full ${gridClass}`}>
-        {tabs.map((tab) => (
-          <TabsTrigger key={tab.value} value={tab.value}>
-            {tab.label}
-          </TabsTrigger>
-        ))}
-      </TabsList>
+      <div className="overflow-x-auto pb-2">
+        <TabsList className="flex w-full">
+          {tabs.map((tab) => (
+            <TabsTrigger key={tab.value} value={tab.value} className="flex-1 whitespace-nowrap">
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </div>
       {children}
     </Tabs>
   );

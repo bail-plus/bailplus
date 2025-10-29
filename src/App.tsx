@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/layout/AppLayout";
 import { AuthProvider } from "@/hooks/auth/useAuth";
 import { RequireAuth, RequireSubscription } from "@/guards";
+import { RequireCompleteProfile } from "@/guards/RequireCompleteProfile";
 
 // App pages (protected)
 import Index from "./pages/app/Index";
@@ -34,6 +35,7 @@ import ResetPassword from "./pages/auth/ResetPassword";
 import ChangeEmail from "./pages/account/ChangeEmail";
 import LostEmailAccess from "./pages/auth/LostEmailAccess";
 import AcceptInvitation from "./pages/auth/AcceptInvitation";
+import CompleteProfile from "./pages/auth/CompleteProfile";
 import Offers from "./pages/marketing/Offers";
 import Auth from "./pages/auth/Auth";
 
@@ -99,34 +101,40 @@ function App() {
 
             {/* Protected app routes */}
             <Route element={<RequireAuth />}>
-              <Route path="/app" element={<Layout><Navigate to="/app/dashboard" replace /></Layout>} />
+              {/* Complete profile - accessible pour les utilisateurs authentifiés, avant RequireCompleteProfile */}
+              <Route path="/complete-profile" element={<CompleteProfile />} />
 
-              {/* Paywall accessible pour les utilisateurs authentifiés sans abonnement */}
-              <Route path="/app/paywall" element={<Layout><TrialPaywall /></Layout>} />
+              {/* Routes qui nécessitent un profil complet */}
+              <Route element={<RequireCompleteProfile />}>
+                <Route path="/app" element={<Layout><Navigate to="/app/dashboard" replace /></Layout>} />
 
-              {/* Change email - accessible pour tous les utilisateurs authentifiés */}
-              <Route path="/app/change-email" element={<ChangeEmail />} />
+                {/* Paywall accessible pour les utilisateurs authentifiés sans abonnement */}
+                <Route path="/app/paywall" element={<Layout><TrialPaywall /></Layout>} />
 
-              {/* Bank callback - page de transition après connexion bancaire */}
-              <Route path="/settings/bank-callback" element={<BankCallback />} />
+                {/* Change email - accessible pour tous les utilisateurs authentifiés */}
+                <Route path="/app/change-email" element={<ChangeEmail />} />
 
-              {/* Routes protégées par l'abonnement */}
-              <Route element={<RequireSubscription />}>
-                <Route path="/app/dashboard" element={<Layout><Index /></Layout>} />
-                <Route path="/app/calendar" element={<Layout><Calendar /></Layout>} />
-                <Route path="/app/properties" element={<Layout><Properties /></Layout>} />
-                <Route path="/app/leases" element={<Layout><Leases /></Layout>} />
-                <Route path="/app/leases/:id" element={<Layout><LeaseDetail /></Layout>} />
-                <Route path="/app/people" element={<Layout><People /></Layout>} />
-                <Route path="/app/providers" element={<Layout><Providers /></Layout>} />
-                <Route path="/app/provider-profile" element={<Layout><ProviderProfile /></Layout>} />
-                <Route path="/app/maintenance" element={<Layout><Maintenance /></Layout>} />
-                <Route path="/app/accounting" element={<Layout><Accounting /></Layout>} />
-                <Route path="/app/documents" element={<Layout><Documents /></Layout>} />
-                <Route path="/app/communications" element={<Layout><Communications /></Layout>} />
-                <Route path="/app/reports" element={<Layout><Reports /></Layout>} />
-                <Route path="/app/tools/tri" element={<Layout><TRISimulator /></Layout>} />
-                <Route path="/app/settings" element={<Layout><Settings /></Layout>} />
+                {/* Bank callback - page de transition après connexion bancaire */}
+                <Route path="/settings/bank-callback" element={<BankCallback />} />
+
+                {/* Routes protégées par l'abonnement */}
+                <Route element={<RequireSubscription />}>
+                  <Route path="/app/dashboard" element={<Layout><Index /></Layout>} />
+                  <Route path="/app/calendar" element={<Layout><Calendar /></Layout>} />
+                  <Route path="/app/properties" element={<Layout><Properties /></Layout>} />
+                  <Route path="/app/leases" element={<Layout><Leases /></Layout>} />
+                  <Route path="/app/leases/:id" element={<Layout><LeaseDetail /></Layout>} />
+                  <Route path="/app/people" element={<Layout><People /></Layout>} />
+                  <Route path="/app/providers" element={<Layout><Providers /></Layout>} />
+                  <Route path="/app/provider-profile" element={<Layout><ProviderProfile /></Layout>} />
+                  <Route path="/app/maintenance" element={<Layout><Maintenance /></Layout>} />
+                  <Route path="/app/accounting" element={<Layout><Accounting /></Layout>} />
+                  <Route path="/app/documents" element={<Layout><Documents /></Layout>} />
+                  <Route path="/app/communications" element={<Layout><Communications /></Layout>} />
+                  <Route path="/app/reports" element={<Layout><Reports /></Layout>} />
+                  <Route path="/app/tools/tri" element={<Layout><TRISimulator /></Layout>} />
+                  <Route path="/app/settings" element={<Layout><Settings /></Layout>} />
+                </Route>
               </Route>
             </Route>
 

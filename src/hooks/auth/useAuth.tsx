@@ -72,6 +72,7 @@ const upsertProfileFromUser = async (u: User) => {
     first_name: firstName,
     last_name: lastName,
     role: md.role ?? 'trial',
+    user_type: md.user_type ?? 'LANDLORD',
     trial_end_date: trialEndDate,
     gender: md.gender ?? null,
     birthdate: toDateOnly(md.birthdate),
@@ -182,6 +183,7 @@ async function signUpUser(params: {
         first_name: firstName,
         last_name: lastName,
         role,
+        user_type: 'LANDLORD',
         trial_end_date: trialEndDate,
         gender,
         birthdate,
@@ -213,7 +215,7 @@ async function signInWithGoogle() {
   const { error, data } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${window.location.origin}/app`,
+      redirectTo: `${window.location.origin}/complete-profile`,
     }
   });
   if (error) throw error;
