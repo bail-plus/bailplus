@@ -29,6 +29,7 @@ export interface NotificationPreferences {
 }
 
 const TABS = [
+  { value: "profile", label: "Profil", roles: ["LANDLORD", "TENANT", "SERVICE_PROVIDER"] as Array<string> },
   { value: "organizations", label: "Entités", roles: ["LANDLORD"] as Array<string> },
   { value: "users", label: "Utilisateurs", roles: ["LANDLORD"] as Array<string> },
   { value: "banking", label: "Banques", roles: ["LANDLORD"] as Array<string> },
@@ -50,10 +51,8 @@ export function useSettingsController() {
   );
 
   const defaultTab = useMemo(() => {
-    if (userType === "TENANT" || userType === "SERVICE_PROVIDER") {
-      return "privacy";
-    }
-    return "organizations";
+    // Premier onglet visible selon le type d'utilisateur
+    return "profile";
   }, [userType]);
 
   const [activeTab, setActiveTab] = useState(defaultTab);

@@ -3,6 +3,7 @@ import { TabsContent } from "@/components/ui/tabs";
 import { InvitationManager } from "@/components/settings/InvitationManager";
 import { SettingsHeader } from "@/components/settings-page/SettingsHeader";
 import { SettingsTabsNav } from "@/components/settings-page/SettingsTabsNav";
+import { ProfileTab } from "@/components/settings-page/ProfileTab";
 import { OrganizationsTab } from "@/components/settings-page/OrganizationsTab";
 import { BankingTab } from "@/components/settings-page/BankingTab";
 import { TemplatesTab } from "@/components/settings-page/TemplatesTab";
@@ -50,7 +51,7 @@ export default function Settings() {
   }));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-8">
       <SettingsHeader />
 
       <SettingsTabsNav
@@ -58,6 +59,10 @@ export default function Settings() {
         activeTab={activeTab}
         onChange={(value) => setActiveTab(value)}
       >
+        <TabsContent value="profile" className="space-y-4">
+          <ProfileTab />
+        </TabsContent>
+
         {userType === "LANDLORD" && (
           <TabsContent value="organizations" className="space-y-4">
             <OrganizationsTab
