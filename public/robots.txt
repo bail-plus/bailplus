@@ -1,14 +1,14 @@
-User-agent: Googlebot
-Allow: /
+# robots.txt pour BailoGenius
 
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
+# Permettre à tous les robots d'indexer le site
 User-agent: *
 Allow: /
+
+# Bloquer les pages privées
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /settings
+Disallow: /api
+
+# Sitemap
+Sitemap: https://bailogenius.gaignerot.com/sitemap.xml
