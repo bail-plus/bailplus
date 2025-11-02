@@ -24,6 +24,17 @@ enabled = true
 
 [auth]
 enabled = true
+# URL du site pour les redirections
+site_url = "http://localhost:5173"
+# URL additionnelles autorisées
+additional_redirect_urls = ["http://localhost:5173"]
+# Désactiver l'auto-confirmation en local (forcer la vérification d'email)
+enable_signup = true
+
+[auth.email]
+# Forcer la confirmation d'email
+enable_signup = true
+enable_confirmations = true
 
 
 [edge_runtime]

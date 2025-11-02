@@ -50,10 +50,12 @@ export function DashboardKPIs({
             <div>
               <p className="text-sm font-medium text-muted-foreground">Taux d'occupation</p>
               <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-2xl font-bold">{100 - vacancyRate}%</span>
+                <span className="text-2xl font-bold">
+                  {totalUnits > 0 ? `${100 - vacancyRate}%` : 'N/A'}
+                </span>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                {occupiedUnits}/{totalUnits} occupés
+                {totalUnits > 0 ? `${occupiedUnits}/${totalUnits} occupés` : 'Aucun logement'}
               </p>
             </div>
             <div className="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center">

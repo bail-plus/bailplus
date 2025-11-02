@@ -6,7 +6,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/layout/AppLayout";
 import { AuthProvider } from "@/hooks/auth/useAuth";
-import { RequireAuth, RequireSubscription } from "@/guards";
+import { RequireAuth, RequireSubscription, RequireEmailVerified } from "@/guards";
 import { RequireCompleteProfile } from "@/guards/RequireCompleteProfile";
 
 // App pages (protected)
@@ -36,6 +36,9 @@ import ChangeEmail from "./pages/account/ChangeEmail";
 import LostEmailAccess from "./pages/auth/LostEmailAccess";
 import AcceptInvitation from "./pages/auth/AcceptInvitation";
 import CompleteProfile from "./pages/auth/CompleteProfile";
+import SelectUserType from "./pages/auth/SelectUserType";
+import VerifyEmail from "./pages/auth/VerifyEmail";
+import EmailConfirmHandler from "./pages/auth/EmailConfirmHandler";
 import Offers from "./pages/marketing/Offers";
 import Auth from "./pages/auth/Auth";
 
@@ -93,7 +96,10 @@ function App() {
             {/* Auth routes (public) */}
             <Route path="/auth" element={<Auth />} />
             <Route path="/login" element={<Navigate to="/auth" replace />} />
+            <Route path="/select-user-type" element={<SelectUserType />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
+            <Route path="/auth/confirm" element={<EmailConfirmHandler />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/lost-email-access" element={<LostEmailAccess />} />
@@ -101,8 +107,10 @@ function App() {
 
             {/* Protected app routes */}
             <Route element={<RequireAuth />}>
-              {/* Complete profile - accessible pour les utilisateurs authentifiés, avant RequireCompleteProfile */}
-              <Route path="/complete-profile" element={<CompleteProfile />} />
+              {/* Complete profile - accessible pour les utilisateurs authentifiés avec email vérifié */}
+              <Route element={<RequireEmailVerified />}>
+                <Route path="/complete-profile" element={<CompleteProfile />} />
+              </Route>
 
               {/* Routes qui nécessitent un profil complet */}
               <Route element={<RequireCompleteProfile />}>

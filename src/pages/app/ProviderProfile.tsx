@@ -58,7 +58,12 @@ export default function ProviderProfile() {
   // Charger les données du prestataire
   useEffect(() => {
     async function loadProvider() {
-      if (!user) return
+      if (!user) {
+        console.log('[ProviderProfile] No user, skipping load')
+        return
+      }
+
+      console.log('[ProviderProfile] Loading provider for user:', user.id)
 
       try {
         const { data, error } = await supabase
@@ -67,33 +72,66 @@ export default function ProviderProfile() {
           .eq('user_id', user.id)
           .maybeSingle()
 
-        if (error) throw error
+        if (error) {
+          console.error('[ProviderProfile] Error loading provider:', error)
+          throw error
+        }
+
+        console.log('[ProviderProfile] Provider data:', data)
+
         let providerRow = data as any
         if (!providerRow) {
+          console.log('[ProviderProfile] No provider found, creating one...')
+
           // Tenter de créer un profil prestataire minimal à partir du profil utilisateur
-          const { data: myProfile } = await supabase
+          const { data: myProfile, error: profileError } = await supabase
             .from('profiles')
-            .select('first_name, last_name, company_name, linked_to_landlord')
+            .select('first_name, last_name, company_name, linked_to_landlord, specialty')
             .eq('user_id', user.id)
             .maybeSingle()
 
+          if (profileError) {
+            console.error('[ProviderProfile] Error loading profile:', profileError)
+          }
+
+          console.log('[ProviderProfile] User profile:', myProfile)
+
+          // Convertir la spécialité du profile (string) en tableau
+          let specialtyArray: string[] = []
+          if (myProfile?.specialty) {
+            // Mapper les valeurs du Select vers les valeurs affichées
+            const specialtyMap: Record<string, string> = {
+              'plomberie': 'Plomberie',
+              'electricite': 'Électricité',
+              'chauffage': 'Chauffage',
+              'menuiserie': 'Menuiserie',
+              'peinture': 'Peinture',
+              'serrurerie': 'Serrurerie',
+              'jardinage': 'Jardinage',
+              'nettoyage': 'Nettoyage',
+              'autre': 'Autre',
+            }
+            const mappedSpecialty = specialtyMap[myProfile.specialty] || myProfile.specialty
+            specialtyArray = [mappedSpecialty]
+          }
+
           const insertPayload: any = {
             user_id: user.id,
+            landlord_id: myProfile?.linked_to_landlord || user.id, // Utiliser l'user_id si pas de landlord
             company_name: myProfile?.company_name || null,
-            specialty: [],
+            specialty: specialtyArray, // Utiliser la spécialité du profil
             professional_email: user.email,
             professional_phone: null,
             hourly_rate: null,
             siret: null,
             address: null,
             available: true,
+            currency: 'EUR', // Ajout de currency
             insurance_certificate_url: null,
             insurance_expiry_date: null,
           }
-          // lier au bailleur si connu
-          if (myProfile?.linked_to_landlord) {
-            insertPayload.landlord_id = myProfile.linked_to_landlord
-          }
+
+          console.log('[ProviderProfile] Inserting payload:', insertPayload)
 
           const { data: created, error: createError } = await supabase
             .from('service_providers')
@@ -102,14 +140,17 @@ export default function ProviderProfile() {
             .single()
 
           if (createError) {
-            console.error('Error auto-creating provider profile:', createError)
+            console.error('[ProviderProfile] Error auto-creating provider profile:', createError)
             toast({
               title: "Erreur",
-              description: "Profil prestataire non trouvé et impossible à créer",
+              description: `Impossible de créer le profil prestataire: ${createError.message}`,
               variant: "destructive",
             })
+            setIsLoading(false)
             return
           }
+
+          console.log('[ProviderProfile] Provider created successfully:', created)
           providerRow = created
         }
 
