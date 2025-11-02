@@ -147,6 +147,7 @@ async function signUpUser(params: {
   password: string;
   firstName: string;
   lastName: string;
+  user_type?: 'LANDLORD' | 'SERVICE_PROVIDER' | 'TENANT';
   role?: Role;
   trial_end_date?: string | null;
   gender?: Gender;
@@ -161,6 +162,7 @@ async function signUpUser(params: {
     password,
     firstName,
     lastName,
+    user_type = 'LANDLORD',
     role = 'trial',
     trial_end_date = null,
     gender = 'other',
@@ -178,12 +180,12 @@ async function signUpUser(params: {
     email,
     password,
     options: {
-      emailRedirectTo: `${window.location.origin}/`,
+      emailRedirectTo: `${window.location.origin}/app`,
       data: {
         first_name: firstName,
         last_name: lastName,
         role,
-        user_type: 'LANDLORD',
+        user_type,
         trial_end_date: trialEndDate,
         gender,
         birthdate,
@@ -215,7 +217,7 @@ async function signInWithGoogle() {
   const { error, data } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      redirectTo: `${window.location.origin}/complete-profile`,
+      redirectTo: `${window.location.origin}/select-user-type?oauth=true`,
     }
   });
   if (error) throw error;
@@ -430,7 +432,16 @@ export function useSignUp() {
       toast.success('Compte créé avec succès ! Vérifiez vos emails.');
     },
     onError: (error: any) => {
-      toast.error(error.message || 'Erreur lors de la création du compte');
+      // Messages d'erreur personnalisés selon le type d'erreur
+      if (error.message?.includes('already registered') || error.message?.includes('User already registered')) {
+        toast.error('Cette adresse email est déjà utilisée');
+      } else if (error.message?.includes('Email rate limit exceeded')) {
+        toast.error('Trop de tentatives. Veuillez réessayer dans quelques minutes.');
+      } else if (error.message?.includes('Password')) {
+        toast.error('Le mot de passe doit contenir au moins 6 caractères');
+      } else {
+        toast.error(error.message || 'Erreur lors de la création du compte');
+      }
     },
   });
 }
