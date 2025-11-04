@@ -5,9 +5,10 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/layout/AppLayout";
-import { AuthProvider } from "@/hooks/auth/useAuth";
+import { AuthProvider, useAuth } from "@/hooks/auth/useAuth";
 import { RequireAuth, RequireSubscription, RequireEmailVerified } from "@/guards";
 import { RequireCompleteProfile } from "@/guards/RequireCompleteProfile";
+import { LoadingGate } from "@/components/layout/LoadingGate";
 
 // App pages (protected)
 import Index from "./pages/app/Index";
@@ -62,99 +63,113 @@ import { MarketingLayout } from "./components/marketing/marketing-layout";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 2,
-      retryDelay: 1000,
-      staleTime: 5 * 60 * 1000, // 5 minutes - les données sont fraîches pendant 5 min
-      gcTime: 10 * 60 * 1000, // 10 minutes
-      refetchOnWindowFocus: false, // Ne pas refetch quand on revient sur l'onglet
-      refetchOnMount: true, // Refetch au mount SI les données sont stale
+      retry: 1, // Réduire les retries pour éviter les blocages longs
+      retryDelay: 500,
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
       refetchOnReconnect: false,
+      networkMode: 'always',
     },
   },
 });
 
+function AuthReadyGate({ children }: { children: React.ReactNode }) {
+  const { isReady, loading } = useAuth();
+
+  return (
+    <LoadingGate
+      isLoading={!isReady}
+      message="Chargement de vos données..."
+      minDuration={200}
+    >
+      {isReady ? children : null}
+    </LoadingGate>
+  );
+}
+
+function AppRoutes() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        {/* Marketing routes (public) */}
+        <Route path="/" element={<MarketingLayout><Landing /></MarketingLayout>} />
+        <Route path="/features" element={<MarketingLayout><Features /></MarketingLayout>} />
+        <Route path="/faq" element={<MarketingLayout><FAQ /></MarketingLayout>} />
+        <Route path="/about" element={<MarketingLayout><About /></MarketingLayout>} />
+        <Route path="/contact" element={<MarketingLayout><Contact /></MarketingLayout>} />
+        <Route path="/resources" element={<MarketingLayout><Resources /></MarketingLayout>} />
+        <Route path="/legal/terms" element={<MarketingLayout><Terms /></MarketingLayout>} />
+        <Route path="/legal/privacy" element={<MarketingLayout><Privacy /></MarketingLayout>} />
+        <Route path="/legal/imprint" element={<MarketingLayout><Imprint /></MarketingLayout>} />
+        <Route path="/offers" element={<MarketingLayout><Offers /></MarketingLayout>} />
+
+        {/* Auth routes (public) */}
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/login" element={<Navigate to="/auth" replace />} />
+        <Route path="/select-user-type" element={<SelectUserType />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/auth/confirm" element={<EmailConfirmHandler />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/lost-email-access" element={<LostEmailAccess />} />
+        <Route path="/accept-invitation" element={<AcceptInvitation />} />
+
+        {/* Protected app routes */}
+        <Route element={<RequireAuth />}>
+          <Route element={<RequireEmailVerified />}>
+            <Route path="/complete-profile" element={<CompleteProfile />} />
+          </Route>
+
+          <Route element={<RequireCompleteProfile />}>
+            <Route path="/app" element={<Layout><Navigate to="/app/dashboard" replace /></Layout>} />
+            <Route path="/app/paywall" element={<Layout><TrialPaywall /></Layout>} />
+            <Route path="/app/change-email" element={<ChangeEmail />} />
+            <Route path="/settings/bank-callback" element={<BankCallback />} />
+
+            <Route element={<RequireSubscription />}>
+              <Route path="/app/dashboard" element={<Layout><Index /></Layout>} />
+              <Route path="/app/calendar" element={<Layout><Calendar /></Layout>} />
+              <Route path="/app/properties" element={<Layout><Properties /></Layout>} />
+              <Route path="/app/profitability" element={<Layout><Profitability /></Layout>} />
+              <Route path="/app/leases" element={<Layout><Leases /></Layout>} />
+              <Route path="/app/leases/:id" element={<Layout><LeaseDetail /></Layout>} />
+              <Route path="/app/people" element={<Layout><People /></Layout>} />
+              <Route path="/app/providers" element={<Layout><Providers /></Layout>} />
+              <Route path="/app/provider-profile" element={<Layout><ProviderProfile /></Layout>} />
+              <Route path="/app/maintenance" element={<Layout><Maintenance /></Layout>} />
+              <Route path="/app/accounting" element={<Layout><Accounting /></Layout>} />
+              <Route path="/app/documents" element={<Layout><Documents /></Layout>} />
+              <Route path="/app/communications" element={<Layout><Communications /></Layout>} />
+              <Route path="/app/reports" element={<Layout><Reports /></Layout>} />
+              <Route path="/app/tools/tri" element={<Layout><TRISimulator /></Layout>} />
+              <Route path="/app/settings" element={<Layout><Settings /></Layout>} />
+            </Route>
+          </Route>
+        </Route>
+
+        {/* Catch-all 404 */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
 function App() {
   return (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            {/* Marketing routes (public) */}
-            <Route path="/" element={<MarketingLayout><Landing /></MarketingLayout>} />
-            <Route path="/features" element={<MarketingLayout><Features /></MarketingLayout>} />
-            <Route path="/faq" element={<MarketingLayout><FAQ /></MarketingLayout>} />
-            <Route path="/about" element={<MarketingLayout><About /></MarketingLayout>} />
-            <Route path="/contact" element={<MarketingLayout><Contact /></MarketingLayout>} />
-            <Route path="/resources" element={<MarketingLayout><Resources /></MarketingLayout>} />
-            <Route path="/legal/terms" element={<MarketingLayout><Terms /></MarketingLayout>} />
-            <Route path="/legal/privacy" element={<MarketingLayout><Privacy /></MarketingLayout>} />
-            <Route path="/legal/imprint" element={<MarketingLayout><Imprint /></MarketingLayout>} />
-            <Route path="/offers" element={<MarketingLayout><Offers /></MarketingLayout>} />
-
-            {/* Auth routes (public) */}
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/login" element={<Navigate to="/auth" replace />} />
-            <Route path="/select-user-type" element={<SelectUserType />} />
-            <Route path="/signup" element={<Signup />} />
-            <Route path="/verify-email" element={<VerifyEmail />} />
-            <Route path="/auth/confirm" element={<EmailConfirmHandler />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/lost-email-access" element={<LostEmailAccess />} />
-            <Route path="/accept-invitation" element={<AcceptInvitation />} />
-
-            {/* Protected app routes */}
-            <Route element={<RequireAuth />}>
-              {/* Complete profile - accessible pour les utilisateurs authentifiés avec email vérifié */}
-              <Route element={<RequireEmailVerified />}>
-                <Route path="/complete-profile" element={<CompleteProfile />} />
-              </Route>
-
-              {/* Routes qui nécessitent un profil complet */}
-              <Route element={<RequireCompleteProfile />}>
-                <Route path="/app" element={<Layout><Navigate to="/app/dashboard" replace /></Layout>} />
-
-                {/* Paywall accessible pour les utilisateurs authentifiés sans abonnement */}
-                <Route path="/app/paywall" element={<Layout><TrialPaywall /></Layout>} />
-
-                {/* Change email - accessible pour tous les utilisateurs authentifiés */}
-                <Route path="/app/change-email" element={<ChangeEmail />} />
-
-                {/* Bank callback - page de transition après connexion bancaire */}
-                <Route path="/settings/bank-callback" element={<BankCallback />} />
-
-                {/* Routes protégées par l'abonnement */}
-                <Route element={<RequireSubscription />}>
-                  <Route path="/app/dashboard" element={<Layout><Index /></Layout>} />
-                  <Route path="/app/calendar" element={<Layout><Calendar /></Layout>} />
-                  <Route path="/app/properties" element={<Layout><Properties /></Layout>} />
-                  <Route path="/app/profitability" element={<Layout><Profitability /></Layout>} />
-                  <Route path="/app/leases" element={<Layout><Leases /></Layout>} />
-                  <Route path="/app/leases/:id" element={<Layout><LeaseDetail /></Layout>} />
-                  <Route path="/app/people" element={<Layout><People /></Layout>} />
-                  <Route path="/app/providers" element={<Layout><Providers /></Layout>} />
-                  <Route path="/app/provider-profile" element={<Layout><ProviderProfile /></Layout>} />
-                  <Route path="/app/maintenance" element={<Layout><Maintenance /></Layout>} />
-                  <Route path="/app/accounting" element={<Layout><Accounting /></Layout>} />
-                  <Route path="/app/documents" element={<Layout><Documents /></Layout>} />
-                  <Route path="/app/communications" element={<Layout><Communications /></Layout>} />
-                  <Route path="/app/reports" element={<Layout><Reports /></Layout>} />
-                  <Route path="/app/tools/tri" element={<Layout><TRISimulator /></Layout>} />
-                  <Route path="/app/settings" element={<Layout><Settings /></Layout>} />
-                </Route>
-              </Route>
-            </Route>
-
-            {/* Catch-all 404 */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </AuthProvider>
-  </QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <AuthReadyGate>
+            <AppRoutes />
+          </AuthReadyGate>
+        </TooltipProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 

@@ -30,12 +30,8 @@ export function RequireCompleteProfile() {
     profile.gender &&
     profile.birthdate;
 
-  console.log('[GUARD] RequireCompleteProfile - Profile:', profile);
-  console.log('[GUARD] isProfileComplete:', isProfileComplete);
-
   // Si profil incomplet et pas déjà sur la page complete-profile, rediriger
   if (!isProfileComplete && location.pathname !== '/complete-profile') {
-    console.log('[GUARD] Redirecting to /complete-profile');
     return <Navigate to="/complete-profile" replace />;
   }
 

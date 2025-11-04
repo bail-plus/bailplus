@@ -10,16 +10,18 @@ declare global {
   // eslint-disable-next-line no-var
   var __SUPABASE__: SupabaseClient<Database> | undefined;
 }
-console.log('[SB/CLIENT]', { SUPABASE_URL, hasAnon: !!SUPABASE_ANON_KEY });
+//console.log('[SB/CLIENT]', { SUPABASE_URL, hasAnon: !!SUPABASE_ANON_KEY });
 
 export const supabase: SupabaseClient<Database> =
   globalThis.__SUPABASE__ ??
   (globalThis.__SUPABASE__ = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
+      flowType: 'pkce',
       storage: localStorage,
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      storageKey: 'gl-edouard-auth', // namespace unique
+      // très important : clé unique pour ton app
+      storageKey: 'gl-edouard-auth',
     },
   }));

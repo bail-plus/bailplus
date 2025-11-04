@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react"
 import { supabase } from "@/integrations/supabase/client"
 import type { Database } from "@/integrations/supabase/types"
+import { useAuth } from "@/hooks/auth/useAuth"
 
 type EntityType = Database["public"]["Enums"]["entity_type_enum"]
 
@@ -29,12 +30,18 @@ export function EntityProvider({ children }: { children: ReactNode }) {
   const [entities, setEntities] = useState<Entity[]>([])
   const [loading, setLoading] = useState(true)
   const [showAll, setShowAllState] = useState(false)
+  const { user, isReady } = useAuth()
 
   const loadEntities = useCallback(async () => {
+    if (!isReady) return
+
+    setLoading(true)
     try {
-      setLoading(true)
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user?.id) {
+        setEntities([])
+        setSelectedEntityState(null)
+        return
+      }
 
       const { data, error } = await supabase
         .from("entities")
@@ -56,18 +63,21 @@ export function EntityProvider({ children }: { children: ReactNode }) {
       setEntities(loadedEntities)
 
       // Si pas d'entité sélectionnée, prendre la première ou celle par défaut
-      if (!selectedEntity && !showAll) {
-        const defaultEntity = loadedEntities.find(e => e.is_default) || loadedEntities[0]
-        if (defaultEntity) {
-          setSelectedEntityState(defaultEntity)
-        }
+      if (!showAll) {
+        setSelectedEntityState(prev => {
+          if (prev && loadedEntities.some(e => e.id === prev.id)) {
+            return prev
+          }
+          const defaultEntity = loadedEntities.find(e => e.is_default) || loadedEntities[0] || null
+          return defaultEntity ?? null
+        })
       }
     } catch (error) {
       console.error('Error loading entities:', error)
     } finally {
       setLoading(false)
     }
-  }, [selectedEntity, showAll])
+  }, [isReady, user?.id, showAll])
 
   useEffect(() => {
     loadEntities()

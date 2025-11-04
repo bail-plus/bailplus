@@ -25,12 +25,7 @@ export function Layout({ children }: LayoutProps) {
   const { mutate: signOut } = useSignOut();
 
   // Déterminer si l'utilisateur est un propriétaire (LANDLORD)
-  const isLandlord = profile?.user_type === 'LANDLORD'
-
-  // Debug log
-  console.log('[LAYOUT] Profile:', profile);
-  console.log('[LAYOUT] user_type:', profile?.user_type);
-  console.log('[LAYOUT] isLandlord:', isLandlord);
+  const isLandlord = profile?.user_type === 'LANDLORD';
 
   return (
     <EntityProvider>

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { useEntity } from '@/contexts/EntityContext';
+import { useAuth } from '@/hooks/auth/useAuth';
 
 export type Lease = Tables<'leases'>;
 export type LeaseInsert = TablesInsert<'leases'>;
@@ -35,10 +36,7 @@ export type LeaseWithDetails = Lease & {
 };
 
 // Fetch all leases with details
-async function fetchLeasesWithDetails(entityId?: string | null, showAll?: boolean): Promise<LeaseWithDetails[]> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Non authentifié');
-
+async function fetchLeasesWithDetails(userId: string, entityId?: string | null, showAll?: boolean): Promise<LeaseWithDetails[]> {
   // Si une entité est sélectionnée, filtrer via properties → units → leases
   let unitIds: string[] = []
   if (!showAll && entityId) {
@@ -71,7 +69,7 @@ async function fetchLeasesWithDetails(entityId?: string | null, showAll?: boolea
   let leasesQuery = supabase
     .from('leases')
     .select('*')
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
 
   // Filtrer par unit_ids si une entité est sélectionnée
   if (!showAll && entityId && unitIds.length > 0) {
@@ -203,11 +201,18 @@ async function deleteLease(id: string): Promise<void> {
 
 // Hook to fetch all leases with details
 export function useLeasesWithDetails() {
+  const { user, isReady } = useAuth();
   const { selectedEntity, showAll } = useEntity();
 
   const query = useQuery({
-    queryKey: ['leases', 'with-details', selectedEntity?.id, showAll],
-    queryFn: () => fetchLeasesWithDetails(selectedEntity?.id, showAll),
+    queryKey: ['leases', 'with-details', user?.id, selectedEntity?.id, showAll],
+    queryFn: () => fetchLeasesWithDetails(user!.id, selectedEntity?.id, showAll),
+    enabled: isReady && !!user?.id,
+    staleTime: 10 * 60 * 1000, // 10 minutes - augmenté pour éviter les recharges
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    retry: 1,
   });
 
   console.log('[LEASES QUERY]', {
@@ -229,6 +234,10 @@ export function useLease(id: string | undefined) {
     queryKey: ['leases', id],
     queryFn: () => fetchLeaseById(id!),
     enabled: !!id,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    retry: 1,
     staleTime: 5 * 60 * 1000,
   });
 }
