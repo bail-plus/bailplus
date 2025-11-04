@@ -60,20 +60,7 @@ import NotFound from "./pages/NotFound";
 import { MarketingLayout } from "./components/marketing/marketing-layout";
 
 // IMPORTANT: Créer le QueryClient EN DEHORS du composant pour éviter qu'il soit recréé à chaque render
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1, // Réduire les retries pour éviter les blocages longs
-      retryDelay: 500,
-      staleTime: 5 * 60 * 1000,
-      gcTime: 10 * 60 * 1000,
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
-      refetchOnReconnect: false,
-      networkMode: 'always',
-    },
-  },
-});
+const queryClient = new QueryClient({});
 
 function AuthReadyGate({ children }: { children: React.ReactNode }) {
   const { isReady, loading } = useAuth();
@@ -123,7 +110,7 @@ function AppRoutes() {
             <Route path="/complete-profile" element={<CompleteProfile />} />
           </Route>
 
-          <Route element={<RequireCompleteProfile />}>
+         {/* <Route element={<RequireCompleteProfile />}> */}
             <Route path="/app" element={<Layout><Navigate to="/app/dashboard" replace /></Layout>} />
             <Route path="/app/paywall" element={<Layout><TrialPaywall /></Layout>} />
             <Route path="/app/change-email" element={<ChangeEmail />} />
@@ -148,7 +135,7 @@ function AppRoutes() {
               <Route path="/app/settings" element={<Layout><Settings /></Layout>} />
             </Route>
           </Route>
-        </Route>
+        {/* </Route> */}
 
         {/* Catch-all 404 */}
         <Route path="*" element={<NotFound />} />
