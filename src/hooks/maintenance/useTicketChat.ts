@@ -29,15 +29,17 @@ export function useTicketMessages(ticketId: string | undefined) {
     staleTime: 10_000,
   })
 
+  // Realtime subscription - DÉSACTIVÉ
   useEffect(() => {
-    if (!ticketId) return
-    const channel = supabase
-      .channel(`tm_${ticketId}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ticket_messages', filter: `ticket_id=eq.${ticketId}` }, () => {
-        query.refetch()
-      })
-      .subscribe()
-    return () => { channel.unsubscribe() }
+    console.log('⏸️ [TICKET] Realtime subscription disabled');
+    // if (!ticketId) return
+    // const channel = supabase
+    //   .channel(`tm_${ticketId}`)
+    //   .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'ticket_messages', filter: `ticket_id=eq.${ticketId}` }, () => {
+    //     query.refetch()
+    //   })
+    //   .subscribe()
+    // return () => { channel.unsubscribe() }
   }, [ticketId])
 
   return query

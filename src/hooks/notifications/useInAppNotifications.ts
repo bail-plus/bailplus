@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
+import { useAuth } from '@/hooks/auth/useAuth'
 
 export interface AppNotification {
   id: string
@@ -48,30 +49,34 @@ async function fetchNotifications(): Promise<AppNotification[]> {
 }
 
 export function useInAppNotifications() {
+  const { user, isReady } = useAuth()
   const qc = useQueryClient()
 
   const query = useQuery({
     queryKey: ['inapp-notifications'],
     queryFn: fetchNotifications,
     staleTime: 30_000,
+    enabled: isReady && !!user,
   })
 
   const unreadCount = useMemo(() => (query.data || []).filter(n => !n.is_read).length, [query.data])
 
-  // realtime subscription
+  // realtime subscription - DÉSACTIVÉ
   useEffect(() => {
-    let sub: ReturnType<typeof supabase.channel> | null = null
-    ;(async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      sub = supabase.channel('inapp-notifs')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'communication_logs', filter: `recipient_id=eq.${user.id}` }, () => {
-          qc.invalidateQueries({ queryKey: ['inapp-notifications'] })
-        })
-        .subscribe()
-    })()
-    return () => { sub?.unsubscribe() }
-  }, [qc])
+    console.log('⏸️ [NOTIF] Realtime subscription disabled');
+    // if (!isReady || !user?.id) return
+    // const sub = supabase.channel('inapp-notifs')
+    //   .on('postgres_changes', {
+    //     event: 'INSERT',
+    //     schema: 'public',
+    //     table: 'communication_logs',
+    //     filter: `recipient_id=eq.${user.id}`
+    //   }, () => {
+    //     qc.invalidateQueries({ queryKey: ['inapp-notifications'] })
+    //   })
+    //   .subscribe()
+    // return () => { sub.unsubscribe() }
+  }, [isReady, user?.id, qc])
 
   const markAsRead = useMutation({
     mutationFn: async (logId: string) => {

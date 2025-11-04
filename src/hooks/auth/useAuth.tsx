@@ -122,14 +122,23 @@ const upsertProfileFromUser = async (u: User) => {
    API Functions
    ======================= */
 async function fetchProfile(userId: string): Promise<Profile | null> {
+  console.log('🔵 [AUTH] fetchProfile START for:', userId);
   try {
-    const { data, error } = await supabase
+    // Timeout de 5 secondes pour éviter les requêtes bloquées
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('fetchProfile timeout after 5s')), 5000);
+    });
+
+    const fetchPromise = supabase
       .from('profiles')
       .select('*')
       .eq('user_id', userId)
       .maybeSingle();
 
+    const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+
     if (error) {
+      console.log('🔴 [AUTH] fetchProfile ERROR:', error);
       // Si erreur réseau, lancer une exception pour que React Query retry
       if (error.message?.includes('Failed to fetch') || error.message?.includes('Load failed')) {
         throw error;
@@ -138,6 +147,7 @@ async function fetchProfile(userId: string): Promise<Profile | null> {
       return null;
     }
 
+    console.log('✅ [AUTH] fetchProfile SUCCESS:', data ? 'data received' : 'no data');
     return data;
   } catch (err) {
     console.error('❌ [AUTH] Exception profil:', err);
@@ -146,8 +156,14 @@ async function fetchProfile(userId: string): Promise<Profile | null> {
 }
 
 async function fetchSubscription(userId: string): Promise<Subscription | null> {
+  console.log('🔵 [AUTH] fetchSubscription START for:', userId);
   try {
-    const { data, error } = await supabase
+    // Timeout de 5 secondes pour éviter les requêtes bloquées
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('fetchSubscription timeout after 5s')), 5000);
+    });
+
+    const fetchPromise = supabase
       .from('subscriptions')
       .select('*')
       .eq('user_id', userId)
@@ -155,7 +171,10 @@ async function fetchSubscription(userId: string): Promise<Subscription | null> {
       .limit(1)
       .maybeSingle();
 
+    const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+
     if (error) {
+      console.log('🔴 [AUTH] fetchSubscription ERROR:', error);
       // Si erreur réseau, lancer une exception pour que React Query retry
       if (error.message?.includes('Failed to fetch') || error.message?.includes('Load failed')) {
         throw error;
@@ -164,6 +183,7 @@ async function fetchSubscription(userId: string): Promise<Subscription | null> {
       return null;
     }
 
+    console.log('✅ [AUTH] fetchSubscription SUCCESS:', data ? 'data received' : 'no data');
     return data;
   } catch (err) {
     console.error('❌ [AUTH] Exception abonnement:', err);
@@ -316,7 +336,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setSession(currentSession);
       setUser(currentUser);
 
-      if (currentUser?.id && event === 'SIGNED_IN') {
+      // Créer le profil uniquement lors de la première connexion (pas lors des reconnexions)
+      if (currentUser?.id && event === 'SIGNED_IN' && !hydrated) {
         try {
           await upsertProfileFromUser(currentUser);
         } catch (error) {
@@ -327,14 +348,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (event === 'SIGNED_OUT') {
         queryClient.removeQueries({ queryKey: ['profile'] });
         queryClient.removeQueries({ queryKey: ['subscription'] });
-      } else if (event === 'SIGNED_IN') {
+      } else if (event === 'SIGNED_IN' && !hydrated) {
+        // Invalider uniquement lors de la première connexion, pas lors des reconnexions
         queryClient.invalidateQueries({ queryKey: ['profile'] });
         queryClient.invalidateQueries({ queryKey: ['subscription'] });
       }
 
       if (!hydrated) {
         hydrated = true;
-        setAuthReady(true);
+        // Petit délai pour laisser la session JWT se propager
+        setTimeout(() => {
+          if (isActive) {
+            console.log('✅ [AUTH] Setting authReady = true');
+            setAuthReady(true);
+          }
+        }, 200);
       }
     });
 
@@ -357,7 +385,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } finally {
         if (isActive && !hydrated) {
           hydrated = true;
-          setAuthReady(true);
+          // Petit délai pour laisser la session JWT se propager
+          setTimeout(() => {
+            if (isActive) {
+              console.log('✅ [AUTH] Setting authReady = true (from getSession)');
+              setAuthReady(true);
+            }
+          }, 200);
         }
       }
     })();
@@ -376,14 +410,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, [queryClient]);
 
+  // Log pour détecter les changements de user.id
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log('👤 [AUTH] user?.id changed:', user?.id);
+    }
+  }, [user?.id]);
+
   const profileQuery = useQuery({
     queryKey: ['profile', user?.id],
-    enabled: !!user?.id && authReady,
-    queryFn: () => fetchProfile(user!.id),
+    enabled: false, // Désactivé par défaut, on lance manuellement
+    queryFn: () => {
+      console.log('📡 [AUTH] Fetching profile for user:', user?.id);
+      return fetchProfile(user!.id);
+    },
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
-    retry: 3, // Augmenté à 3 pour gérer les erreurs réseau temporaires
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Backoff exponentiel
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
@@ -391,16 +435,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const subscriptionQuery = useQuery({
     queryKey: ['subscription', user?.id],
-    enabled: !!user?.id && authReady,
-    queryFn: () => fetchSubscription(user!.id),
+    enabled: false, // Désactivé par défaut, on lance manuellement
+    queryFn: () => {
+      console.log('📡 [AUTH] Fetching subscription for user:', user?.id);
+      return fetchSubscription(user!.id);
+    },
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
-    retry: 3, // Augmenté à 3 pour gérer les erreurs réseau temporaires
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // Backoff exponentiel
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
+
+  // Lancer les queries manuellement après que authReady soit true + délai de sécurité
+  useEffect(() => {
+    if (authReady && user?.id && !profileQuery.data && !profileQuery.isFetching) {
+      console.log('⏰ [AUTH] Scheduling profile query in 500ms...');
+      const timer = setTimeout(() => {
+        console.log('🚀 [AUTH] Manually triggering profile query NOW');
+        profileQuery.refetch();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [authReady, user?.id, profileQuery]);
+
+  useEffect(() => {
+    if (authReady && user?.id && !subscriptionQuery.data && !subscriptionQuery.isFetching) {
+      console.log('⏰ [AUTH] Scheduling subscription query in 500ms...');
+      const timer = setTimeout(() => {
+        console.log('🚀 [AUTH] Manually triggering subscription query NOW');
+        subscriptionQuery.refetch();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [authReady, user?.id, subscriptionQuery]);
 
   const profileData = profileQuery.data ?? null;
   const subscriptionData = subscriptionQuery.data ?? null;
@@ -411,6 +481,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const loading = !authReady || !profileReady || !subscriptionReady;
   const isReady = authReady && profileReady && subscriptionReady;
+
+  // Supprimé: useEffect en double qui lançait les queries trop tôt
+
+  // Debug: log quand on reste bloqué
+  if (import.meta.env.DEV && authReady && (!profileReady || !subscriptionReady)) {
+    console.log('🔴 [AUTH] Bloqué sur chargement:', {
+      authReady,
+      hasUser,
+      userId: user?.id,
+      profileReady,
+      subscriptionReady,
+      profileStatus: profileQuery.status,
+      profileFetching: profileQuery.isFetching,
+      profileError: profileQuery.error,
+      profileEnabled: authReady && !!user?.id,
+      subscriptionStatus: subscriptionQuery.status,
+      subscriptionFetching: subscriptionQuery.isFetching,
+      subscriptionError: subscriptionQuery.error,
+      subscriptionEnabled: authReady && !!user?.id,
+    });
+  }
 
   const refreshProfile = useCallback(async () => {
     if (!user?.id) return null;

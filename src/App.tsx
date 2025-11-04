@@ -1,3 +1,4 @@
+import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -64,14 +65,29 @@ const queryClient = new QueryClient({});
 
 function AuthReadyGate({ children }: { children: React.ReactNode }) {
   const { isReady, loading } = useAuth();
+  const [forceReady, setForceReady] = React.useState(false);
+
+  // Timeout de sécurité : forcer le passage après 10 secondes
+  React.useEffect(() => {
+    if (isReady) return;
+
+    const timeout = setTimeout(() => {
+      console.warn('⚠️ [AuthReadyGate] Timeout atteint - forçage du passage après 10s');
+      setForceReady(true);
+    }, 10000);
+
+    return () => clearTimeout(timeout);
+  }, [isReady]);
+
+  const shouldShow = isReady || forceReady;
 
   return (
     <LoadingGate
-      isLoading={!isReady}
+      isLoading={!shouldShow}
       message="Chargement de vos données..."
       minDuration={200}
     >
-      {isReady ? children : null}
+      {shouldShow ? children : null}
     </LoadingGate>
   );
 }
@@ -110,7 +126,7 @@ function AppRoutes() {
             <Route path="/complete-profile" element={<CompleteProfile />} />
           </Route>
 
-         {/* <Route element={<RequireCompleteProfile />}> */}
+          <Route element={<RequireCompleteProfile />}>
             <Route path="/app" element={<Layout><Navigate to="/app/dashboard" replace /></Layout>} />
             <Route path="/app/paywall" element={<Layout><TrialPaywall /></Layout>} />
             <Route path="/app/change-email" element={<ChangeEmail />} />
@@ -135,7 +151,7 @@ function AppRoutes() {
               <Route path="/app/settings" element={<Layout><Settings /></Layout>} />
             </Route>
           </Route>
-        {/* </Route> */}
+        </Route>
 
         {/* Catch-all 404 */}
         <Route path="*" element={<NotFound />} />

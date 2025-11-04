@@ -12,12 +12,30 @@ declare global {
 }
 //console.log('[SB/CLIENT]', { SUPABASE_URL, hasAnon: !!SUPABASE_ANON_KEY });
 
+// Custom storage adapter pour debugging
+const customStorage = {
+  getItem: (key: string) => {
+    console.log('🔑 [STORAGE] getItem:', key);
+    const value = localStorage.getItem(key);
+    console.log('🔑 [STORAGE] getItem result:', value ? 'data found' : 'null');
+    return value;
+  },
+  setItem: (key: string, value: string) => {
+    console.log('🔑 [STORAGE] setItem:', key);
+    localStorage.setItem(key, value);
+  },
+  removeItem: (key: string) => {
+    console.log('🔑 [STORAGE] removeItem:', key);
+    localStorage.removeItem(key);
+  },
+};
+
 export const supabase: SupabaseClient<Database> =
   globalThis.__SUPABASE__ ??
   (globalThis.__SUPABASE__ = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
       flowType: 'pkce',
-      storage: localStorage,
+      storage: customStorage as any,
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
