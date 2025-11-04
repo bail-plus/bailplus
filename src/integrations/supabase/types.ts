@@ -252,6 +252,33 @@ export type Database = {
           },
         ]
       }
+      chat_history: {
+        Row: {
+          conversation_id: string
+          created_at: string | null
+          id: number
+          message: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string | null
+          id?: number
+          message: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string | null
+          id?: number
+          message?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       communication_logs: {
         Row: {
           content: string
@@ -1190,34 +1217,115 @@ export type Database = {
       properties: {
         Row: {
           address: string
+          agency_fees: number | null
           city: string | null
+          condo_fees_annual: number | null
+          corporate_tax_rate: number | null
           created_at: string
+          dividend_distribution_percentage: number | null
           entity_id: string | null
+          furniture_amortization_duration: number | null
+          furniture_value: number | null
+          has_loan: boolean | null
+          housing_tax: number | null
           id: string
+          insurance_annual: number | null
+          loan_amount: number | null
+          loan_duration_months: number | null
+          loan_monthly_payment: number | null
+          loan_rate: number | null
+          loan_start_date: string | null
+          management_fees_percentage: number | null
+          marginal_tax_rate: number | null
           name: string
+          notary_fees: number | null
+          other_acquisition_costs: number | null
+          other_income: number | null
           postal_code: string | null
+          property_amortization_duration: number | null
+          property_tax: number | null
+          purchase_date: string | null
+          purchase_price: number | null
+          renovation_costs: number | null
+          social_contributions_rate: number | null
+          tax_regime: string | null
+          tax_structure: string | null
           updated_at: string
           user_id: string | null
         }
         Insert: {
           address: string
+          agency_fees?: number | null
           city?: string | null
+          condo_fees_annual?: number | null
+          corporate_tax_rate?: number | null
           created_at?: string
+          dividend_distribution_percentage?: number | null
           entity_id?: string | null
+          furniture_amortization_duration?: number | null
+          furniture_value?: number | null
+          has_loan?: boolean | null
+          housing_tax?: number | null
           id?: string
+          insurance_annual?: number | null
+          loan_amount?: number | null
+          loan_duration_months?: number | null
+          loan_monthly_payment?: number | null
+          loan_rate?: number | null
+          loan_start_date?: string | null
+          management_fees_percentage?: number | null
+          marginal_tax_rate?: number | null
           name: string
+          notary_fees?: number | null
+          other_acquisition_costs?: number | null
+          other_income?: number | null
           postal_code?: string | null
+          property_amortization_duration?: number | null
+          property_tax?: number | null
+          purchase_date?: string | null
+          purchase_price?: number | null
+          renovation_costs?: number | null
+          social_contributions_rate?: number | null
+          tax_regime?: string | null
+          tax_structure?: string | null
           updated_at?: string
           user_id?: string | null
         }
         Update: {
           address?: string
+          agency_fees?: number | null
           city?: string | null
+          condo_fees_annual?: number | null
+          corporate_tax_rate?: number | null
           created_at?: string
+          dividend_distribution_percentage?: number | null
           entity_id?: string | null
+          furniture_amortization_duration?: number | null
+          furniture_value?: number | null
+          has_loan?: boolean | null
+          housing_tax?: number | null
           id?: string
+          insurance_annual?: number | null
+          loan_amount?: number | null
+          loan_duration_months?: number | null
+          loan_monthly_payment?: number | null
+          loan_rate?: number | null
+          loan_start_date?: string | null
+          management_fees_percentage?: number | null
+          marginal_tax_rate?: number | null
           name?: string
+          notary_fees?: number | null
+          other_acquisition_costs?: number | null
+          other_income?: number | null
           postal_code?: string | null
+          property_amortization_duration?: number | null
+          property_tax?: number | null
+          purchase_date?: string | null
+          purchase_price?: number | null
+          renovation_costs?: number | null
+          social_contributions_rate?: number | null
+          tax_regime?: string | null
+          tax_structure?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -1906,9 +2014,18 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      recent_conversations: {
+        Row: {
+          conversation_id: string | null
+          last_message_at: string | null
+          message_count: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      check_email_exists: { Args: { email_to_check: string }; Returns: boolean }
       is_landlord: { Args: never; Returns: boolean }
       is_service_provider: { Args: never; Returns: boolean }
       is_tenant: { Args: never; Returns: boolean }

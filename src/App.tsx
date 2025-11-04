@@ -13,6 +13,7 @@ import { RequireCompleteProfile } from "@/guards/RequireCompleteProfile";
 import Index from "./pages/app/Index";
 import Calendar from "./pages/app/Calendar";
 import Properties from "./pages/app/Properties";
+import Profitability from "./pages/app/Profitability";
 import Leases from "./pages/app/Leases";
 import LeaseDetail from "./pages/app/LeaseDetail";
 import People from "./pages/app/People";
@@ -130,6 +131,7 @@ function App() {
                   <Route path="/app/dashboard" element={<Layout><Index /></Layout>} />
                   <Route path="/app/calendar" element={<Layout><Calendar /></Layout>} />
                   <Route path="/app/properties" element={<Layout><Properties /></Layout>} />
+                  <Route path="/app/profitability" element={<Layout><Profitability /></Layout>} />
                   <Route path="/app/leases" element={<Layout><Leases /></Layout>} />
                   <Route path="/app/leases/:id" element={<Layout><LeaseDetail /></Layout>} />
                   <Route path="/app/people" element={<Layout><People /></Layout>} />
