@@ -162,20 +162,14 @@ export default function CompleteProfile() {
       console.log('[CompleteProfile] 🔄 Mise à jour du profil dans Supabase...');
       console.log('[CompleteProfile] User ID:', user?.id);
 
-      // Ajouter un timeout de 10 secondes
-      // IMPORTANT : Ne pas utiliser .select() car la policy RLS SELECT est trop complexe et timeout
-      const updatePromise = supabase
+      // IMPORTANT : Ne pas utiliser .select() ou .single() car la policy RLS SELECT est trop complexe
+      // On fait juste l'update sans vérifier le résultat
+      const { error } = await supabase
         .from('profiles')
         .update(payload)
         .eq('user_id', user?.id);
 
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout: La mise à jour a pris trop de temps (>10s)')), 10000)
-      );
-
-      const { data, error } = await Promise.race([updatePromise, timeoutPromise]) as any;
-
-      console.log('[CompleteProfile] Résultat update:', { data, error });
+      console.log('[CompleteProfile] Résultat update:', { error });
 
       if (error) {
         console.error('[CompleteProfile] ❌ Erreur Supabase:', error);

@@ -12,7 +12,8 @@ import {
   MessageCircle,
   TrendingUp,
   Settings,
-  Target
+  Target,
+  Percent
 } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 import {
@@ -45,6 +46,7 @@ const allItems: NavigationItem[] = [
   { title: "Calendrier", url: "/app/calendar", icon: Calendar, roles: ['LANDLORD', 'SERVICE_PROVIDER'] },
   { title: "Mon Profil", url: "/app/provider-profile", icon: User, roles: ['SERVICE_PROVIDER'] },
   { title: "Parc", url: "/app/properties", icon: Building2, roles: ['LANDLORD'] },
+  { title: "Rentabilité", url: "/app/profitability", icon: Percent, roles: ['LANDLORD'] },
   { title: "Baux", url: "/app/leases", icon: UserCheck, roles: ['LANDLORD'] },
   { title: "Garant", url: "/app/people", icon: Users, roles: ['LANDLORD'] },
   { title: "Prestataires", url: "/app/providers", icon: Wrench, roles: ['LANDLORD'] },
