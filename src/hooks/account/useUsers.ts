@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
+import { useAuth } from '@/hooks/auth/useAuth';
 
 type UserTypeEnum = Database['public']['Enums']['user_type_enum'];
 
@@ -21,14 +22,11 @@ export interface User {
 /**
  * Récupère tous les locataires (TENANT) invités par le landlord connecté
  */
-async function fetchTenants(): Promise<User[]> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Non authentifié');
-
+async function fetchTenants(landlordId: string): Promise<User[]> {
   const { data, error } = await supabase
     .from('profiles')
     .select('user_id, email, first_name, last_name, phone_number, user_type, company_name, specialty, is_invited_user, linked_to_landlord, invitation_accepted_at')
-    .eq('linked_to_landlord', user.id)
+    .eq('linked_to_landlord', landlordId)
     .eq('user_type', 'TENANT')
     .order('created_at', { ascending: false });
 
@@ -39,32 +37,26 @@ async function fetchTenants(): Promise<User[]> {
 /**
  * Récupère tous les prestataires (SERVICE_PROVIDER) invités par le landlord connecté
  */
-async function fetchServiceProviderUsers(): Promise<User[]> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Non authentifié');
-
+async function fetchServiceProviderUsers(landlordId: string): Promise<User[]> {
   const { data, error } = await supabase
     .from('profiles')
     .select('user_id, email, first_name, last_name, phone_number, user_type, company_name, specialty, is_invited_user, linked_to_landlord, invitation_accepted_at')
-    .eq('linked_to_landlord', user.id)
+    .eq('linked_to_landlord', landlordId)
     .eq('user_type', 'SERVICE_PROVIDER')
     .order('created_at', { ascending: false });
 
   if (error) throw new Error(error.message);
-  return data as User[];
+  return (data || []) as User[];
 }
 
 /**
  * Récupère tous les utilisateurs invités (TENANT et SERVICE_PROVIDER)
  */
-async function fetchAllInvitedUsers(): Promise<User[]> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Non authentifié');
-
+async function fetchAllInvitedUsers(landlordId: string): Promise<User[]> {
   const { data, error } = await supabase
     .from('profiles')
     .select('user_id, email, first_name, last_name, phone_number, user_type, company_name, specialty, is_invited_user, linked_to_landlord, invitation_accepted_at')
-    .eq('linked_to_landlord', user.id)
+    .eq('linked_to_landlord', landlordId)
     .in('user_type', ['TENANT', 'SERVICE_PROVIDER'])
     .order('created_at', { ascending: false });
 
@@ -76,10 +68,17 @@ async function fetchAllInvitedUsers(): Promise<User[]> {
  * Hook pour récupérer les locataires (TENANT)
  */
 export function useTenants() {
+  const { user, isReady } = useAuth();
+
   return useQuery({
-    queryKey: ['tenants'],
-    queryFn: fetchTenants,
+    queryKey: ['tenants', user?.id],
+    queryFn: () => fetchTenants(user!.id),
+    enabled: isReady && !!user?.id,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    retry: 1,
   });
 }
 
@@ -87,10 +86,17 @@ export function useTenants() {
  * Hook pour récupérer les prestataires (SERVICE_PROVIDER)
  */
 export function useServiceProviderUsers() {
+  const { user, isReady } = useAuth();
+
   return useQuery({
-    queryKey: ['service-provider-users'],
-    queryFn: fetchServiceProviderUsers,
+    queryKey: ['service-provider-users', user?.id],
+    queryFn: () => fetchServiceProviderUsers(user!.id),
+    enabled: isReady && !!user?.id,
     staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    retry: 1,
   });
 }
 
@@ -98,9 +104,16 @@ export function useServiceProviderUsers() {
  * Hook pour récupérer tous les utilisateurs invités
  */
 export function useAllInvitedUsers() {
+  const { user, isReady } = useAuth();
+
   return useQuery({
-    queryKey: ['all-invited-users'],
-    queryFn: fetchAllInvitedUsers,
+    queryKey: ['all-invited-users', user?.id],
+    queryFn: () => fetchAllInvitedUsers(user!.id),
+    enabled: isReady && !!user?.id,
     staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    retry: 1,
   });
 }

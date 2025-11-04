@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfMonth, endOfMonth, format } from 'date-fns';
 import { useEntity } from '@/contexts/EntityContext';
+import { useAuth } from '@/hooks/auth/useAuth';
 
 export interface DashboardStats {
   // KPI principaux
@@ -376,10 +377,16 @@ async function fetchDashboardData(entityId?: string | null, showAll?: boolean): 
 
 export function useDashboard() {
   const { selectedEntity, showAll } = useEntity();
+  const { user, isReady } = useAuth();
 
   return useQuery({
-    queryKey: ['dashboard', selectedEntity?.id, showAll],
+    queryKey: ['dashboard', user?.id, selectedEntity?.id, showAll],
     queryFn: () => fetchDashboardData(selectedEntity?.id, showAll),
+    enabled: isReady && !!user?.id,
     staleTime: 2 * 60 * 1000, // 2 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    retry: 1,
   });
 }

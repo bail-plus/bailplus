@@ -424,6 +424,10 @@ export function useMaintenanceTicketsWithDetails() {
     queryFn: () => fetchMaintenanceTicketsWithDetails(userId, selectedEntity?.id, showAll),
     enabled: !!userId,
     staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    retry: 1,
   });
 }
 
@@ -433,6 +437,10 @@ export function useMaintenanceTicket(id: string | undefined) {
     queryKey: ['maintenance-tickets', id],
     queryFn: () => fetchTicketById(id!),
     enabled: !!id,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    retry: 1,
     staleTime: 5 * 60 * 1000,
   });
 }

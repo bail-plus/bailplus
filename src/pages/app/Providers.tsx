@@ -25,8 +25,18 @@ export default function Providers() {
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
 
   const { toast } = useToast()
-  const { data: providers = [], isLoading, error } = useServiceProviders()
-  const { data: providerUsers = [] } = useServiceProviderUsers()
+  const { data: providers = [], isLoading, isFetching, error } = useServiceProviders()
+  const { data: providerUsers = [], isLoading: loadingProviderUsers, error: providerUsersError } = useServiceProviderUsers()
+
+  console.log('[PROVIDERS PAGE]', {
+    isLoading,
+    isFetching,
+    error,
+    providersLength: providers.length,
+    loadingProviderUsers,
+    providerUsersError,
+    providerUsersLength: providerUsers.length,
+  })
   const updateProvider = useUpdateServiceProvider()
   const deleteProvider = useDeleteServiceProvider()
   const { createInvitation } = useInvitations()
@@ -132,19 +142,24 @@ export default function Providers() {
     ? mergedProviders.reduce((sum: number, p: any) => sum + (p.average_rating || 0), 0) / mergedProviders.length
     : 0
 
-  if (error) {
+  if (error || providerUsersError) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
-            <p className="text-destructive">Erreur lors du chargement des prestataires</p>
+            <p className="text-destructive">
+              Erreur lors du chargement des prestataires<br />
+              <span className="text-muted-foreground text-sm">
+                {(error as Error)?.message || (providerUsersError as Error)?.message}
+              </span>
+            </p>
           </div>
         </div>
       </div>
     )
   }
 
-  if (isLoading) {
+  if (isLoading || loadingProviderUsers) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-center min-h-[400px]">

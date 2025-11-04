@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
+import { useAuth } from '@/hooks/auth/useAuth';
 
 export interface ServiceProvider {
   id: string;
@@ -27,12 +28,7 @@ export interface ServiceProvider {
 export type ServiceProviderInsert = TablesInsert<'service_providers'>;
 export type ServiceProviderUpdate = TablesUpdate<'service_providers'>;
 
-async function fetchServiceProviders(): Promise<ServiceProvider[]> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Non authentifié');
-
-  console.log('[SERVICE PROVIDERS] Fetching providers for landlord', user.id);
-
+async function fetchServiceProviders(userId: string): Promise<ServiceProvider[]> {
   const { data, error } = await supabase
     .from('service_providers')
     .select(`
@@ -56,24 +52,29 @@ async function fetchServiceProviders(): Promise<ServiceProvider[]> {
         email
       )
     `)
-    .eq('landlord_id', user.id)
+    .eq('landlord_id', userId)
     .order('company_name', { ascending: true });
 
   if (error) {
-    console.error('[SERVICE PROVIDERS] Error fetching:', error);
+    console.error('[SERVICE PROVIDERS] Error:', error);
     throw error;
   }
 
-  console.log('[SERVICE PROVIDERS] Loaded', data?.length || 0, 'providers');
-
-  return (data || []) as any;
+  return (data || []) as ServiceProvider[];
 }
 
 export function useServiceProviders() {
+  const { user, isReady } = useAuth();
+
   return useQuery({
-    queryKey: ['service-providers'],
-    queryFn: fetchServiceProviders,
+    queryKey: ['service-providers', user?.id],
+    queryFn: () => fetchServiceProviders(user!.id),
+    enabled: isReady && !!user?.id,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    retry: 1,
   });
 }
 

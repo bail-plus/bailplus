@@ -179,13 +179,17 @@ export function useRemoveTicketParticipant() {
 
 // Hook to fetch service providers
 export function useServiceProviders() {
-  const { user } = useAuth();
+  const { user, isReady } = useAuth();
   const landlordId = user?.id ?? '';
 
   return useQuery({
     queryKey: ['service-providers', landlordId],
     queryFn: () => fetchServiceProviders(landlordId),
-    enabled: !!landlordId,
+    enabled: isReady && !!landlordId,
     staleTime: 10 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    retry: 1,
   });
 }
