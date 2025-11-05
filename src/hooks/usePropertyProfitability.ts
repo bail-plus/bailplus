@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { PropertyWithUnits } from '@/hooks/properties/useProperties';
 import { calculateTax, calculateMonthlyPayment, type TaxInputs } from '@/lib/taxCalculator';
+import { calculateGlobalProjection, calculatePropertyProjection, type ProjectionData } from '@/lib/projectionCalculator';
 
 export interface PropertyProfitability {
   propertyId: string;
@@ -253,5 +254,63 @@ export function usePropertyProfitability(property: PropertyWithUnits | null) {
     gcTime: 0, // Don't keep in cache
     refetchOnWindowFocus: true, // Refetch when user returns to window
     refetchOnMount: true, // Refetch on component mount
+  });
+}
+
+/**
+ * Hook pour récupérer la projection financière globale
+ */
+export function useGlobalProjection(
+  properties: PropertyWithUnits[],
+  projectionYears: number = 25,
+  inflationRate: number = 2.0
+) {
+  return useQuery({
+    queryKey: ['globalProjection', properties.map((p) => `${p.id}-${p.updated_at || Date.now()}`), projectionYears, inflationRate],
+    queryFn: async (): Promise<ProjectionData> => {
+      // Récupérer les revenus locatifs pour chaque propriété
+      const propertiesDataPromises = properties.map(async (property) => {
+        const annualRentalIncome = await fetchPropertyRentalIncome(property.id);
+        return { property, annualRentalIncome };
+      });
+
+      const propertiesData = await Promise.all(propertiesDataPromises);
+
+      // Filtrer uniquement les propriétés avec des données d'investissement
+      const propertiesWithData = propertiesData.filter(
+        ({ property }) =>
+          (property.purchase_price ?? 0) +
+          (property.notary_fees ?? 0) +
+          (property.agency_fees ?? 0) +
+          (property.renovation_costs ?? 0) +
+          (property.other_acquisition_costs ?? 0) > 0
+      );
+
+      return calculateGlobalProjection(propertiesWithData, projectionYears, inflationRate);
+    },
+    enabled: properties.length > 0,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes (les calculs sont lourds)
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+  });
+}
+
+/**
+ * Hook pour récupérer la projection financière d'une propriété
+ */
+export function usePropertyProjection(
+  property: PropertyWithUnits | null,
+  projectionYears: number = 25,
+  inflationRate: number = 2.0
+) {
+  return useQuery({
+    queryKey: ['propertyProjection', property?.id, projectionYears, inflationRate],
+    queryFn: async (): Promise<ProjectionData | null> => {
+      if (!property) return null;
+      const annualRentalIncome = await fetchPropertyRentalIncome(property.id);
+      return calculatePropertyProjection(property, annualRentalIncome, projectionYears, inflationRate);
+    },
+    enabled: !!property?.id,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
   });
 }

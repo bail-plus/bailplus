@@ -2,17 +2,49 @@ import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { BarChart3, TrendingUp, AlertCircle, Building2 } from "lucide-react"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Slider } from "@/components/ui/slider"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { BarChart3, TrendingUp, AlertCircle, Building2, LineChart } from "lucide-react"
 import { usePropertiesWithUnits } from "@/hooks/properties/useProperties"
-import { useGlobalProfitability } from "@/hooks/usePropertyProfitability"
+import { useGlobalProfitability, useGlobalProjection, usePropertyProjection } from "@/hooks/usePropertyProfitability"
 import { GlobalProfitabilitySummary } from "@/components/properties/GlobalProfitabilitySummary"
 import { PropertyProfitabilityTable } from "@/components/properties/PropertyProfitabilityTable"
 import { ProfitabilityCard } from "@/components/properties/ProfitabilityCard"
+import { ProjectionChart } from "@/components/properties/ProjectionChart"
+import { ProjectionTimeline } from "@/components/properties/ProjectionTimeline"
 
 export default function Profitability() {
   const { data: properties = [], isLoading: propertiesLoading } = usePropertiesWithUnits()
   const { data: profitabilityData, isLoading: profitabilityLoading } = useGlobalProfitability(properties)
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null)
+
+  // États pour la projection
+  const [projectionYears, setProjectionYears] = useState(25)
+  const [inflationRate, setInflationRate] = useState(2.0)
+  const [projectionPropertyId, setProjectionPropertyId] = useState<string | "all">("all")
+
+  // Récupération des données de projection selon le filtre
+  const selectedProjectionProperty = projectionPropertyId === "all"
+    ? null
+    : properties.find(p => p.id === projectionPropertyId) || null
+
+  const { data: globalProjectionData, isLoading: globalProjectionLoading } = useGlobalProjection(
+    properties,
+    projectionYears,
+    inflationRate
+  )
+
+  const { data: singleProjectionData, isLoading: singleProjectionLoading } = usePropertyProjection(
+    selectedProjectionProperty,
+    projectionYears,
+    inflationRate
+  )
+
+  // Utiliser les bonnes données selon le filtre
+  const projectionData = projectionPropertyId === "all" ? globalProjectionData : singleProjectionData
+  const projectionLoading = projectionPropertyId === "all" ? globalProjectionLoading : singleProjectionLoading
 
   const selectedProperty = properties.find(p => p.id === selectedPropertyId)
   const selectedPropertyProfit = profitabilityData?.properties.find(p => p.propertyId === selectedPropertyId)
@@ -75,6 +107,10 @@ export default function Profitability() {
           <TabsTrigger value="by-property" className="gap-2">
             <Building2 className="w-4 h-4" />
             Par propriété
+          </TabsTrigger>
+          <TabsTrigger value="projection" className="gap-2">
+            <LineChart className="w-4 h-4" />
+            Projection
           </TabsTrigger>
         </TabsList>
 
@@ -209,6 +245,156 @@ export default function Profitability() {
               property={selectedProperty}
               annualRentalIncome={selectedPropertyProfit?.annualRentalIncome ?? 0}
             />
+          )}
+        </TabsContent>
+
+        {/* Projection à long terme */}
+        <TabsContent value="projection" className="space-y-6">
+          {!hasFinancialData ? (
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Complétez les informations financières de vos propriétés et créez des baux actifs
+                pour visualiser les projections à long terme.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <>
+              {/* Contrôles de simulation */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Paramètres de projection</CardTitle>
+                  <CardDescription>
+                    Ajustez les paramètres pour personnaliser votre projection financière
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Sélection de propriété */}
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="projection-property">
+                          Propriété à projeter
+                        </Label>
+                        <Select
+                          value={projectionPropertyId}
+                          onValueChange={(value) => setProjectionPropertyId(value)}
+                        >
+                          <SelectTrigger id="projection-property">
+                            <SelectValue placeholder="Sélectionner une propriété" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">
+                              <div className="flex items-center gap-2">
+                                <Building2 className="w-4 h-4" />
+                                Toutes les propriétés
+                              </div>
+                            </SelectItem>
+                            {properties
+                              .filter(p => {
+                                const totalInvestment =
+                                  (p.purchase_price ?? 0) +
+                                  (p.notary_fees ?? 0) +
+                                  (p.agency_fees ?? 0) +
+                                  (p.renovation_costs ?? 0) +
+                                  (p.other_acquisition_costs ?? 0)
+                                return totalInvestment > 0
+                              })
+                              .map((property) => (
+                                <SelectItem key={property.id} value={property.id}>
+                                  {property.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-muted-foreground">
+                          {projectionPropertyId === "all"
+                            ? "Vue consolidée de tout le parc"
+                            : "Vue détaillée d'une propriété"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Durée de projection */}
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="projection-years">
+                          Durée de projection : <strong>{projectionYears} ans</strong>
+                        </Label>
+                        <Slider
+                          id="projection-years"
+                          min={5}
+                          max={50}
+                          step={5}
+                          value={[projectionYears]}
+                          onValueChange={(value) => setProjectionYears(value[0])}
+                          className="w-full"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Projection jusqu'en {new Date().getFullYear() + projectionYears}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Taux d'inflation */}
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="inflation-rate">
+                          Taux d'inflation annuel : <strong>{inflationRate}%</strong>
+                        </Label>
+                        <div className="flex items-center gap-4">
+                          <Slider
+                            id="inflation-rate"
+                            min={0}
+                            max={5}
+                            step={0.1}
+                            value={[inflationRate]}
+                            onValueChange={(value) => setInflationRate(value[0])}
+                            className="flex-1"
+                          />
+                          <Input
+                            type="number"
+                            value={inflationRate}
+                            onChange={(e) => setInflationRate(parseFloat(e.target.value) || 0)}
+                            min={0}
+                            max={10}
+                            step={0.1}
+                            className="w-20"
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Appliqué aux loyers et charges annuellement
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {projectionLoading ? (
+                <div className="flex justify-center items-center min-h-[400px]">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground">Calcul de la projection...</p>
+                  </div>
+                </div>
+              ) : projectionData ? (
+                <>
+                  {/* Timeline détaillée */}
+                  <ProjectionTimeline
+                    data={projectionData.yearlyProjections}
+                    initialInvestment={profitabilityData?.totalInvestment ?? 0}
+                    roiYear={projectionData.roiYear ?? undefined}
+                  />
+
+                  {/* Graphiques */}
+                  <ProjectionChart
+                    data={projectionData.yearlyProjections}
+                    propertyValue={profitabilityData?.totalInvestment ?? 0}
+                  />
+                </>
+              ) : null}
+            </>
           )}
         </TabsContent>
       </Tabs>
