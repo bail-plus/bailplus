@@ -177,22 +177,24 @@ export function PropertyFormDialog({
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="postal_code">Code postal</Label>
+                  <Label htmlFor="postal_code">Code postal *</Label>
                   <Input
                     id="postal_code"
                     placeholder="75001"
                     value={formData.postal_code ?? ""}
                     onChange={(e) => handlePostalCodeChange(e.target.value)}
+                    required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="city">Ville</Label>
+                  <Label htmlFor="city">Ville *</Label>
                   <Input
                     id="city"
                     placeholder="Paris"
                     list="city-suggestions"
                     value={formData.city ?? ""}
                     onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    required
                   />
                   <datalist id="city-suggestions">
                     {citySuggestions.map((c) => (

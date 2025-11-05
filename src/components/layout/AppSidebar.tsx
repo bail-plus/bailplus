@@ -13,7 +13,8 @@ import {
   TrendingUp,
   Settings,
   Target,
-  Percent
+  Percent,
+  Search
 } from "lucide-react"
 import { NavLink, useLocation } from "react-router-dom"
 import {
@@ -50,6 +51,7 @@ const allItems: NavigationItem[] = [
   { title: "Baux", url: "/app/leases", icon: UserCheck, roles: ['LANDLORD'] },
   { title: "Garant", url: "/app/people", icon: Users, roles: ['LANDLORD'] },
   { title: "Prestataires", url: "/app/providers", icon: Wrench, roles: ['LANDLORD'] },
+  { title: "Trouver un prestataire", url: "/app/find-providers", icon: Search, roles: ['LANDLORD'] },
   { title: "Maintenance", url: "/app/maintenance", icon: Wrench, roles: ['LANDLORD', 'TENANT', 'SERVICE_PROVIDER'] },
   { title: "Comptabilité", url: "/app/accounting", icon: Calculator, roles: ['LANDLORD'] },
   { title: "Documents", url: "/app/documents", icon: FileText, roles: ['LANDLORD', 'TENANT', 'SERVICE_PROVIDER'] },

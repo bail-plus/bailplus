@@ -21,6 +21,7 @@ import LeaseDetail from "./pages/app/LeaseDetail";
 import People from "./pages/app/People";
 import Providers from "./pages/app/Providers";
 import ProviderProfile from "./pages/app/ProviderProfile";
+import FindProviders from "./pages/app/FindProviders";
 import Maintenance from "./pages/app/Maintenance";
 import Accounting from "./pages/app/Accounting";
 import Documents from "./pages/app/Documents";
@@ -142,6 +143,7 @@ function AppRoutes() {
               <Route path="/app/people" element={<Layout><People /></Layout>} />
               <Route path="/app/providers" element={<Layout><Providers /></Layout>} />
               <Route path="/app/provider-profile" element={<Layout><ProviderProfile /></Layout>} />
+              <Route path="/app/find-providers" element={<Layout><FindProviders /></Layout>} />
               <Route path="/app/maintenance" element={<Layout><Maintenance /></Layout>} />
               <Route path="/app/accounting" element={<Layout><Accounting /></Layout>} />
               <Route path="/app/documents" element={<Layout><Documents /></Layout>} />

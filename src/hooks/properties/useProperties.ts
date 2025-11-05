@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { useEntity } from '@/contexts/EntityContext';
+import { geocodeAddress } from '@/services/geocoding';
 
 export type Property = Tables<'properties'>;
 export type PropertyInsert = TablesInsert<'properties'>;
@@ -115,10 +116,40 @@ async function createProperty(property: PropertyInsert, entityId?: string | null
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Non authentifié');
 
+  // Géocoder automatiquement l'adresse si elle est fournie et qu'il n'y a pas déjà de coordonnées
+  let geocodedData = {};
+  if (property.address && !property.latitude && !property.longitude) {
+    try {
+      const fullAddress = [
+        property.address,
+        property.postal_code,
+        property.city,
+      ]
+        .filter(Boolean)
+        .join(', ');
+
+      const geocodeResult = await geocodeAddress(fullAddress);
+
+      if (geocodeResult && geocodeResult.score >= 0.4) {
+        geocodedData = {
+          latitude: geocodeResult.latitude,
+          longitude: geocodeResult.longitude,
+          city: geocodeResult.city,
+          postal_code: geocodeResult.postalCode,
+        };
+        console.log('✅ Propriété géocodée automatiquement:', geocodeResult);
+      }
+    } catch (error) {
+      console.warn('⚠️ Impossible de géocoder l\'adresse:', error);
+      // On continue sans bloquer la création
+    }
+  }
+
   const { data, error } = await supabase
     .from('properties')
     .insert({
       ...property,
+      ...geocodedData, // Ajoute les coordonnées GPS si géocodage réussi
       user_id: user.id,
       entity_id: property.entity_id || entityId || null, // Utilise entity_id du form, sinon celui sélectionné, sinon null
     })

@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client"
 import { useMyProviderRatings, useMyProviderRatingStats } from "@/hooks/providers/useProviderRatings"
 import { Progress } from "@/components/ui/progress"
 import type { ServiceProvider } from "@/hooks/providers/useServiceProviders"
+import { InterventionRadiusSettings } from "@/components/providers/InterventionRadiusSettings"
 
 const SPECIALTIES = [
   "Plomberie",
@@ -313,6 +314,9 @@ export default function ProviderProfile() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Intervention Radius Settings */}
+      <InterventionRadiusSettings />
 
       {/* Rating Distribution */}
       {stats && stats.total_ratings > 0 && (

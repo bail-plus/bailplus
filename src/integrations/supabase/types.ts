@@ -531,6 +531,13 @@ export type Database = {
             foreignKeyName: "documents_property_id_fkey"
             columns: ["property_id"]
             isOneToOne: false
+            referencedRelation: "available_providers_with_distance"
+            referencedColumns: ["property_id"]
+          },
+          {
+            foreignKeyName: "documents_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
             referencedRelation: "properties"
             referencedColumns: ["id"]
           },
@@ -677,6 +684,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "expenses_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "available_providers_with_distance"
+            referencedColumns: ["property_id"]
+          },
           {
             foreignKeyName: "expenses_property_id_fkey"
             columns: ["property_id"]
@@ -939,6 +953,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "leases"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_tickets_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "available_providers_with_distance"
+            referencedColumns: ["property_id"]
           },
           {
             foreignKeyName: "maintenance_tickets_property_id_fkey"
@@ -1230,11 +1251,13 @@ export type Database = {
           housing_tax: number | null
           id: string
           insurance_annual: number | null
+          latitude: number | null
           loan_amount: number | null
           loan_duration_months: number | null
           loan_monthly_payment: number | null
           loan_rate: number | null
           loan_start_date: string | null
+          longitude: number | null
           management_fees_percentage: number | null
           marginal_tax_rate: number | null
           name: string
@@ -1268,11 +1291,13 @@ export type Database = {
           housing_tax?: number | null
           id?: string
           insurance_annual?: number | null
+          latitude?: number | null
           loan_amount?: number | null
           loan_duration_months?: number | null
           loan_monthly_payment?: number | null
           loan_rate?: number | null
           loan_start_date?: string | null
+          longitude?: number | null
           management_fees_percentage?: number | null
           marginal_tax_rate?: number | null
           name: string
@@ -1306,11 +1331,13 @@ export type Database = {
           housing_tax?: number | null
           id?: string
           insurance_annual?: number | null
+          latitude?: number | null
           loan_amount?: number | null
           loan_duration_months?: number | null
           loan_monthly_payment?: number | null
           loan_rate?: number | null
           loan_start_date?: string | null
+          longitude?: number | null
           management_fees_percentage?: number | null
           marginal_tax_rate?: number | null
           name?: string
@@ -1380,6 +1407,54 @@ export type Database = {
             columns: ["ticket_id"]
             isOneToOne: false
             referencedRelation: "maintenance_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      provider_service_areas: {
+        Row: {
+          city: string | null
+          created_at: string | null
+          department: string | null
+          id: string
+          postal_code: string | null
+          provider_id: string
+          region: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          city?: string | null
+          created_at?: string | null
+          department?: string | null
+          id?: string
+          postal_code?: string | null
+          provider_id: string
+          region?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          city?: string | null
+          created_at?: string | null
+          department?: string | null
+          id?: string
+          postal_code?: string | null
+          provider_id?: string
+          region?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_service_areas_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "available_providers_with_distance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "provider_service_areas_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "service_providers"
             referencedColumns: ["id"]
           },
         ]
@@ -1530,6 +1605,7 @@ export type Database = {
           availability_schedule: Json | null
           available: boolean | null
           average_rating: number | null
+          city: string | null
           company_name: string | null
           created_at: string | null
           currency: string | null
@@ -1537,7 +1613,11 @@ export type Database = {
           id: string
           insurance_certificate_url: string | null
           insurance_expiry_date: string | null
+          intervention_radius_km: number | null
           landlord_id: string
+          latitude: number | null
+          longitude: number | null
+          postal_code: string | null
           professional_email: string | null
           professional_phone: string | null
           response_time_hours: number | null
@@ -1552,6 +1632,7 @@ export type Database = {
           availability_schedule?: Json | null
           available?: boolean | null
           average_rating?: number | null
+          city?: string | null
           company_name?: string | null
           created_at?: string | null
           currency?: string | null
@@ -1559,7 +1640,11 @@ export type Database = {
           id?: string
           insurance_certificate_url?: string | null
           insurance_expiry_date?: string | null
+          intervention_radius_km?: number | null
           landlord_id: string
+          latitude?: number | null
+          longitude?: number | null
+          postal_code?: string | null
           professional_email?: string | null
           professional_phone?: string | null
           response_time_hours?: number | null
@@ -1574,6 +1659,7 @@ export type Database = {
           availability_schedule?: Json | null
           available?: boolean | null
           average_rating?: number | null
+          city?: string | null
           company_name?: string | null
           created_at?: string | null
           currency?: string | null
@@ -1581,7 +1667,11 @@ export type Database = {
           id?: string
           insurance_certificate_url?: string | null
           insurance_expiry_date?: string | null
+          intervention_radius_km?: number | null
           landlord_id?: string
+          latitude?: number | null
+          longitude?: number | null
+          postal_code?: string | null
           professional_email?: string | null
           professional_phone?: string | null
           response_time_hours?: number | null
@@ -1865,6 +1955,13 @@ export type Database = {
             foreignKeyName: "units_property_id_fkey"
             columns: ["property_id"]
             isOneToOne: false
+            referencedRelation: "available_providers_with_distance"
+            referencedColumns: ["property_id"]
+          },
+          {
+            foreignKeyName: "units_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
             referencedRelation: "properties"
             referencedColumns: ["id"]
           },
@@ -1947,6 +2044,13 @@ export type Database = {
             foreignKeyName: "user_invitations_property_id_fkey"
             columns: ["property_id"]
             isOneToOne: false
+            referencedRelation: "available_providers_with_distance"
+            referencedColumns: ["property_id"]
+          },
+          {
+            foreignKeyName: "user_invitations_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
             referencedRelation: "properties"
             referencedColumns: ["id"]
           },
@@ -2014,6 +2118,57 @@ export type Database = {
       }
     }
     Views: {
+      available_providers_with_distance: {
+        Row: {
+          address: string | null
+          availability_schedule: Json | null
+          available: boolean | null
+          average_rating: number | null
+          city: string | null
+          company_name: string | null
+          created_at: string | null
+          currency: string | null
+          distance_km: number | null
+          hourly_rate: number | null
+          id: string | null
+          insurance_certificate_url: string | null
+          insurance_expiry_date: string | null
+          intervention_radius_km: number | null
+          landlord_id: string | null
+          latitude: number | null
+          longitude: number | null
+          postal_code: string | null
+          professional_email: string | null
+          professional_phone: string | null
+          property_address: string | null
+          property_city: string | null
+          property_id: string | null
+          property_name: string | null
+          property_postal_code: string | null
+          response_time_hours: number | null
+          siret: string | null
+          specialty: string[] | null
+          total_interventions: number | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_providers_landlord_id_fkey"
+            columns: ["landlord_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "service_providers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       recent_conversations: {
         Row: {
           conversation_id: string | null
@@ -2025,6 +2180,10 @@ export type Database = {
       }
     }
     Functions: {
+      calculate_distance: {
+        Args: { lat1: number; lat2: number; lon1: number; lon2: number }
+        Returns: number
+      }
       check_email_exists: { Args: { email_to_check: string }; Returns: boolean }
       is_landlord: { Args: never; Returns: boolean }
       is_service_provider: { Args: never; Returns: boolean }

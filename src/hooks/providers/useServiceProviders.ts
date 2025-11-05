@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import { useAuth } from '@/hooks/auth/useAuth';
+import { calculateDistance } from '@/services/geocoding';
+import { toast } from 'sonner';
 
 export interface ServiceProvider {
   id: string;
@@ -140,6 +142,209 @@ export function useDeleteServiceProvider() {
     mutationFn: deleteServiceProvider,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['service-providers'] });
+    },
+  });
+}
+
+/**
+ * Hook pour récupérer les prestataires disponibles dans un rayon donné autour d'une propriété
+ */
+export function useAvailableProviders(
+  propertyId?: string,
+  maxDistance?: number
+) {
+  return useQuery({
+    queryKey: ['available-providers', propertyId, maxDistance],
+    queryFn: async () => {
+      if (!propertyId) return [];
+
+      // 1. Récupérer la propriété avec ses coordonnées
+      const { data: property, error: propertyError } = await supabase
+        .from('properties')
+        .select('*')
+        .eq('id', propertyId)
+        .single();
+
+      if (propertyError) throw propertyError;
+      if (!property.latitude || !property.longitude) {
+        toast.error('La propriété n\'a pas de coordonnées GPS');
+        return [];
+      }
+
+      // 2. Récupérer tous les prestataires disponibles avec coordonnées
+      const { data: providers, error: providersError } = await supabase
+        .from('service_providers')
+        .select(`
+          *,
+          user:profiles!service_providers_user_id_fkey(
+            first_name,
+            last_name,
+            email
+          )
+        `)
+        .eq('available', true)
+        .not('latitude', 'is', null)
+        .not('longitude', 'is', null);
+
+      if (providersError) throw providersError;
+
+      // 3. Filtrer par distance et rayon d'intervention
+      const providersWithDistance = providers
+        .map((provider) => {
+          const distance = calculateDistance(
+            property.latitude!,
+            property.longitude!,
+            provider.latitude!,
+            provider.longitude!
+          );
+
+          return {
+            ...provider,
+            distance,
+          };
+        })
+        .filter((provider) => {
+          // Le prestataire doit avoir défini un rayon et être dans ce rayon
+          const withinProviderRadius = provider.intervention_radius_km
+            ? provider.distance <= provider.intervention_radius_km
+            : false;
+
+          // Si maxDistance est défini, filtrer aussi par cette limite
+          const withinMaxDistance = maxDistance
+            ? provider.distance <= maxDistance
+            : true;
+
+          return withinProviderRadius && withinMaxDistance;
+        })
+        .sort((a, b) => a.distance - b.distance); // Trier par distance croissante
+
+      return providersWithDistance;
+    },
+    enabled: !!propertyId,
+  });
+}
+
+/**
+ * Hook pour mettre à jour le rayon d'intervention d'un prestataire
+ */
+export function useUpdateProviderRadius() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      providerId,
+      radiusKm,
+    }: {
+      providerId: string;
+      radiusKm: number;
+    }) => {
+      const { data, error } = await supabase
+        .from('service_providers')
+        .update({ intervention_radius_km: radiusKm })
+        .eq('id', providerId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['service-providers'] });
+      queryClient.invalidateQueries({ queryKey: ['available-providers'] });
+      toast.success('Rayon d\'intervention mis à jour');
+    },
+    onError: (error) => {
+      console.error('Erreur mise à jour rayon:', error);
+      toast.error('Erreur lors de la mise à jour du rayon d\'intervention');
+    },
+  });
+}
+
+/**
+ * Hook pour mettre à jour les coordonnées GPS d'un prestataire
+ */
+export function useUpdateProviderLocation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      providerId,
+      latitude,
+      longitude,
+      city,
+      postalCode,
+      address,
+    }: {
+      providerId: string;
+      latitude: number;
+      longitude: number;
+      city?: string;
+      postalCode?: string;
+      address?: string;
+    }) => {
+      const updateData: ServiceProviderUpdate = {
+        latitude,
+        longitude,
+      };
+
+      if (city) updateData.city = city;
+      if (postalCode) updateData.postal_code = postalCode;
+      if (address) updateData.address = address;
+
+      const { data, error } = await supabase
+        .from('service_providers')
+        .update(updateData)
+        .eq('id', providerId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['service-providers'] });
+      queryClient.invalidateQueries({ queryKey: ['available-providers'] });
+      toast.success('Localisation mise à jour');
+    },
+    onError: (error) => {
+      console.error('Erreur mise à jour localisation:', error);
+      toast.error('Erreur lors de la mise à jour de la localisation');
+    },
+  });
+}
+
+/**
+ * Hook pour récupérer le profil prestataire de l'utilisateur connecté
+ */
+export function useCurrentProviderProfile() {
+  return useQuery({
+    queryKey: ['current-provider-profile'],
+    queryFn: async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) return null;
+
+      const { data, error } = await supabase
+        .from('service_providers')
+        .select(`
+          *,
+          user:profiles!service_providers_user_id_fkey(
+            first_name,
+            last_name,
+            email
+          )
+        `)
+        .eq('user_id', user.id)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') return null; // Pas de profil prestataire
+        throw error;
+      }
+
+      return data;
     },
   });
 }
