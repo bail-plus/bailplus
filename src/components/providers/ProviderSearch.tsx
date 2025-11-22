@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import {
   MapPin,
   Star,
@@ -15,17 +17,44 @@ import {
   Loader2,
   Euro,
   Briefcase,
+  User,
+  Calendar,
 } from 'lucide-react';
 import { usePropertiesWithUnits } from '@/hooks/properties/useProperties';
 import { useAvailableProviders } from '@/hooks/providers/useServiceProviders';
 
+const SPECIALTIES = [
+  { value: 'plomberie', label: 'Plomberie' },
+  { value: 'electricite', label: 'Électricité' },
+  { value: 'chauffage', label: 'Chauffage' },
+  { value: 'menuiserie', label: 'Menuiserie' },
+  { value: 'peinture', label: 'Peinture' },
+  { value: 'serrurerie', label: 'Serrurerie' },
+  { value: 'jardinage', label: 'Jardinage' },
+  { value: 'nettoyage', label: 'Nettoyage' },
+  { value: 'autre', label: 'Autre' },
+];
+
 export function ProviderSearch() {
   const { data: properties = [], isLoading: propertiesLoading } = usePropertiesWithUnits();
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>('');
+  const [selectedSpecialty, setSelectedSpecialty] = useState<string>('all');
+  const [selectedProvider, setSelectedProvider] = useState<any>(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   const { data: providers = [], isLoading: providersLoading } = useAvailableProviders(
     selectedPropertyId || undefined
   );
+
+  // Filtrer les prestataires par spécialité
+  const filteredProviders = useMemo(() => {
+    if (selectedSpecialty === 'all') return providers;
+
+    return providers.filter((provider) => {
+      if (!provider.specialty || provider.specialty.length === 0) return false;
+      return provider.specialty.includes(selectedSpecialty);
+    });
+  }, [providers, selectedSpecialty]);
 
   const selectedProperty = properties.find((p) => p.id === selectedPropertyId);
 
@@ -104,32 +133,70 @@ export function ProviderSearch() {
         </CardContent>
       </Card>
 
+      {/* Filtre par spécialité */}
+      {selectedProperty && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Briefcase className="w-5 h-5" />
+              Filtrer par métier
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select value={selectedSpecialty} onValueChange={setSelectedSpecialty}>
+              <SelectTrigger>
+                <SelectValue placeholder="Tous les métiers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les métiers</SelectItem>
+                {SPECIALTIES.map((spec) => (
+                  <SelectItem key={spec.value} value={spec.value}>
+                    {spec.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Résultats de recherche */}
       {selectedProperty && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold">
-              Prestataires disponibles près de {selectedProperty.name}
+              {filteredProviders.length} prestataire{filteredProviders.length > 1 ? 's' : ''} disponible{filteredProviders.length > 1 ? 's' : ''} près de {selectedProperty.name}
+              {selectedSpecialty !== 'all' && (
+                <Badge variant="secondary" className="ml-2">
+                  {SPECIALTIES.find(s => s.value === selectedSpecialty)?.label}
+                </Badge>
+              )}
             </h3>
             {providersLoading && <Loader2 className="w-5 h-5 animate-spin" />}
           </div>
 
-          {!providersLoading && providers.length === 0 && (
+          {!providersLoading && filteredProviders.length === 0 && (
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                Aucun prestataire disponible dans la zone d'intervention de cette propriété.
-                {!selectedProperty.latitude || !selectedProperty.longitude ? (
-                  <span className="block mt-2 font-semibold">
-                    Veuillez d'abord ajouter les coordonnées GPS de cette propriété.
-                  </span>
-                ) : null}
+                {providers.length === 0 ? (
+                  <>
+                    Aucun prestataire disponible dans la zone d'intervention de cette propriété.
+                    {!selectedProperty.latitude || !selectedProperty.longitude ? (
+                      <span className="block mt-2 font-semibold">
+                        Veuillez d'abord ajouter les coordonnées GPS de cette propriété.
+                      </span>
+                    ) : null}
+                  </>
+                ) : (
+                  `Aucun prestataire trouvé pour le métier "${SPECIALTIES.find(s => s.value === selectedSpecialty)?.label}".`
+                )}
               </AlertDescription>
             </Alert>
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {providers.map((provider) => (
+            {filteredProviders.map((provider) => (
               <Card key={provider.id} className="hover:shadow-lg transition-shadow">
                 <CardHeader>
                   <div className="flex items-start justify-between">
@@ -137,14 +204,14 @@ export function ProviderSearch() {
                       <CardTitle className="text-lg">
                         {provider.company_name || 'Prestataire'}
                       </CardTitle>
-                      <CardDescription className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
                         <MapPin className="w-3 h-3" />
                         {provider.city}, {provider.postal_code}
                         <Badge variant="secondary" className="ml-2">
                           <Navigation className="w-3 h-3 mr-1" />
                           {provider.distance} km
                         </Badge>
-                      </CardDescription>
+                      </div>
                     </div>
 
                     {provider.average_rating && (
@@ -224,7 +291,15 @@ export function ProviderSearch() {
                     <Button size="sm" className="flex-1">
                       Contacter
                     </Button>
-                    <Button size="sm" variant="outline" className="flex-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => {
+                        setSelectedProvider(provider);
+                        setIsProfileModalOpen(true);
+                      }}
+                    >
                       Voir le profil
                     </Button>
                   </div>
@@ -234,6 +309,187 @@ export function ProviderSearch() {
           </div>
         </div>
       )}
+
+      {/* Modale de profil détaillé */}
+      <Dialog open={isProfileModalOpen} onOpenChange={setIsProfileModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="w-5 h-5" />
+              Profil du prestataire
+            </DialogTitle>
+          </DialogHeader>
+
+          {selectedProvider && (
+            <div className="space-y-6 pt-4">
+              {/* En-tête du profil */}
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="text-2xl font-bold">
+                    {selectedProvider.company_name || 'Prestataire'}
+                  </h3>
+                  <p className="text-muted-foreground flex items-center gap-2 mt-1">
+                    <MapPin className="w-4 h-4" />
+                    {selectedProvider.city}, {selectedProvider.postal_code}
+                  </p>
+                </div>
+
+                {selectedProvider.average_rating && (
+                  <div className="flex items-center gap-2 bg-yellow-50 px-3 py-2 rounded-lg">
+                    <Star className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                    <div>
+                      <div className="font-bold text-lg">
+                        {selectedProvider.average_rating.toFixed(1)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {selectedProvider.review_count || 0} avis
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Spécialités */}
+              {selectedProvider.specialty && selectedProvider.specialty.length > 0 && (
+                <div>
+                  <Label className="text-sm font-semibold mb-2 block">
+                    Spécialités
+                  </Label>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedProvider.specialty.map((spec: string) => (
+                      <Badge key={spec} variant="secondary">
+                        <Briefcase className="w-3 h-3 mr-1" />
+                        {SPECIALTIES.find(s => s.value === spec)?.label || spec}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Description */}
+              {selectedProvider.description && (
+                <div>
+                  <Label className="text-sm font-semibold mb-2 block">
+                    Description
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedProvider.description}
+                  </p>
+                </div>
+              )}
+
+              {/* Informations de contact */}
+              <div className="border-t pt-4">
+                <Label className="text-sm font-semibold mb-3 block">
+                  Informations de contact
+                </Label>
+                <div className="space-y-3">
+                  {selectedProvider.professional_phone && (
+                    <div className="flex items-center gap-3">
+                      <Phone className="w-4 h-4 text-muted-foreground" />
+                      <a
+                        href={`tel:${selectedProvider.professional_phone}`}
+                        className="text-sm hover:underline"
+                      >
+                        {selectedProvider.professional_phone}
+                      </a>
+                    </div>
+                  )}
+
+                  {selectedProvider.professional_email && (
+                    <div className="flex items-center gap-3">
+                      <Mail className="w-4 h-4 text-muted-foreground" />
+                      <a
+                        href={`mailto:${selectedProvider.professional_email}`}
+                        className="text-sm hover:underline"
+                      >
+                        {selectedProvider.professional_email}
+                      </a>
+                    </div>
+                  )}
+
+                  {selectedProvider.distance !== undefined && (
+                    <div className="flex items-center gap-3">
+                      <Navigation className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm">
+                        À {selectedProvider.distance} km de votre propriété
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Tarifs et disponibilité */}
+              <div className="border-t pt-4">
+                <Label className="text-sm font-semibold mb-3 block">
+                  Tarifs et disponibilité
+                </Label>
+                <div className="space-y-3">
+                  {selectedProvider.hourly_rate && (
+                    <div className="flex items-center gap-3">
+                      <Euro className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm">
+                        {selectedProvider.hourly_rate}€/heure
+                      </span>
+                    </div>
+                  )}
+
+                  {selectedProvider.intervention_radius_km && (
+                    <div className="flex items-center gap-3">
+                      <MapPin className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm">
+                        Rayon d'intervention : {selectedProvider.intervention_radius_km} km
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Statistiques */}
+              <div className="border-t pt-4">
+                <Label className="text-sm font-semibold mb-3 block">
+                  Statistiques
+                </Label>
+                <div className="grid grid-cols-2 gap-4">
+                  {selectedProvider.total_interventions !== undefined && (
+                    <div className="bg-muted rounded-lg p-3">
+                      <div className="text-2xl font-bold">
+                        {selectedProvider.total_interventions}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Interventions réalisées
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedProvider.years_of_experience && (
+                    <div className="bg-muted rounded-lg p-3">
+                      <div className="text-2xl font-bold">
+                        {selectedProvider.years_of_experience}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Années d'expérience
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="border-t pt-4 flex gap-3">
+                <Button className="flex-1">
+                  <Phone className="w-4 h-4 mr-2" />
+                  Contacter
+                </Button>
+                <Button variant="outline" className="flex-1">
+                  <Mail className="w-4 h-4 mr-2" />
+                  Envoyer un email
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

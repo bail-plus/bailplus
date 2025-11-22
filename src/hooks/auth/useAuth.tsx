@@ -55,12 +55,10 @@ const upsertProfileFromUser = async (u: User) => {
 
   // Si le profil existe déjà, ne rien faire (ne pas écraser les données)
   if (existingProfile) {
-    console.log('✅ [AUTH] Profil existe déjà, pas de mise à jour');
     return existingProfile;
   }
 
   // Le profil n'existe pas, on le crée
-  console.log('🆕 [AUTH] Création du profil pour', u.email);
 
   // Extraire first_name et last_name depuis Google (full_name) ou formulaire classique
   let firstName = md.first_name ?? null;
@@ -122,7 +120,6 @@ const upsertProfileFromUser = async (u: User) => {
    API Functions
    ======================= */
 async function fetchProfile(userId: string): Promise<Profile | null> {
-  console.log('🔵 [AUTH] fetchProfile START for:', userId);
   try {
     // Timeout de 5 secondes pour éviter les requêtes bloquées
     const timeoutPromise = new Promise<never>((_, reject) => {
@@ -138,7 +135,6 @@ async function fetchProfile(userId: string): Promise<Profile | null> {
     const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
 
     if (error) {
-      console.log('🔴 [AUTH] fetchProfile ERROR:', error);
       // Si erreur réseau, lancer une exception pour que React Query retry
       if (error.message?.includes('Failed to fetch') || error.message?.includes('Load failed')) {
         throw error;
@@ -147,7 +143,6 @@ async function fetchProfile(userId: string): Promise<Profile | null> {
       return null;
     }
 
-    console.log('✅ [AUTH] fetchProfile SUCCESS:', data ? 'data received' : 'no data');
     return data;
   } catch (err) {
     console.error('❌ [AUTH] Exception profil:', err);
@@ -156,7 +151,6 @@ async function fetchProfile(userId: string): Promise<Profile | null> {
 }
 
 async function fetchSubscription(userId: string): Promise<Subscription | null> {
-  console.log('🔵 [AUTH] fetchSubscription START for:', userId);
   try {
     // Timeout de 5 secondes pour éviter les requêtes bloquées
     const timeoutPromise = new Promise<never>((_, reject) => {
@@ -174,7 +168,6 @@ async function fetchSubscription(userId: string): Promise<Subscription | null> {
     const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
 
     if (error) {
-      console.log('🔴 [AUTH] fetchSubscription ERROR:', error);
       // Si erreur réseau, lancer une exception pour que React Query retry
       if (error.message?.includes('Failed to fetch') || error.message?.includes('Load failed')) {
         throw error;
@@ -183,7 +176,6 @@ async function fetchSubscription(userId: string): Promise<Subscription | null> {
       return null;
     }
 
-    console.log('✅ [AUTH] fetchSubscription SUCCESS:', data ? 'data received' : 'no data');
     return data;
   } catch (err) {
     console.error('❌ [AUTH] Exception abonnement:', err);
@@ -359,7 +351,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         // Petit délai pour laisser la session JWT se propager
         setTimeout(() => {
           if (isActive) {
-            console.log('✅ [AUTH] Setting authReady = true');
             setAuthReady(true);
           }
         }, 200);
@@ -388,7 +379,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           // Petit délai pour laisser la session JWT se propager
           setTimeout(() => {
             if (isActive) {
-              console.log('✅ [AUTH] Setting authReady = true (from getSession)');
               setAuthReady(true);
             }
           }, 200);
@@ -413,7 +403,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // Log pour détecter les changements de user.id
   useEffect(() => {
     if (import.meta.env.DEV) {
-      console.log('👤 [AUTH] user?.id changed:', user?.id);
     }
   }, [user?.id]);
 
@@ -421,7 +410,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     queryKey: ['profile', user?.id],
     enabled: false, // Désactivé par défaut, on lance manuellement
     queryFn: () => {
-      console.log('📡 [AUTH] Fetching profile for user:', user?.id);
       return fetchProfile(user!.id);
     },
     staleTime: 5 * 60 * 1000,
@@ -437,7 +425,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     queryKey: ['subscription', user?.id],
     enabled: false, // Désactivé par défaut, on lance manuellement
     queryFn: () => {
-      console.log('📡 [AUTH] Fetching subscription for user:', user?.id);
       return fetchSubscription(user!.id);
     },
     staleTime: 2 * 60 * 1000,
@@ -452,9 +439,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // Lancer les queries manuellement après que authReady soit true + délai de sécurité
   useEffect(() => {
     if (authReady && user?.id && !profileQuery.data && !profileQuery.isFetching) {
-      console.log('⏰ [AUTH] Scheduling profile query in 500ms...');
       const timer = setTimeout(() => {
-        console.log('🚀 [AUTH] Manually triggering profile query NOW');
         profileQuery.refetch();
       }, 500);
       return () => clearTimeout(timer);
@@ -463,9 +448,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     if (authReady && user?.id && !subscriptionQuery.data && !subscriptionQuery.isFetching) {
-      console.log('⏰ [AUTH] Scheduling subscription query in 500ms...');
       const timer = setTimeout(() => {
-        console.log('🚀 [AUTH] Manually triggering subscription query NOW');
         subscriptionQuery.refetch();
       }, 500);
       return () => clearTimeout(timer);
@@ -486,7 +469,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Debug: log quand on reste bloqué
   if (import.meta.env.DEV && authReady && (!profileReady || !subscriptionReady)) {
-    console.log('🔴 [AUTH] Bloqué sur chargement:', {
       authReady,
       hasUser,
       userId: user?.id,

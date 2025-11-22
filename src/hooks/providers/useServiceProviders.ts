@@ -188,7 +188,47 @@ export function useAvailableProviders(
 
       if (providersError) throw providersError;
 
-      // 3. Filtrer par distance et rayon d'intervention
+      // 3. Récupérer les notes et interventions pour chaque prestataire
+      const providerIds = providers.map(p => p.id);
+
+      // Récupérer les notes moyennes et le nombre d'avis
+      const { data: ratings } = await supabase
+        .from('provider_ratings')
+        .select('provider_id, rating')
+        .in('provider_id', providerIds);
+
+      // Récupérer le nombre d'interventions (tickets assignés et terminés)
+      const { data: interventions } = await supabase
+        .from('maintenance_tickets')
+        .select('assigned_to')
+        .in('assigned_to', providerIds)
+        .eq('status', 'TERMINE');
+
+      // Calculer les statistiques par prestataire
+      const ratingsMap = new Map<string, { average: number; count: number }>();
+      if (ratings) {
+        ratings.forEach(r => {
+          if (!r.provider_id || r.rating === null) return;
+
+          const existing = ratingsMap.get(r.provider_id);
+          if (existing) {
+            existing.count += 1;
+            existing.average = ((existing.average * (existing.count - 1)) + r.rating) / existing.count;
+          } else {
+            ratingsMap.set(r.provider_id, { average: r.rating, count: 1 });
+          }
+        });
+      }
+
+      const interventionsMap = new Map<string, number>();
+      if (interventions) {
+        interventions.forEach(i => {
+          if (!i.assigned_to) return;
+          interventionsMap.set(i.assigned_to, (interventionsMap.get(i.assigned_to) || 0) + 1);
+        });
+      }
+
+      // 4. Filtrer par distance et rayon d'intervention
       const providersWithDistance = providers
         .map((provider) => {
           const distance = calculateDistance(
@@ -198,9 +238,15 @@ export function useAvailableProviders(
             provider.longitude!
           );
 
+          const providerRating = ratingsMap.get(provider.id);
+          const totalInterventions = interventionsMap.get(provider.id) || 0;
+
           return {
             ...provider,
             distance,
+            average_rating: providerRating?.average || null,
+            review_count: providerRating?.count || 0,
+            total_interventions: totalInterventions,
           };
         })
         .filter((provider) => {
@@ -301,9 +347,12 @@ export function useUpdateProviderLocation() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ['service-providers'] });
       queryClient.invalidateQueries({ queryKey: ['available-providers'] });
+      queryClient.invalidateQueries({ queryKey: ['current-provider-profile'] });
+      // Attendre que la query soit rechargée pour mettre à jour l'affichage
+      await queryClient.refetchQueries({ queryKey: ['current-provider-profile'] });
       toast.success('Localisation mise à jour');
     },
     onError: (error) => {

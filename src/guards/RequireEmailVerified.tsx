@@ -24,13 +24,9 @@ export function RequireEmailVerified() {
   // Vérifier si l'email est vérifié
   const isEmailVerified = user?.email_confirmed_at !== null;
 
-  console.log('[GUARD] RequireEmailVerified - User:', user?.email);
-  console.log('[GUARD] Email verified:', isEmailVerified);
-  console.log('[GUARD] email_confirmed_at:', user?.email_confirmed_at);
 
   // Si email non vérifié et pas déjà sur la page verify-email, rediriger
   if (!isEmailVerified && location.pathname !== '/verify-email') {
-    console.log('[GUARD] Redirecting to /verify-email');
     // Préserver les paramètres de type si présents
     const searchParams = new URLSearchParams(location.search);
     const type = searchParams.get('type');

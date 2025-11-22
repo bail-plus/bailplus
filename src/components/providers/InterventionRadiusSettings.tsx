@@ -17,14 +17,39 @@ export function InterventionRadiusSettings() {
 
   const [radius, setRadius] = useState(50);
   const [address, setAddress] = useState('');
+  const [postalCode, setPostalCode] = useState('');
+  const [city, setCity] = useState('');
   const [isGeocoding, setIsGeocoding] = useState(false);
 
   useEffect(() => {
     if (provider) {
       setRadius(provider.intervention_radius_km || 50);
       setAddress(provider.address || '');
+      setPostalCode(provider.postal_code || '');
+      setCity(provider.city || '');
     }
   }, [provider]);
+
+  // Récupérer automatiquement la ville à partir du code postal
+  useEffect(() => {
+    const fetchCity = async () => {
+      if (postalCode.length === 5) {
+        try {
+          const response = await fetch(
+            `https://geo.api.gouv.fr/communes?codePostal=${postalCode}&fields=nom&format=json`
+          );
+          const data = await response.json();
+          if (data && data.length > 0) {
+            setCity(data[0].nom);
+          }
+        } catch (error) {
+          console.error('Erreur lors de la récupération de la ville:', error);
+        }
+      }
+    };
+
+    fetchCity();
+  }, [postalCode]);
 
   const handleUpdateRadius = async () => {
     if (!provider) return;
@@ -36,15 +61,17 @@ export function InterventionRadiusSettings() {
   };
 
   const handleGeocodeAddress = async () => {
-    if (!provider || !address.trim()) {
-      toast.error('Veuillez saisir une adresse');
+    if (!provider || !address.trim() || !postalCode.trim() || !city.trim()) {
+      toast.error('Veuillez saisir l\'adresse, le code postal et la ville');
       return;
     }
 
     setIsGeocoding(true);
 
     try {
-      const result = await geocodeAddress(address);
+      // Construire l'adresse complète
+      const fullAddress = `${address}, ${postalCode} ${city}`;
+      const result = await geocodeAddress(fullAddress);
 
       if (!result) {
         toast.error('Impossible de trouver cette adresse');
@@ -62,10 +89,12 @@ export function InterventionRadiusSettings() {
         longitude: result.longitude,
         city: result.city,
         postalCode: result.postalCode,
-        address: result.address,
+        address: address,
       });
 
-      setAddress(result.address);
+      // Mettre à jour les champs avec les résultats du géocodage
+      setCity(result.city);
+      setPostalCode(result.postalCode);
     } catch (error) {
       console.error('Erreur géocodage:', error);
       toast.error('Erreur lors de la localisation de l\'adresse');
@@ -112,38 +141,69 @@ export function InterventionRadiusSettings() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="address">Adresse complète</Label>
-            <div className="flex gap-2">
+            <Label htmlFor="address">Adresse</Label>
+            <Input
+              id="address"
+              placeholder="12 Rue de la Paix"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              disabled={isGeocoding}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="postal_code">Code postal *</Label>
               <Input
-                id="address"
-                placeholder="12 Rue de la Paix, 75002 Paris"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
+                id="postal_code"
+                placeholder="75002"
+                value={postalCode}
+                onChange={(e) => setPostalCode(e.target.value.replace(/\s+/g, '').slice(0, 5))}
+                disabled={isGeocoding}
+                maxLength={5}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="city">Ville *</Label>
+              <Input
+                id="city"
+                placeholder="Paris"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
                 disabled={isGeocoding}
               />
-              <Button
-                onClick={handleGeocodeAddress}
-                disabled={isGeocoding || !address.trim()}
-              >
-                {isGeocoding ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Navigation className="w-4 h-4" />
-                )}
-                Localiser
-              </Button>
             </div>
-            {hasLocation && (
-              <p className="text-xs text-muted-foreground">
-                Position actuelle : {provider.city}, {provider.postal_code}
-                {provider.latitude && provider.longitude && (
-                  <span className="ml-2">
-                    ({provider.latitude.toFixed(4)}, {provider.longitude.toFixed(4)})
-                  </span>
-                )}
-              </p>
-            )}
           </div>
+
+          <Button
+            onClick={handleGeocodeAddress}
+            disabled={isGeocoding || !address.trim() || !postalCode.trim() || !city.trim()}
+            className="w-full"
+          >
+            {isGeocoding ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Localisation en cours...
+              </>
+            ) : (
+              <>
+                <Navigation className="w-4 h-4 mr-2" />
+                Localiser mon adresse
+              </>
+            )}
+          </Button>
+
+          {hasLocation && (
+            <p className="text-xs text-muted-foreground">
+              Position actuelle : {provider.city}, {provider.postal_code}
+              {provider.latitude && provider.longitude && (
+                <span className="ml-2">
+                  ({provider.latitude.toFixed(4)}, {provider.longitude.toFixed(4)})
+                </span>
+              )}
+            </p>
+          )}
 
           {!hasLocation && (
             <Alert>

@@ -181,7 +181,11 @@ export default function CompleteProfile() {
       // Invalider les queries pour forcer le rechargement du profil
       console.log('[CompleteProfile] 🔄 Invalidation des queries...');
       await queryClient.invalidateQueries({ queryKey: ['profile', user?.id] });
-      console.log('[CompleteProfile] ✅ Queries invalidées');
+
+      // Attendre que la query soit refetchée avant de rediriger
+      console.log('[CompleteProfile] 🔄 Attente du rechargement du profil...');
+      await queryClient.refetchQueries({ queryKey: ['profile', user?.id] });
+      console.log('[CompleteProfile] ✅ Profil rechargé');
 
       toast.success('Profil complété avec succès !');
 

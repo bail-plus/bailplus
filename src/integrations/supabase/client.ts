@@ -10,22 +10,17 @@ declare global {
   // eslint-disable-next-line no-var
   var __SUPABASE__: SupabaseClient<Database> | undefined;
 }
-//console.log('[SB/CLIENT]', { SUPABASE_URL, hasAnon: !!SUPABASE_ANON_KEY });
 
 // Custom storage adapter pour debugging
 const customStorage = {
   getItem: (key: string) => {
-    console.log('🔑 [STORAGE] getItem:', key);
     const value = localStorage.getItem(key);
-    console.log('🔑 [STORAGE] getItem result:', value ? 'data found' : 'null');
     return value;
   },
   setItem: (key: string, value: string) => {
-    console.log('🔑 [STORAGE] setItem:', key);
     localStorage.setItem(key, value);
   },
   removeItem: (key: string) => {
-    console.log('🔑 [STORAGE] removeItem:', key);
     localStorage.removeItem(key);
   },
 };
