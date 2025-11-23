@@ -27,6 +27,12 @@ export interface ServiceProvider {
   };
 }
 
+export interface ProviderHistoryEntry extends ServiceProvider {
+  last_intervention_at: string | null;
+  interventions_count: number;
+  tenants_count: number;
+}
+
 export type ServiceProviderInsert = TablesInsert<'service_providers'>;
 export type ServiceProviderUpdate = TablesUpdate<'service_providers'>;
 
@@ -267,6 +273,127 @@ export function useAvailableProviders(
       return providersWithDistance;
     },
     enabled: !!propertyId,
+  });
+}
+
+/**
+ * Prestataires ayant déjà travaillé avec un locataire de la propriété (tickets assignés)
+ */
+export function useTenantProviderHistory(propertyId?: string) {
+  const { isReady } = useAuth();
+
+  return useQuery<ProviderHistoryEntry[]>({
+    queryKey: ['tenant-provider-history', propertyId],
+    enabled: isReady && !!propertyId,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      if (!propertyId) return [];
+
+      const { data: tickets, error: ticketsError } = await supabase
+        .from('maintenance_tickets')
+        .select('assigned_to, tenant_user_id, updated_at, created_at')
+        .eq('property_id', propertyId)
+        .not('assigned_to', 'is', null)
+        .not('tenant_user_id', 'is', null);
+
+      if (ticketsError) throw ticketsError;
+
+      const providerUserIds = Array.from(
+        new Set((tickets || []).map((t) => t.assigned_to).filter(Boolean))
+      ) as string[];
+
+      if (providerUserIds.length === 0) return [];
+
+      const { data: providerRows, error: providerError } = await supabase
+        .from('service_providers')
+        .select(`
+          *,
+          user:profiles!service_providers_user_id_fkey(
+            first_name,
+            last_name,
+            email
+          )
+        `)
+        .in('user_id', providerUserIds);
+
+      if (providerError) throw providerError;
+
+      const missingIds = providerUserIds.filter(
+        (id) => !(providerRows || []).some((p) => p.user_id === id)
+      );
+
+      let fallbackProfiles: ProviderHistoryEntry[] = [];
+      if (missingIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('user_id, first_name, last_name, email, phone_number, company_name, specialty')
+          .in('user_id', missingIds);
+
+        if (profilesError) throw profilesError;
+
+        fallbackProfiles =
+          (profiles || [])
+            .filter((p) => p.user_id && missingIds.includes(p.user_id))
+            .map((p) => ({
+              id: p.user_id!,
+              user_id: p.user_id!,
+              company_name: p.company_name,
+              specialty: p.specialty ? [p.specialty] : null,
+              available: null,
+              total_interventions: null,
+              average_rating: null,
+              professional_phone: p.phone_number ?? null,
+              professional_email: p.email ?? null,
+              hourly_rate: null,
+              siret: null,
+              address: null,
+              insurance_certificate_url: null,
+              insurance_expiry_date: null,
+              user: {
+                first_name: p.first_name,
+                last_name: p.last_name,
+                email: p.email,
+              },
+              last_intervention_at: null,
+              interventions_count: 0,
+              tenants_count: 0,
+            })) ?? [];
+      }
+
+      const providerBase = (providerRows as ProviderHistoryEntry[] | null | undefined) ?? [];
+      const providersWithStats: ProviderHistoryEntry[] = [
+        ...providerBase,
+        ...fallbackProfiles,
+      ].map((provider) => {
+        const providerTickets = (tickets || []).filter(
+          (t) => t.assigned_to === provider.user_id
+        );
+
+        const lastIntervention =
+          providerTickets
+            .map((t) => t.updated_at || t.created_at)
+            .filter(Boolean)
+            .sort((a, b) => new Date(b as string).getTime() - new Date(a as string).getTime())[0] || null;
+
+        const tenantsCount = new Set(
+          providerTickets.map((t) => t.tenant_user_id).filter(Boolean) as string[]
+        ).size;
+
+        return {
+          ...provider,
+          id: provider.id || provider.user_id,
+          last_intervention_at: lastIntervention,
+          interventions_count: providerTickets.length,
+          tenants_count: tenantsCount,
+        };
+      });
+
+      return providersWithStats.sort((a, b) => {
+        const aDate = a.last_intervention_at ? new Date(a.last_intervention_at).getTime() : 0;
+        const bDate = b.last_intervention_at ? new Date(b.last_intervention_at).getTime() : 0;
+        return bDate - aDate;
+      });
+    },
   });
 }
 

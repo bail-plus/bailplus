@@ -19,9 +19,11 @@ import {
   Briefcase,
   User,
   Calendar,
+  Clock3,
+  Users,
 } from 'lucide-react';
 import { usePropertiesWithUnits } from '@/hooks/properties/useProperties';
-import { useAvailableProviders } from '@/hooks/providers/useServiceProviders';
+import { useAvailableProviders, useTenantProviderHistory } from '@/hooks/providers/useServiceProviders';
 
 const SPECIALTIES = [
   { value: 'plomberie', label: 'Plomberie' },
@@ -45,6 +47,9 @@ export function ProviderSearch() {
   const { data: providers = [], isLoading: providersLoading } = useAvailableProviders(
     selectedPropertyId || undefined
   );
+  const { data: historyProviders = [], isLoading: historyLoading } = useTenantProviderHistory(
+    selectedPropertyId || undefined
+  );
 
   // Filtrer les prestataires par spécialité
   const filteredProviders = useMemo(() => {
@@ -61,6 +66,15 @@ export function ProviderSearch() {
   const hasPropertiesWithLocation = properties.some(
     (p) => p.latitude && p.longitude
   );
+
+  const formatDate = (value: string | null) => {
+    if (!value) return 'Date inconnue';
+    return new Date(value).toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    });
+  };
 
   if (propertiesLoading) {
     return (
@@ -162,151 +176,239 @@ export function ProviderSearch() {
 
       {/* Résultats de recherche */}
       {selectedProperty && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">
-              {filteredProviders.length} prestataire{filteredProviders.length > 1 ? 's' : ''} disponible{filteredProviders.length > 1 ? 's' : ''} près de {selectedProperty.name}
-              {selectedSpecialty !== 'all' && (
-                <Badge variant="secondary" className="ml-2">
-                  {SPECIALTIES.find(s => s.value === selectedSpecialty)?.label}
-                </Badge>
-              )}
-            </h3>
-            {providersLoading && <Loader2 className="w-5 h-5 animate-spin" />}
-          </div>
-
-          {!providersLoading && filteredProviders.length === 0 && (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                {providers.length === 0 ? (
-                  <>
-                    Aucun prestataire disponible dans la zone d'intervention de cette propriété.
-                    {!selectedProperty.latitude || !selectedProperty.longitude ? (
-                      <span className="block mt-2 font-semibold">
-                        Veuillez d'abord ajouter les coordonnées GPS de cette propriété.
-                      </span>
-                    ) : null}
-                  </>
-                ) : (
-                  `Aucun prestataire trouvé pour le métier "${SPECIALTIES.find(s => s.value === selectedSpecialty)?.label}".`
+        <div className="space-y-6">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">
+                {filteredProviders.length} prestataire{filteredProviders.length > 1 ? 's' : ''} disponible{filteredProviders.length > 1 ? 's' : ''} près de {selectedProperty.name}
+                {selectedSpecialty !== 'all' && (
+                  <Badge variant="secondary" className="ml-2">
+                    {SPECIALTIES.find(s => s.value === selectedSpecialty)?.label}
+                  </Badge>
                 )}
-              </AlertDescription>
-            </Alert>
-          )}
+              </h3>
+              {providersLoading && <Loader2 className="w-5 h-5 animate-spin" />}
+            </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {filteredProviders.map((provider) => (
-              <Card key={provider.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-lg">
-                        {provider.company_name || 'Prestataire'}
-                      </CardTitle>
-                      <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-                        <MapPin className="w-3 h-3" />
-                        {provider.city}, {provider.postal_code}
-                        <Badge variant="secondary" className="ml-2">
-                          <Navigation className="w-3 h-3 mr-1" />
-                          {provider.distance} km
-                        </Badge>
+            {!providersLoading && filteredProviders.length === 0 && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  {providers.length === 0 ? (
+                    <>
+                      Aucun prestataire disponible dans la zone d'intervention de cette propriété.
+                      {!selectedProperty.latitude || !selectedProperty.longitude ? (
+                        <span className="block mt-2 font-semibold">
+                          Veuillez d'abord ajouter les coordonnées GPS de cette propriété.
+                        </span>
+                      ) : null}
+                    </>
+                  ) : (
+                    `Aucun prestataire trouvé pour le métier "${SPECIALTIES.find(s => s.value === selectedSpecialty)?.label}".`
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {filteredProviders.map((provider) => (
+                <Card key={provider.id} className="hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex gap-3">
+                        <div className="h-11 w-11 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Building2 className="w-5 h-5 text-primary" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">
+                            {provider.company_name || 'Prestataire'}
+                          </CardTitle>
+                          <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                            <MapPin className="w-3 h-3" />
+                            {provider.city}, {provider.postal_code}
+                            <Badge variant="secondary" className="ml-2">
+                              <Navigation className="w-3 h-3 mr-1" />
+                              {provider.distance} km
+                            </Badge>
+                          </div>
+                        </div>
+
+                        {provider.average_rating && (
+                          <div className="flex items-center gap-2 bg-yellow-50 px-2 py-1 rounded-md">
+                            <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                            <span className="text-sm font-medium">
+                              {provider.average_rating.toFixed(1)} ({provider.review_count || 0})
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
-
-                    {provider.average_rating && (
-                      <div className="flex items-center gap-1">
-                        <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                        <span className="font-semibold">
-                          {provider.average_rating.toFixed(1)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </CardHeader>
-
-                <CardContent className="space-y-4">
-                  {/* Spécialités */}
-                  {provider.specialty && provider.specialty.length > 0 && (
+                  </CardHeader>
+                  <CardContent className="space-y-3">
                     <div className="flex flex-wrap gap-2">
-                      {provider.specialty.slice(0, 3).map((spec) => (
+                      {provider.specialty?.map((spec: string) => (
                         <Badge key={spec} variant="outline">
                           <Briefcase className="w-3 h-3 mr-1" />
-                          {spec}
+                          {SPECIALTIES.find(s => s.value === spec)?.label || spec}
                         </Badge>
                       ))}
-                      {provider.specialty.length > 3 && (
-                        <Badge variant="outline">
-                          +{provider.specialty.length - 3}
-                        </Badge>
-                      )}
                     </div>
-                  )}
 
-                  {/* Informations */}
-                  <div className="space-y-2 text-sm">
-                    {provider.hourly_rate && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Euro className="w-4 h-4" />
-                        <span>{provider.hourly_rate}€/heure</span>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div className="space-y-1">
+                        <p className="text-muted-foreground">Rayon</p>
+                        <p className="font-semibold">{provider.intervention_radius_km} km</p>
                       </div>
-                    )}
+                      <div className="space-y-1">
+                        <p className="text-muted-foreground">Tarif horaire</p>
+                        <p className="font-semibold">{provider.hourly_rate ? `${provider.hourly_rate}€` : 'Sur devis'}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-muted-foreground">Interventions</p>
+                        <p className="font-semibold">{provider.total_interventions || 0}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-muted-foreground">Réactivité</p>
+                        <p className="font-semibold">{provider.response_time_hours ? `${provider.response_time_hours}h` : 'N.C.'}</p>
+                      </div>
+                    </div>
 
-                    {provider.professional_phone && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2">
                         <Phone className="w-4 h-4" />
-                        <a
-                          href={`tel:${provider.professional_phone}`}
-                          className="hover:underline"
-                        >
-                          {provider.professional_phone}
-                        </a>
+                        <span>{provider.professional_phone || 'Non renseigné'}</span>
                       </div>
-                    )}
-
-                    {provider.professional_email && (
-                      <div className="flex items-center gap-2 text-muted-foreground">
+                      <div className="flex items-center gap-2">
                         <Mail className="w-4 h-4" />
-                        <a
-                          href={`mailto:${provider.professional_email}`}
-                          className="hover:underline"
-                        >
-                          {provider.professional_email}
-                        </a>
+                        <span>{provider.professional_email || provider.user?.email || 'Non renseigné'}</span>
                       </div>
-                    )}
-                  </div>
-
-                  {/* Stats */}
-                  {provider.total_interventions && (
-                    <div className="pt-3 border-t text-xs text-muted-foreground">
-                      {provider.total_interventions} intervention
-                      {provider.total_interventions > 1 ? 's' : ''} réalisée
-                      {provider.total_interventions > 1 ? 's' : ''}
                     </div>
-                  )}
 
-                  {/* Actions */}
-                  <div className="pt-2 flex gap-2">
-                    <Button size="sm" className="flex-1">
-                      Contacter
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => {
-                        setSelectedProvider(provider);
-                        setIsProfileModalOpen(true);
-                      }}
-                    >
-                      Voir le profil
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button size="sm" className="flex-1">
+                        Contacter
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => {
+                          setSelectedProvider(provider);
+                          setIsProfileModalOpen(true);
+                        }}
+                      >
+                        Voir le profil
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                Prestataires déjà sollicités par vos locataires
+              </CardTitle>
+              <CardDescription>
+                Basé sur les tickets de maintenance assignés pour ce bien. Priorisez ceux qui connaissent déjà le locataire.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {historyLoading && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Recherche des interventions passées...
+                </div>
+              )}
+
+              {!historyLoading && historyProviders.length === 0 && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Aucun prestataire n'a encore été assigné aux locataires de cette propriété.
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {!historyLoading && historyProviders.length > 0 && (
+                <div className="space-y-3">
+                  {historyProviders.map((provider) => {
+                    const displayName =
+                      provider.company_name ||
+                      [provider.user?.first_name, provider.user?.last_name].filter(Boolean).join(' ') ||
+                      provider.professional_email ||
+                      'Prestataire';
+
+                    return (
+                      <div
+                        key={provider.id}
+                        className="border rounded-lg p-3 hover:border-primary/60 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <User className="w-4 h-4 text-primary" />
+                              <p className="font-semibold">{displayName}</p>
+                              {provider.specialty?.slice(0, 2).map((spec: string) => (
+                                <Badge key={spec} variant="secondary">
+                                  {SPECIALTIES.find((s) => s.value === spec)?.label || spec}
+                                </Badge>
+                              ))}
+                            </div>
+                            <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2">
+                              <MapPin className="w-3 h-3" />
+                              {[provider.city, provider.postal_code].filter(Boolean).join(' ') || 'Localisation inconnue'}
+                            </p>
+                            <div className="flex flex-wrap gap-2 mt-2 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1">
+                                <Clock3 className="w-3 h-3" />
+                                Dernière intervention {formatDate(provider.last_intervention_at)}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Briefcase className="w-3 h-3" />
+                                {provider.interventions_count} intervention{provider.interventions_count > 1 ? 's' : ''}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Users className="w-3 h-3" />
+                                {provider.tenants_count} locataire{provider.tenants_count > 1 ? 's' : ''}
+                              </span>
+                            </div>
+                          </div>
+
+                          {provider.average_rating && (
+                            <div className="flex items-center gap-2 bg-yellow-50 px-2 py-1 rounded-md">
+                              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                              <span className="text-sm font-medium">
+                                {provider.average_rating.toFixed(1)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 mt-3">
+                          {provider.professional_phone && (
+                            <Button variant="outline" size="sm" className="gap-2">
+                              <Phone className="w-4 h-4" />
+                              Appeler
+                            </Button>
+                          )}
+                          {provider.professional_email && (
+                            <Button variant="ghost" size="sm" className="gap-2">
+                              <Mail className="w-4 h-4" />
+                              Écrire
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       )}
 

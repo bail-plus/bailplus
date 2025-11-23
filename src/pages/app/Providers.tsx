@@ -15,6 +15,7 @@ import { ProvidersSearch } from "@/components/providers/ProvidersSearch"
 import { ProvidersList } from "@/components/providers/ProvidersList"
 import { ProviderFormDialog } from "@/components/providers/ProviderFormDialog"
 import { ProviderInviteDialog } from "@/components/providers/ProviderInviteDialog"
+import { ProviderSearch as ProviderLocator } from "@/components/providers/ProviderSearch"
 
 export default function Providers() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -178,9 +179,7 @@ export default function Providers() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Prestataires</h1>
-          <p className="text-muted-foreground mt-1">
-            Gérez vos prestataires de service
-          </p>
+          <p className="text-muted-foreground mt-1">Gérez vos prestataires et trouvez-en de nouveaux dans le bon rayon.</p>
         </div>
 
         <Button className="gap-2" onClick={() => setIsInviteDialogOpen(true)}>
@@ -213,6 +212,17 @@ export default function Providers() {
         onEditProvider={handleEditProvider}
         onDeleteProvider={handleDeleteProvider}
       />
+
+      {/* Trouver un nouveau prestataire */}
+      <div className="border-t pt-6 space-y-3">
+        <div>
+          <h2 className="text-2xl font-semibold">Trouver un prestataire</h2>
+          <p className="text-muted-foreground">
+            Recherche par bien, rayon et métier, avec l’historique des prestataires déjà sollicités par vos locataires.
+          </p>
+        </div>
+        <ProviderLocator />
+      </div>
 
       {/* Edit Dialog */}
       <ProviderFormDialog
