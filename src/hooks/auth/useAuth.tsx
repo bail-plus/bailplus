@@ -469,6 +469,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   // Debug: log quand on reste bloqué
   if (import.meta.env.DEV && authReady && (!profileReady || !subscriptionReady)) {
+    console.log('[AUTH] Waiting readiness', {
       authReady,
       hasUser,
       userId: user?.id,
