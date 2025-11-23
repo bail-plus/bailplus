@@ -1,6 +1,7 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
+import { useSearchParams } from "react-router-dom"
 import { useToast } from "@/hooks/ui/use-toast"
 import {
   usePropertiesWithUnits,
@@ -26,6 +27,7 @@ import { UnitsDialog } from "@/components/properties/UnitsDialog"
 import { UnitFormDialog } from "@/components/properties/UnitFormDialog"
 
 export default function Properties() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedProperty, setSelectedProperty] = useState<PropertyWithUnits | null>(null)
   const [isPropertyDialogOpen, setIsPropertyDialogOpen] = useState(false)
@@ -44,6 +46,17 @@ export default function Properties() {
   const createUnit = useCreateUnit()
   const updateUnit = useUpdateUnit()
   const deleteUnit = useDeleteUnit()
+
+  // Ouvre le formulaire de création si ?create=1 est présent
+  useEffect(() => {
+    if (searchParams.get("create") === "1") {
+      setSelectedProperty(null)
+      setIsPropertyDialogOpen(true)
+      const next = new URLSearchParams(searchParams)
+      next.delete("create")
+      setSearchParams(next, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   // Property handlers
   const handleOpenPropertyDialog = () => {

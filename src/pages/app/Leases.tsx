@@ -1,6 +1,7 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
+import { useSearchParams } from "react-router-dom"
 import { useToast } from "@/hooks/ui/use-toast"
 import { supabase } from "@/integrations/supabase/client"
 import {
@@ -22,6 +23,7 @@ import { LeasesList } from "@/components/leases/LeasesList"
 import { LeaseFormDialog } from "@/components/leases/LeaseFormDialog"
 
 export default function Leases() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [selectedLease, setSelectedLease] = useState<LeaseWithDetails | null>(null)
@@ -37,6 +39,17 @@ export default function Leases() {
   const deleteLease = useDeleteLease()
   const createUnit = useCreateUnit()
   const { createInvitation } = useInvitations()
+
+  // Ouvre le formulaire si ?create=1 est présent
+  useEffect(() => {
+    if (searchParams.get("create") === "1") {
+      setSelectedLease(null)
+      setIsDialogOpen(true)
+      const next = new URLSearchParams(searchParams)
+      next.delete("create")
+      setSearchParams(next, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   const handleOpenDialog = () => {
     setSelectedLease(null)

@@ -1,11 +1,6 @@
 import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { Plus, Building2, FileText, Calculator, Wrench, Calendar } from "lucide-react"
-import { PropertyModal } from "@/components/modals/property-modal"
-import { LeaseModal } from "@/components/modals/lease-modal"
-import { ReceiptModal } from "@/components/modals/receipt-modal"
-import { ExpenseModal } from "@/components/modals/expense-modal"
-import { TicketModal } from "@/components/modals/ticket-modal"
-import { VisitModal } from "@/components/modals/visit-modal"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -56,36 +51,16 @@ const createItems = [
 ]
 
 export function CreateButton() {
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
-  const [propertyModalOpen, setPropertyModalOpen] = useState(false)
-  const [leaseModalOpen, setLeaseModalOpen] = useState(false)
-  const [receiptModalOpen, setReceiptModalOpen] = useState(false)
-  const [expenseModalOpen, setExpenseModalOpen] = useState(false)
-  const [ticketModalOpen, setTicketModalOpen] = useState(false)
-  const [visitModalOpen, setVisitModalOpen] = useState(false)
 
-  const handleItemClick = (action: string) => {
-    setOpen(false)
-    switch (action) {
-      case 'property':
-        setPropertyModalOpen(true)
-        break
-      case 'lease':
-        setLeaseModalOpen(true)
-        break
-      case 'receipt':
-        setReceiptModalOpen(true)
-        break
-      case 'expense':
-        setExpenseModalOpen(true)
-        break
-      case 'ticket':
-        setTicketModalOpen(true)
-        break
-      case 'visit':
-        setVisitModalOpen(true)
-        break
-    }
+  const destinations: Record<string, string> = {
+    property: "/app/properties?create=1",
+    lease: "/app/leases?create=1",
+    receipt: "/app/documents?create=receipt",
+    expense: "/app/accounting?create=expense",
+    ticket: "/app/maintenance?create=1",
+    visit: "/app/calendar?create=visit",
   }
 
   return (
@@ -107,7 +82,10 @@ export function CreateButton() {
           {createItems.map((item) => (
             <DropdownMenuItem 
               key={item.action}
-              onClick={() => handleItemClick(item.action)}
+              onClick={() => {
+                setOpen(false)
+                navigate(destinations[item.action] || "/app")
+              }}
               className="cursor-pointer"
             >
               <item.icon className="w-4 h-4 mr-3 text-muted-foreground" />
@@ -119,13 +97,6 @@ export function CreateButton() {
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
-      
-      <PropertyModal open={propertyModalOpen} onOpenChange={setPropertyModalOpen} />
-      <LeaseModal open={leaseModalOpen} onOpenChange={setLeaseModalOpen} />
-      <ReceiptModal open={receiptModalOpen} onOpenChange={setReceiptModalOpen} />
-      <ExpenseModal open={expenseModalOpen} onOpenChange={setExpenseModalOpen} />
-      <TicketModal open={ticketModalOpen} onOpenChange={setTicketModalOpen} />
-      <VisitModal open={visitModalOpen} onOpenChange={setVisitModalOpen} />
     </>
   )
 }
