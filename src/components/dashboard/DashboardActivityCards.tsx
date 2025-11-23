@@ -264,7 +264,7 @@ export function ServiceProvidersCard({ serviceProviders }: ServiceProvidersCardP
               <div
                 key={provider.id}
                 className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
-                onClick={() => navigate('/app/settings')}
+                onClick={() => navigate('/app/providers')}
               >
                 <div className="flex-1">
                   <p className="text-sm font-medium">
@@ -297,7 +297,15 @@ export function ServiceProvidersCard({ serviceProviders }: ServiceProvidersCardP
           <div className="text-center py-8 text-muted-foreground">
             <UserCheck className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p className="text-sm">Aucun prestataire</p>
-            <p className="text-xs mt-2">Invitez vos prestataires depuis les Paramètres</p>
+            <p className="text-xs mt-2">Ajoutez-en depuis l’onglet Prestataires</p>
+            <div className="mt-3">
+              <button
+                onClick={() => navigate('/app/providers')}
+                className="text-xs text-primary hover:underline"
+              >
+                Ouvrir mes prestataires
+              </button>
+            </div>
           </div>
         )}
       </CardContent>
