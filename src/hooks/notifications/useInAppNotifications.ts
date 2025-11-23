@@ -63,7 +63,6 @@ export function useInAppNotifications() {
 
   // realtime subscription - DÉSACTIVÉ
   useEffect(() => {
-    console.log('⏸️ [NOTIF] Realtime subscription disabled');
     // if (!isReady || !user?.id) return
     // const sub = supabase.channel('inapp-notifs')
     //   .on('postgres_changes', {
