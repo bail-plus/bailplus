@@ -323,9 +323,9 @@ export default function Profitability() {
                         </Label>
                         <Slider
                           id="projection-years"
-                          min={5}
-                          max={50}
-                          step={5}
+                          min={0}
+                          max={100}
+                          step={1}
                           value={[projectionYears]}
                           onValueChange={(value) => setProjectionYears(value[0])}
                           className="w-full"
