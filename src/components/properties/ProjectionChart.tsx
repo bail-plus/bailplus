@@ -100,7 +100,8 @@ export function ProjectionChart({ data, propertyValue }: ProjectionChartProps) {
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis
                 dataKey="year"
-                label={{ value: "Année", position: "insideBottom", offset: -5 }}
+                label={{ value: "Année", position: "insideBottom", offset: 8 }}
+                tickMargin={12}
               />
               <YAxis
                 tickFormatter={(value) => `${(value / 1000).toFixed(0)}k€`}
@@ -134,7 +135,8 @@ export function ProjectionChart({ data, propertyValue }: ProjectionChartProps) {
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis
                 dataKey="year"
-                label={{ value: "Année", position: "insideBottom", offset: -5 }}
+                label={{ value: "Année", position: "insideBottom", offset: 8 }}
+                tickMargin={12}
               />
               <YAxis
                 tickFormatter={(value) => `${(value / 1000).toFixed(0)}k€`}
@@ -177,7 +179,8 @@ export function ProjectionChart({ data, propertyValue }: ProjectionChartProps) {
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis
                 dataKey="year"
-                label={{ value: "Année", position: "insideBottom", offset: -5 }}
+                label={{ value: "Année", position: "insideBottom", offset: 8 }}
+                tickMargin={12}
               />
               <YAxis
                 tickFormatter={(value) => `${(value / 1000).toFixed(0)}k€`}
@@ -206,7 +209,8 @@ export function ProjectionChart({ data, propertyValue }: ProjectionChartProps) {
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis
                 dataKey="year"
-                label={{ value: "Année", position: "insideBottom", offset: -5 }}
+                label={{ value: "Année", position: "insideBottom", offset: 8 }}
+                tickMargin={12}
               />
               <YAxis
                 tickFormatter={(value) => `${(value / 1000).toFixed(0)}k€`}

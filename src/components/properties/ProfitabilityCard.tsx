@@ -127,11 +127,11 @@ export function ProfitabilityCard({ property, annualRentalIncome = 0 }: Profitab
             </Badge>
           </div>
           <div className="text-xs text-muted-foreground space-y-1 ml-4">
-            {property.purchase_price && <div>• Prix d'achat : {property.purchase_price.toLocaleString('fr-FR')} €</div>}
-            {property.notary_fees && <div>• Frais notaire : {property.notary_fees.toLocaleString('fr-FR')} €</div>}
-            {property.agency_fees && <div>• Frais agence : {property.agency_fees.toLocaleString('fr-FR')} €</div>}
-            {property.renovation_costs && <div>• Travaux : {property.renovation_costs.toLocaleString('fr-FR')} €</div>}
-            {property.other_acquisition_costs && <div>• Autres : {property.other_acquisition_costs.toLocaleString('fr-FR')} €</div>}
+            {property.purchase_price !== null && property.purchase_price !== undefined && <div>• Prix d'achat : {property.purchase_price.toLocaleString('fr-FR')} €</div>}
+            {property.notary_fees !== null && property.notary_fees !== undefined && <div>• Frais notaire : {property.notary_fees.toLocaleString('fr-FR')} €</div>}
+            {property.agency_fees !== null && property.agency_fees !== undefined && <div>• Frais agence : {property.agency_fees.toLocaleString('fr-FR')} €</div>}
+            {property.renovation_costs !== null && property.renovation_costs !== undefined && <div>• Travaux : {property.renovation_costs.toLocaleString('fr-FR')} €</div>}
+            {property.other_acquisition_costs !== null && property.other_acquisition_costs !== undefined && <div>• Autres : {property.other_acquisition_costs.toLocaleString('fr-FR')} €</div>}
           </div>
         </div>
 
@@ -145,8 +145,8 @@ export function ProfitabilityCard({ property, annualRentalIncome = 0 }: Profitab
             </Badge>
           </div>
           <div className="text-xs text-muted-foreground space-y-1 ml-4">
-            {annualRentalIncome > 0 && <div>• Loyers : {annualRentalIncome.toLocaleString('fr-FR')} €</div>}
-            {property.other_income && <div>• Autres revenus : {property.other_income.toLocaleString('fr-FR')} €</div>}
+            {annualRentalIncome !== undefined && annualRentalIncome !== null && annualRentalIncome > 0 && <div>• Loyers : {annualRentalIncome.toLocaleString('fr-FR')} €</div>}
+            {property.other_income !== null && property.other_income !== undefined && property.other_income !== 0 && <div>• Autres revenus : {property.other_income.toLocaleString('fr-FR')} €</div>}
           </div>
         </div>
 
@@ -160,10 +160,10 @@ export function ProfitabilityCard({ property, annualRentalIncome = 0 }: Profitab
             </Badge>
           </div>
           <div className="text-xs text-muted-foreground space-y-1 ml-4">
-            {property.property_tax && <div>• Taxe foncière : {property.property_tax.toLocaleString('fr-FR')} €</div>}
-            {property.housing_tax && <div>• Taxe habitation : {property.housing_tax.toLocaleString('fr-FR')} €</div>}
-            {property.condo_fees_annual && <div>• Charges copro : {property.condo_fees_annual.toLocaleString('fr-FR')} €</div>}
-            {property.insurance_annual && <div>• Assurance : {property.insurance_annual.toLocaleString('fr-FR')} €</div>}
+            {property.property_tax !== null && property.property_tax !== undefined && property.property_tax !== 0 && <div>• Taxe foncière : {property.property_tax.toLocaleString('fr-FR')} €</div>}
+            {property.housing_tax !== null && property.housing_tax !== undefined && property.housing_tax !== 0 && <div>• Taxe habitation : {property.housing_tax.toLocaleString('fr-FR')} €</div>}
+            {property.condo_fees_annual !== null && property.condo_fees_annual !== undefined && property.condo_fees_annual !== 0 && <div>• Charges copro : {property.condo_fees_annual.toLocaleString('fr-FR')} €</div>}
+            {property.insurance_annual !== null && property.insurance_annual !== undefined && property.insurance_annual !== 0 && <div>• Assurance : {property.insurance_annual.toLocaleString('fr-FR')} €</div>}
             {managementFees > 0 && <div>• Frais de gestion ({property.management_fees_percentage}%) : {managementFees.toLocaleString('fr-FR')} €</div>}
             {annualLoanPayments > 0 && <div>• Mensualités crédit : {annualLoanPayments.toLocaleString('fr-FR')} €</div>}
           </div>
@@ -217,14 +217,12 @@ export function ProfitabilityCard({ property, annualRentalIncome = 0 }: Profitab
           <div className="space-y-1">
             <div className="text-xs text-muted-foreground">Rentabilité brute</div>
             <div className="text-2xl font-bold flex items-center gap-1">
-              <Percent className="w-5 h-5" />
               {grossYield.toFixed(2)} %
             </div>
           </div>
           <div className="space-y-1">
             <div className="text-xs text-muted-foreground">Rentabilité nette {hasTaxData && "(avant impôts)"}</div>
             <div className="text-2xl font-bold flex items-center gap-1">
-              <Percent className="w-5 h-5" />
               {netYield.toFixed(2)} %
             </div>
           </div>
@@ -232,7 +230,6 @@ export function ProfitabilityCard({ property, annualRentalIncome = 0 }: Profitab
             <div className="space-y-1">
               <div className="text-xs text-muted-foreground">Rentabilité nette (après impôts)</div>
               <div className="text-2xl font-bold flex items-center gap-1 text-green-600">
-                <Percent className="w-5 h-5" />
                 {netYieldAfterTax.toFixed(2)} %
               </div>
             </div>
