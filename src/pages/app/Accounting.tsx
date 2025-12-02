@@ -7,6 +7,7 @@ import {
 } from "@/hooks/accounting/useAccounting"
 import { usePropertiesWithUnits } from "@/hooks/properties/useProperties"
 import { useQueryClient } from "@tanstack/react-query"
+import { useSearchParams } from "react-router-dom"
 import { supabase } from "@/integrations/supabase/client"
 import { FinancialStats } from "@/components/accounting/FinancialStats"
 import { ExpenseForm } from "@/components/accounting/ExpenseForm"
@@ -22,9 +23,11 @@ import { useInvoiceManagement } from "@/hooks/accounting/useInvoiceManagement"
 import { useAccountingStats } from "@/hooks/accounting/useAccountingStats"
 
 export default function Accounting() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
+  const [activeTab, setActiveTab] = useState<"expenses" | "loyers" | "transactions">("expenses")
 
   const { data: expenses = [], isLoading: expensesLoading } = useExpenses()
   const { data: rentInvoices = [], isLoading: invoicesLoading } = useRentInvoices()
@@ -36,6 +39,24 @@ export default function Accounting() {
   const transactionManagement = useTransactionManagement()
   const invoiceManagement = useInvoiceManagement(rentInvoices)
   const stats = useAccountingStats(rentInvoices, expenses, transactions)
+
+  // Ouvrir les formulaires selon le paramètre ?create=
+  useEffect(() => {
+    const create = searchParams.get("create")
+    if (!create) return
+
+    if (create === "expense") {
+      setActiveTab("expenses")
+      expenseManagement.setIsExpenseDialogOpen(true)
+    } else if (create === "receipt") {
+      setActiveTab("transactions")
+      transactionManagement.setIsTransactionDialogOpen(true)
+    }
+
+    const next = new URLSearchParams(searchParams)
+    next.delete("create")
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams, expenseManagement, transactionManagement])
 
   // Realtime refresh for rent invoices
   useEffect(() => {
@@ -92,7 +113,7 @@ export default function Accounting() {
       />
 
       {/* Tabs */}
-      <Tabs defaultValue="expenses" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="space-y-4">
         <TabsList>
           <TabsTrigger value="expenses">Dépenses ({expenses.length})</TabsTrigger>
           <TabsTrigger value="loyers">Loyers ({rentInvoices.length})</TabsTrigger>

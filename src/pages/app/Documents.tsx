@@ -15,8 +15,10 @@ import ReceiptGeneratorModal from "@/components/receipts/ReceiptGeneratorModal"
 import LeaseGeneratorModal from "@/components/leases/LeaseGeneratorModal"
 import EDLGeneratorModal from "@/components/inspections/EdlGeneratorModal"
 import LetterGeneratorModal from "@/components/letters/LetterGeneratorModal"
+import { useSearchParams } from "react-router-dom"
 
 export default function Documents() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const { profile } = useAuth()
   const { selectedEntity, showAll } = useEntity()
   const [searchTerm, setSearchTerm] = useState("")
@@ -37,6 +39,26 @@ export default function Documents() {
   useEffect(() => {
     loadDocuments()
   }, [loadDocuments])
+
+  // Ouvre les modales selon le paramètre ?create=
+  useEffect(() => {
+    const create = searchParams.get("create")
+    if (!create) return
+
+    if (create === "receipt") {
+      modals.setReceiptModalOpen(true)
+    } else if (create === "lease") {
+      modals.setLeaseModalOpen(true)
+    } else if (create === "edl") {
+      modals.setEdlModalOpen(true)
+    } else if (create === "letter") {
+      modals.setLetterModalOpen(true)
+    }
+
+    const next = new URLSearchParams(searchParams)
+    next.delete("create")
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams, modals])
 
   const filteredDocuments = documents.filter(doc => {
     const matchesSearch = doc.name.toLowerCase().includes(searchTerm.toLowerCase())

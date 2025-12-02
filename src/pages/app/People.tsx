@@ -1,27 +1,40 @@
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
 import { useToast } from "@/hooks/ui/use-toast"
 import {
   useContactsWithLeaseInfo,
+  useContactsByProperty,
   useCreateContact,
   useUpdateContact,
   useDeleteContact,
   type ContactWithLeaseInfo,
   type ContactInsert
 } from "@/hooks/properties/useContacts"
+import { usePropertiesWithUnits } from "@/hooks/properties/useProperties"
 import { PeopleStats } from "@/components/people/PeopleStats"
 import { PeopleSearch } from "@/components/people/PeopleSearch"
 import { PeopleList } from "@/components/people/PeopleList"
 import { PersonFormDialog } from "@/components/people/PersonFormDialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
 
 export default function People() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedPerson, setSelectedPerson] = useState<ContactWithLeaseInfo | null>(null)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string>("all")
 
   const { toast } = useToast()
-  const { data: contacts = [], isLoading, error } = useContactsWithLeaseInfo()
+  const { data: contactsAll = [], isLoading, error } = useContactsWithLeaseInfo()
+  const { data: contactsByProperty = [], isLoading: loadingByProperty } = useContactsByProperty(
+    selectedPropertyId === "all" ? undefined : selectedPropertyId
+  )
+  const { data: properties = [] } = usePropertiesWithUnits()
+  const contacts = useMemo(
+    () => (selectedPropertyId === "all" ? contactsAll : contactsByProperty),
+    [selectedPropertyId, contactsAll, contactsByProperty]
+  )
   const createContact = useCreateContact()
   const updateContact = useUpdateContact()
   const deleteContact = useDeleteContact()
@@ -94,7 +107,7 @@ export default function People() {
     )
   }
 
-  if (isLoading) {
+  if (isLoading || loadingByProperty) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-center min-h-[400px]">
@@ -125,7 +138,26 @@ export default function People() {
       </div>
 
       {/* Search */}
-      <PeopleSearch searchTerm={searchTerm} onSearchChange={setSearchTerm} />
+      <div className="grid gap-4 md:grid-cols-[1fr,1fr] items-end">
+        <div className="space-y-2">
+          <Label className="text-sm text-muted-foreground">Filtrer par bien</Label>
+          <Select value={selectedPropertyId} onValueChange={setSelectedPropertyId}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Tous les biens" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les biens</SelectItem>
+              {properties.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <PeopleSearch searchTerm={searchTerm} onSearchChange={setSearchTerm} />
+      </div>
 
       {/* Stats Cards */}
       <PeopleStats contacts={contacts} />

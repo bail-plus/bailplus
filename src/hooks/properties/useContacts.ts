@@ -34,8 +34,8 @@ async function fetchContacts(): Promise<Contact[]> {
   return data ?? [];
 }
 
-// Fetch contacts with lease information
-async function fetchContactsWithLeaseInfo(): Promise<ContactWithLeaseInfo[]> {
+// Fetch contacts with lease information (optionally filtré par bien)
+async function fetchContactsWithLeaseInfo(propertyId?: string): Promise<ContactWithLeaseInfo[]> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Non authentifié');
 
@@ -95,7 +95,22 @@ async function fetchContactsWithLeaseInfo(): Promise<ContactWithLeaseInfo[]> {
     };
   });
 
-  return enrichedContacts;
+  if (!propertyId) return enrichedContacts;
+
+  // Filtrer les contacts liés au bien sélectionné (tenant ou garant)
+  const leaseIdsForProperty = new Set(
+    (allLeases || [])
+      .filter(l => (l as any).properties?.id === propertyId)
+      .map(l => l.id)
+  );
+
+  return enrichedContacts.filter(contact => {
+    const fromTenant = (contact.leases || []).some(l => leaseIdsForProperty.has(l.id));
+    const fromGuarantor = leaseGuarantors?.some(
+      lg => lg.guarantor_contact_id === contact.id && leaseIdsForProperty.has(lg.lease_id)
+    );
+    return fromTenant || fromGuarantor;
+  });
 }
 
 // Fetch a single contact by ID
@@ -167,7 +182,17 @@ export function useContacts() {
 export function useContactsWithLeaseInfo() {
   return useQuery({
     queryKey: ['contacts', 'with-lease-info'],
-    queryFn: fetchContactsWithLeaseInfo,
+    queryFn: () => fetchContactsWithLeaseInfo(),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// Hook to fetch contacts with lease info pour un bien
+export function useContactsByProperty(propertyId?: string) {
+  return useQuery({
+    queryKey: ['contacts', 'with-lease-info', propertyId],
+    queryFn: () => fetchContactsWithLeaseInfo(propertyId),
+    enabled: !!propertyId,
     staleTime: 5 * 60 * 1000,
   });
 }

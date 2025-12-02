@@ -69,6 +69,16 @@ export default function Maintenance() {
     }
   }, [tickets, searchParams, setSearchParams])
 
+  // Ouvrir le formulaire de ticket si ?create=1
+  useEffect(() => {
+    if (searchParams.get('create') === '1') {
+      ticketForm.setIsTicketDialogOpen(true)
+      const next = new URLSearchParams(searchParams)
+      next.delete('create')
+      setSearchParams(next, { replace: true })
+    }
+  }, [searchParams, setSearchParams, ticketForm])
+
   // Get units for selected property
   const selectedProperty = properties.find(p => p.id === ticketForm.ticketFormData.property_id)
   const availableUnits = selectedProperty?.units ?? []
