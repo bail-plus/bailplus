@@ -1,74 +1,45 @@
-# Documentation BailoGenius
+# Documentation - BailoGenius
 
-Bienvenue dans la documentation technique de BailoGenius, une plateforme de gestion locative complète.
+Index centralisé de toute la documentation du projet.
 
-## Table des matières
+## Structure de la documentation
 
-### 📚 Documentation disponible
+### 📋 [Setup](./setup/)
+Guides de mise en place et configuration initiale du projet.
+- **SETUP-RAPIDE.md** - Guide de démarrage rapide
+- **GITFLOW.md** - Instructions pour utiliser Git Flow
+- **SECRETS-GITHUB.md** - Gestion des secrets et variables d'environnement
 
-#### 🎯 Features (Fonctionnalités)
+### 🔗 [Integration](./integration/)
+Documentation sur les intégrations avec des services externes.
+- **BRIDGE_API_V3_DEPLOYMENT.md** - Déploiement et configuration de l'API Bridge V3
+- **INTEGRATION_GOCARDLESS.md** - Intégration GoCardless
+- **SPRINTS_GOCARDLESS.md** - Sprints et planification GoCardless
 
-1. **[Système d'Invitation](./features/invitations.md)**
-   - Architecture et flux de travail
-   - Gestion des invitations de locataires et prestataires
-   - Configuration et déploiement
-   - Guide de dépannage
+### ⚙️ [Configuration](./configuration/)
+Paramètres et configuration des services.
+- **CRON_CONFIGURATION.md** - Configuration des tâches planifiées (CRON)
 
-#### 📝 Changelogs (Historique des versions)
+### 🚀 [Deployment](./deployment/)
+Guides de déploiement et mise en production.
+- **DEPLOYMENT.md** - Processus de déploiement
 
-1. **[Invitations v1.0.0](./changelogs/invitations.md)**
-   - Système d'invitation complet
-   - Fonctionnalités ajoutées, corrections de bugs
-   - Roadmap des prochaines versions
+### 🏗️ [Infrastructure](./infrastructure/)
+Documentation sur l'infrastructure et le monitoring.
+- **EMAIL-SETUP.md** - Configuration des emails
+- **SERVER-MONITORING.md** - Monitoring du serveur
+- **AUTO-RESTART.md** - Configuration du redémarrage automatique
 
-## À propos du projet
+### 📚 [SEO](./deployment/)
+- **SEO-GUIDE.md** - Guide SEO et optimisations
 
-BailoGenius est une plateforme SaaS de gestion locative qui permet aux propriétaires de:
-- Gérer leurs biens immobiliers
-- Suivre les loyers et les paiements
-- Gérer les tickets de maintenance
-- Inviter et gérer locataires et prestataires de services
-- Gérer les documents et contrats
-
-## Technologies utilisées
+## Stack technique
 
 - **Frontend**: React + TypeScript + Vite
-- **Backend**: Supabase (PostgreSQL + Edge Functions)
-- **UI**: shadcn/ui + Tailwind CSS
-- **Auth**: Supabase Auth
-- **Email**: Resend
-- **Paiements**: Stripe (à venir)
+- **UI**: shadcn-ui + Tailwind CSS
+- **Backend**: Supabase
+- **Intégrations**: Bridge API, GoCardless, Stripe
 
-## Contribuer à la documentation
+## Contribution
 
-Pour ajouter une nouvelle page de documentation:
-
-1. Créer un fichier `.md` dans le sous-dossier approprié (`features/` ou `changelogs/`)
-2. Suivre le template existant (voir `features/invitations.md`)
-3. Ajouter un lien dans ce README
-4. Utiliser une structure claire avec:
-   - Vue d'ensemble
-   - Architecture
-   - Flux de travail
-   - Configuration
-   - Dépannage
-   - Références
-
-## Structure des fichiers
-
-```
-docs/
-├── README.md                    # Index principal
-├── features/                    # Documentation des fonctionnalités
-│   └── invitations.md          # Système d'invitation
-└── changelogs/                  # Historique des versions
-    └── invitations.md          # Changelog des invitations
-```
-
-## Contact
-
-Pour toute question ou suggestion concernant la documentation, veuillez créer une issue dans le repository.
-
----
-
-**Dernière mise à jour**: Octobre 2025
+Lors d'ajout de nouvelles features ou modifications importantes, assurez-vous de mettre à jour la documentation correspondante.
