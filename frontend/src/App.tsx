@@ -13,7 +13,9 @@ import { LoadingGate } from "@/components/layout/LoadingGate";
 
 // App pages (protected)
 import Index from "./pages/app/Index";
-import Calendar from "./pages/app/Calendar";
+import Calendar from "./pages/app/owner/Calendar";
+import CalendarTenant from "./pages/app/tenant/CalendarTenant";
+import CalendarProvider from "./pages/app/provider/CalendarProvider";
 import Properties from "./pages/app/Properties";
 import Profitability from "./pages/app/Profitability";
 import Leases from "./pages/app/Leases";
@@ -134,7 +136,13 @@ function AppRoutes() {
 
             <Route element={<RequireSubscription />}>
               <Route path="/app/dashboard" element={<Layout><Index /></Layout>} />
+
+              {/* Calendriers par rôle */}
               <Route path="/app/calendar" element={<Layout><Calendar /></Layout>} />
+              <Route path="/app/owner/calendar" element={<Layout><Calendar /></Layout>} />
+              <Route path="/app/tenant/calendar" element={<Layout><CalendarTenant /></Layout>} />
+              <Route path="/app/provider/calendar" element={<Layout><CalendarProvider /></Layout>} />
+
               <Route path="/app/properties" element={<Layout><Properties /></Layout>} />
               <Route path="/app/profitability" element={<Layout><Profitability /></Layout>} />
               <Route path="/app/leases" element={<Layout><Leases /></Layout>} />
