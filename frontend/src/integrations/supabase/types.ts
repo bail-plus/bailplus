@@ -601,6 +601,7 @@ export type Database = {
           title: string
           unit_id: string | null
           updated_at: string
+          user_id: string
         }
         Insert: {
           attendees?: string | null
@@ -619,6 +620,7 @@ export type Database = {
           title: string
           unit_id?: string | null
           updated_at?: string
+          user_id: string
         }
         Update: {
           attendees?: string | null
@@ -637,6 +639,7 @@ export type Database = {
           title?: string
           unit_id?: string | null
           updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
