@@ -178,35 +178,73 @@ hotfix/utils-calculations-wrong-formula
 
 ```
 bailogenius-gestion-locative/
-├── src/
-│   ├── components/           # Composants réutilisables
-│   │   ├── layout/          # Layout & navigation
-│   │   ├── ui/              # UI components (buttons, modals, etc.)
-│   │   ├── forms/           # Formulaires
-│   │   ├── accounting/      # Comptabilité
-│   │   ├── providers/       # Prestataires
-│   │   ├── properties/      # Propriétés
-│   │   ├── leases/          # Baux
-│   │   ├── communications/  # Communications
-│   │   └── ...
-│   ├── pages/               # Pages applicatives
-│   │   ├── app/
-│   │   │   ├── Properties.tsx
-│   │   │   ├── Leases.tsx
-│   │   │   ├── Calendar.tsx
-│   │   │   ├── Accounting.tsx
-│   │   │   └── ...
-│   │   └── auth/
-│   ├── hooks/               # Custom hooks
-│   │   ├── auth/
-│   │   ├── entities/
-│   │   └── ...
-│   ├── contexts/            # Context API
-│   ├── utils/               # Fonctions utilitaires
-│   ├── config/              # Configuration
-│   └── integrations/        # Intégrations externes
-├── package.json
-└── GITFLOW.md
+├── frontend/
+│   ├── src/
+│   │   ├── components/           # Composants réutilisables
+│   │   │   ├── accounting/      # Comptabilité
+│   │   │   ├── communications/  # Communications
+│   │   │   ├── dashboard/       # Tableaux de bord
+│   │   │   ├── documents/       # Documents
+│   │   │   ├── email/           # Emails
+│   │   │   ├── inspections/     # États des lieux
+│   │   │   ├── layout/          # Layout & navigation
+│   │   │   ├── leases/          # Baux
+│   │   │   ├── letters/         # Courriers
+│   │   │   ├── maintenance/     # Maintenance
+│   │   │   ├── marketing/       # Marketing
+│   │   │   ├── modals/          # Modales
+│   │   │   ├── notifications/   # Notifications
+│   │   │   ├── offers/          # Offres
+│   │   │   ├── people/          # Contacts/personnes
+│   │   │   ├── properties/      # Propriétés
+│   │   │   ├── provider/        # Prestataire individuel
+│   │   │   ├── providers/       # Liste prestataires
+│   │   │   ├── receipts/        # Quittances
+│   │   │   ├── reports/         # Rapports
+│   │   │   ├── routing/         # Routage
+│   │   │   ├── settings/        # Paramètres (composants)
+│   │   │   ├── settings-page/   # Page paramètres
+│   │   │   ├── tri-simulator/   # Simulateur tri
+│   │   │   └── ui/              # UI components (buttons, modals, etc.)
+│   │   ├── pages/               # Pages applicatives
+│   │   │   ├── account/         # Compte utilisateur
+│   │   │   ├── app/             # Application principale
+│   │   │   ├── auth/            # Authentification
+│   │   │   ├── dashboards/      # Dashboards
+│   │   │   ├── marketing/       # Pages marketing
+│   │   │   ├── settings/        # Pages paramètres
+│   │   │   ├── NotFound.tsx     # Page 404
+│   │   │   └── NotFoundPublic.tsx
+│   │   ├── hooks/               # Custom hooks
+│   │   │   ├── account/         # Hooks compte
+│   │   │   ├── accounting/      # Hooks comptabilité
+│   │   │   ├── analytics/       # Hooks analytics
+│   │   │   ├── auth/            # Hooks authentification
+│   │   │   ├── communications/  # Hooks communications
+│   │   │   ├── documents/       # Hooks documents
+│   │   │   ├── leasing/         # Hooks baux
+│   │   │   ├── maintenance/     # Hooks maintenance
+│   │   │   ├── marketing/       # Hooks marketing
+│   │   │   ├── notifications/   # Hooks notifications
+│   │   │   ├── properties/      # Hooks propriétés
+│   │   │   ├── providers/       # Hooks prestataires
+│   │   │   ├── receipts/        # Hooks quittances
+│   │   │   ├── tri/             # Hooks TRI
+│   │   │   └── ui/              # Hooks UI
+│   │   ├── contexts/            # Context API
+│   │   ├── guards/              # Guards de navigation
+│   │   ├── services/            # Services (API calls)
+│   │   ├── lib/                 # Bibliothèques
+│   │   ├── utils/               # Fonctions utilitaires
+│   │   ├── config/              # Configuration
+│   │   └── integrations/        # Intégrations externes
+│   ├── supabase/                # Supabase functions
+│   └── package.json
+├── docs/                        # Documentation
+│   ├── setup/
+│   │   └── GITFLOW.md          # Ce fichier
+│   └── ...
+└── .github/                     # GitHub workflows
 ```
 
 ---
@@ -215,33 +253,144 @@ bailogenius-gestion-locative/
 
 ### **Components** (composants)
 
+#### Layout & Navigation
 ```
 feature/components-layout-sidebar-responsive
 feature/components-layout-header-notifications
-feature/components-ui-buttons-styling
-feature/components-forms-validation-email
+feature/components-routing-breadcrumb-navigation
+```
+
+#### Propriétés & Baux
+```
+feature/components-properties-card-display
+feature/components-properties-filters-advanced
+feature/components-leases-creation-wizard
+feature/components-leases-rent-calculator
+```
+
+#### Comptabilité & Finances
+```
 feature/components-accounting-chart-performance
+feature/components-accounting-export-pdf
+feature/components-receipts-generator-template
+feature/components-receipts-list-filters
+```
+
+#### Prestataires & Maintenance
+```
 feature/components-providers-search-filters
+feature/components-providers-rating-system
+feature/components-maintenance-ticket-form
+feature/components-maintenance-status-tracker
+```
+
+#### Communications & Documents
+```
+feature/components-communications-email-template
+feature/components-letters-generator-pdf
+feature/components-documents-upload-manager
+feature/components-notifications-toast-system
+```
+
+#### Marketing & TRI
+```
+feature/components-marketing-landing-hero
+feature/components-tri-simulator-calculator
+feature/components-offers-comparison-table
+```
+
+#### UI & Modales
+```
+feature/components-ui-buttons-styling
+feature/components-ui-datepicker-range
+feature/components-modals-confirmation-dialog
 ```
 
 ### **Pages** (pages applicatives)
 
+#### Pages App
 ```
-feature/pages-app-properties-list-filters
-feature/pages-app-properties-detail-modal
-feature/pages-app-leases-creation-wizard
-feature/pages-app-calendar-sync-google
-feature/pages-app-accounting-export-pdf
-feature/pages-app-dashboard-widgets-layout
+feature/pages-app-properties-list-view
+feature/pages-app-properties-detail-tabs
+feature/pages-app-leases-management-dashboard
+feature/pages-app-accounting-overview
+```
+
+#### Pages Auth & Account
+```
+feature/pages-auth-login-oauth-integration
+feature/pages-auth-register-validation
+feature/pages-account-profile-settings
+feature/pages-account-billing-subscription
+```
+
+#### Pages Dashboards
+```
+feature/pages-dashboards-owner-analytics
+feature/pages-dashboards-financial-summary
+```
+
+#### Pages Settings
+```
+feature/pages-settings-preferences-notifications
+feature/pages-settings-integrations-api-keys
+```
+
+#### Pages Marketing
+```
+feature/pages-marketing-landing-homepage
+feature/pages-marketing-pricing-plans
 ```
 
 ### **Hooks** (hooks personnalisés)
 
+#### Hooks Auth & Account
 ```
 feature/hooks-auth-useAuth-token-refresh
-feature/hooks-entities-useEntityFilter-search
+feature/hooks-auth-useSession-persistence
+feature/hooks-account-useProfile-update
+```
+
+#### Hooks Properties & Leasing
+```
 feature/hooks-properties-usePropertyCrud-operations
-feature/hooks-leases-useLeaseCalculations-rent
+feature/hooks-properties-usePropertyProfitability-calculations
+feature/hooks-leasing-useLeaseCalculations-rent
+feature/hooks-leasing-useLeaseDocuments-generation
+```
+
+#### Hooks Accounting & Receipts
+```
+feature/hooks-accounting-useTransactions-filtering
+feature/hooks-accounting-useCharts-data
+feature/hooks-receipts-useReceiptGenerator-pdf
+```
+
+#### Hooks Providers & Maintenance
+```
+feature/hooks-providers-useProviderSearch-filters
+feature/hooks-maintenance-useTicketStatus-tracker
+```
+
+#### Hooks Communications & Notifications
+```
+feature/hooks-communications-useEmailSender-smtp
+feature/hooks-notifications-useToast-manager
+```
+
+#### Hooks UI & Analytics
+```
+feature/hooks-ui-useModal-state
+feature/hooks-analytics-usePageTracking-events
+```
+
+### **Services** (services API)
+
+```
+feature/services-api-properties-endpoint
+feature/services-bridge-bank-sync
+feature/services-supabase-storage-upload
+feature/services-stripe-payment-intent
 ```
 
 ### **Utils** (utilitaires)
@@ -252,6 +401,7 @@ feature/utils-validation-phone-format
 feature/utils-calculations-profit-margin
 feature/utils-formatting-currency-display
 feature/utils-date-helpers-lease-periods
+feature/utils-pdf-generator-receipts
 ```
 
 ### **Contexts** (contextes)
@@ -260,6 +410,15 @@ feature/utils-date-helpers-lease-periods
 feature/contexts-entity-provider-multi-select
 feature/contexts-auth-permissions-roles
 feature/contexts-filters-advanced-search
+feature/contexts-theme-dark-mode
+```
+
+### **Guards** (guards de navigation)
+
+```
+feature/guards-auth-protected-route
+feature/guards-role-admin-access
+feature/guards-subscription-premium-features
 ```
 
 ---
@@ -507,4 +666,4 @@ git diff develop..feature/branch-name
 
 ---
 
-**Dernière mise à jour** : 2 décembre 2024
+**Dernière mise à jour** : 11 décembre 2024
