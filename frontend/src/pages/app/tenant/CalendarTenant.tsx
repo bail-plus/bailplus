@@ -34,7 +34,9 @@ const CalendarTenant = () => {
   const [selectedEventTypes, setSelectedEventTypes] = useState<string[]>([])
   const [selectedPropertyFilter, setSelectedPropertyFilter] = useState<string>("all")
 
-  const { events, extraEvents, loading } = useCalendarEvents(currentMonth, "[CALENDAR_TENANT]")
+  const { data, isLoading } = useCalendarEvents(currentMonth, "[CALENDAR_TENANT]")
+  const events = data?.events || []
+  const extraEvents = data?.extraEvents || []
 
   const days = useMemo(
     () => eachDayOfInterval({ start: startOfMonth(currentMonth), end: endOfMonth(currentMonth) }),
@@ -116,7 +118,7 @@ const CalendarTenant = () => {
         selectedDate={selectedDate}
         baseEvents={eventsOfSelectedDay.base}
         extraEvents={eventsOfSelectedDay.extra}
-        loading={loading}
+        loading={isLoading}
         onEventClick={handleEventClick}
       />
 

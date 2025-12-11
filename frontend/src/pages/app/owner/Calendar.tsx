@@ -46,7 +46,9 @@ const Calendar = ({ userType = "owner" }: CalendarProps) => {
     event_type: "visit",
   })
 
-  const { events, extraEvents, loading, reloadEvents } = useCalendarEvents(currentMonth, "[CALENDAR]")
+  const { data, isLoading, refetch } = useCalendarEvents(currentMonth, "[CALENDAR]")
+  const events = data?.events || []
+  const extraEvents = data?.extraEvents || []
 
   // Auto-ouverture du formulaire via ?create=visit
   useEffect(() => {
@@ -151,7 +153,7 @@ const Calendar = ({ userType = "owner" }: CalendarProps) => {
         start_date: format(selectedDate, "yyyy-MM-dd"),
         event_type: "visit",
       })
-      reloadEvents()
+      refetch()
     } catch (error) {
       console.error('[CALENDAR] Error creating event:', error)
       toast({ title: "Erreur", description: "Impossible de créer le rendez-vous", variant: "destructive" })
@@ -235,7 +237,7 @@ const Calendar = ({ userType = "owner" }: CalendarProps) => {
         selectedDate={selectedDate}
         baseEvents={eventsOfSelectedDay.base}
         extraEvents={eventsOfSelectedDay.extra}
-        loading={loading}
+        loading={isLoading}
         onEventClick={handleEventClick}
       />
 

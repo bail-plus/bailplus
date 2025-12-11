@@ -45,7 +45,9 @@ const CalendarProvider = () => {
     event_type: "maintenance",
   })
 
-  const { events, extraEvents, loading, reloadEvents } = useCalendarEvents(currentMonth, "[CALENDAR_PROVIDER]")
+  const { data, isLoading, refetch } = useCalendarEvents(currentMonth, "[CALENDAR_PROVIDER]")
+  const events = data?.events || []
+  const extraEvents = data?.extraEvents || []
 
   // Auto-ouverture du formulaire via ?create=visit
   useEffect(() => {
@@ -150,7 +152,7 @@ const CalendarProvider = () => {
         start_date: format(selectedDate, "yyyy-MM-dd"),
         event_type: "maintenance",
       })
-      reloadEvents()
+      refetch()
     } catch (error) {
       console.error('[CALENDAR_PROVIDER] Error creating event:', error)
       toast({ title: "Erreur", description: "Impossible de créer l'intervention", variant: "destructive" })
@@ -214,7 +216,7 @@ const CalendarProvider = () => {
         selectedDate={selectedDate}
         baseEvents={eventsOfSelectedDay.base}
         extraEvents={eventsOfSelectedDay.extra}
-        loading={loading}
+        loading={isLoading}
         onEventClick={handleEventClick}
       />
 

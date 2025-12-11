@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback } from "react"
+import { useQuery } from '@tanstack/react-query'
 import { format, startOfMonth, endOfMonth } from "date-fns"
 import { supabase } from "@/integrations/supabase/client"
 import { useEntity } from "@/contexts/EntityContext"
 import { useAuth } from "@/hooks/auth/useAuth"
-import { useToast } from "@/hooks/ui/use-toast"
 import type { Tables } from "@/integrations/supabase/types"
 
 type EventRow = Tables<"events">
@@ -31,23 +30,15 @@ export type CalendarItem = {
 export function useCalendarEvents(currentMonth: Date, logPrefix: string = "[CALENDAR]") {
   const { selectedEntity, showAll } = useEntity()
   const { user } = useAuth()
-  const { toast } = useToast()
 
-  const [events, setEvents] = useState<EventRow[]>([])
-  const [extraEvents, setExtraEvents] = useState<CalendarItem[]>([])
-  const [loading, setLoading] = useState(true)
-
-  const loadEvents = useCallback(async (monthDate: Date) => {
-    try {
-      setLoading(true)
-      console.log(`${logPrefix} Loading events for month:`, format(monthDate, 'yyyy-MM'))
+  return useQuery({
+    queryKey: ['calendar-events', user?.id, selectedEntity?.id, showAll, format(currentMonth, 'yyyy-MM')],
+    queryFn: async () => {
+      console.log(`${logPrefix} Loading events for month:`, format(currentMonth, 'yyyy-MM'))
 
       if (!user) {
         console.log(`${logPrefix} No user, skipping load`)
-        setEvents([])
-        setExtraEvents([])
-        setLoading(false)
-        return
+        return { events: [], extraEvents: [] }
       }
 
       console.log(`${logPrefix} User ID:`, user.id)
@@ -62,8 +53,8 @@ export function useCalendarEvents(currentMonth: Date, logPrefix: string = "[CALE
         propertyIds = props?.map(p => p.id) || []
       }
 
-      const rangeStart = format(startOfMonth(monthDate), "yyyy-MM-dd")
-      const rangeEnd = format(endOfMonth(monthDate), "yyyy-MM-dd")
+      const rangeStart = format(startOfMonth(currentMonth), "yyyy-MM-dd")
+      const rangeEnd = format(endOfMonth(currentMonth), "yyyy-MM-dd")
       console.log(`${logPrefix} Date range:`, rangeStart, 'to', rangeEnd)
 
       let query = supabase
@@ -86,7 +77,7 @@ export function useCalendarEvents(currentMonth: Date, logPrefix: string = "[CALE
       }
 
       console.log(`${logPrefix} Events loaded:`, data?.length || 0, 'events', data)
-      setEvents(data || [])
+      const events = data || []
 
       // Charger les loyers dus dans le mois
       const { data: rentData, error: rentError } = await supabase
@@ -165,7 +156,7 @@ export function useCalendarEvents(currentMonth: Date, logPrefix: string = "[CALE
             id: t.id,
             source: "ticket",
             title: t.title || "Ticket",
-            start_date: dateStr || format(monthDate, "yyyy-MM-dd"),
+            start_date: dateStr || format(currentMonth, "yyyy-MM-dd"),
             start_time: null,
             end_date: dateStr,
             end_time: null,
@@ -179,24 +170,13 @@ export function useCalendarEvents(currentMonth: Date, logPrefix: string = "[CALE
         })
         .filter((t) => t.start_date >= rangeStart && t.start_date <= rangeEnd)
 
-      setExtraEvents([...rentItems, ...ticketItems])
-    } catch (error) {
-      console.error('Error loading events:', error)
-      toast({
-        title: "Erreur",
-        description: "Impossible de charger les événements",
-        variant: "destructive",
-      })
-      setEvents([])
-      setExtraEvents([])
-    } finally {
-      setLoading(false)
-    }
-  }, [selectedEntity, showAll, toast, user, logPrefix])
-
-  useEffect(() => {
-    loadEvents(currentMonth)
-  }, [currentMonth, loadEvents])
-
-  return { events, extraEvents, loading, reloadEvents: () => loadEvents(currentMonth) }
+      return {
+        events,
+        extraEvents: [...rentItems, ...ticketItems]
+      }
+    },
+    enabled: !!user?.id,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes (remplace cacheTime)
+  })
 }
