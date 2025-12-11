@@ -15,6 +15,7 @@ import { useSearchParams } from "react-router-dom"
 import { useToast } from "@/hooks/ui/use-toast"
 import { usePropertiesWithUnits } from "@/hooks/properties/useProperties"
 import type { Tables } from "@/integrations/supabase/types"
+import { useAuth } from "@/hooks/auth/useAuth"
 
 type EventRow = Tables<"events">
 
@@ -49,9 +50,16 @@ const eventTypes = {
 
 const Calendar = () => {
   const { selectedEntity, showAll } = useEntity()
-  const { data: properties = [] } = usePropertiesWithUnits()
+  const { data: allProperties = [] } = usePropertiesWithUnits()
   const { toast } = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
+  const { user } = useAuth()
+
+  // Filtrer les propriétés par entité sélectionnée
+  const properties = useMemo(() => {
+    if (showAll || !selectedEntity) return allProperties
+    return allProperties.filter(p => p.entity_id === selectedEntity.id)
+  }, [allProperties, selectedEntity, showAll])
 
   const [events, setEvents] = useState<EventRow[]>([])
   const [extraEvents, setExtraEvents] = useState<CalendarItem[]>([])
@@ -60,6 +68,8 @@ const Calendar = () => {
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [editingEventId, setEditingEventId] = useState<string | null>(null)
+  const [selectedEventTypes, setSelectedEventTypes] = useState<string[]>([])
+  const [selectedPropertyFilter, setSelectedPropertyFilter] = useState<string>("all")
   const [newEvent, setNewEvent] = useState<Partial<EventRow>>({
     start_date: format(new Date(), "yyyy-MM-dd"),
     event_type: "visit",
@@ -68,6 +78,17 @@ const Calendar = () => {
   const loadEvents = useCallback(async (monthDate: Date) => {
     try {
       setLoading(true)
+      console.log('[CALENDAR] Loading events for month:', format(monthDate, 'yyyy-MM'))
+
+      if (!user) {
+        console.log('[CALENDAR] No user, skipping load')
+        setEvents([])
+        setExtraEvents([])
+        setLoading(false)
+        return
+      }
+
+      console.log('[CALENDAR] User ID:', user.id)
 
       // Filtrage par entité => propriété
       let propertyIds: string[] = []
@@ -81,19 +102,28 @@ const Calendar = () => {
 
       const rangeStart = format(startOfMonth(monthDate), "yyyy-MM-dd")
       const rangeEnd = format(endOfMonth(monthDate), "yyyy-MM-dd")
+      console.log('[CALENDAR] Date range:', rangeStart, 'to', rangeEnd)
 
       let query = supabase
         .from('events')
         .select('*')
+        .eq('user_id', user.id)
         .gte('start_date', rangeStart)
         .lte('start_date', rangeEnd)
 
       if (!showAll && selectedEntity && propertyIds.length > 0) {
-        query = query.in('property_id', propertyIds)
+        console.log('[CALENDAR] Filtering by property_ids:', propertyIds)
+        query = query.or(`property_id.in.(${propertyIds.join(',')}),property_id.is.null`)
       }
 
       const { data, error } = await query.order('start_date').order('start_time', { nullsFirst: false })
-      if (error) throw error
+
+      if (error) {
+        console.error('[CALENDAR] Error loading events:', error)
+        throw error
+      }
+
+      console.log('[CALENDAR] Events loaded:', data?.length || 0, 'events', data)
       setEvents(data || [])
 
       // Charger les loyers dus dans le mois
@@ -200,7 +230,7 @@ const Calendar = () => {
     } finally {
       setLoading(false)
     }
-  }, [selectedEntity, showAll, toast])
+  }, [selectedEntity, showAll, toast, user])
 
   useEffect(() => {
     loadEvents(currentMonth)
@@ -228,21 +258,38 @@ const Calendar = () => {
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, EventRow[]>()
-    events.forEach(ev => {
-      const key = ev.start_date
-      map.set(key, [...(map.get(key) || []), ev])
-    })
+    events
+      .filter(ev => {
+        // Filtre par type (INVERSE : on affiche si le type N'EST PAS dans la liste)
+        if (selectedEventTypes.includes(ev.event_type)) return false
+        // Filtre par bien
+        if (selectedPropertyFilter === "all") return true
+        return ev.property_id === selectedPropertyFilter
+      })
+      .forEach(ev => {
+        const key = ev.start_date
+        map.set(key, [...(map.get(key) || []), ev])
+      })
     return map
-  }, [events])
+  }, [events, selectedEventTypes, selectedPropertyFilter])
 
   const extraEventsByDate = useMemo(() => {
     const map = new Map<string, CalendarItem[]>()
-    extraEvents.forEach(ev => {
-      const key = ev.start_date
-      map.set(key, [...(map.get(key) || []), ev])
-    })
+    extraEvents
+      .filter(ev => {
+        // Filtre par type (INVERSE : on affiche si le type N'EST PAS dans la liste)
+        if (selectedEventTypes.includes(ev.event_type)) return false
+        // Filtre par bien (les loyers/tickets n'ont pas de property_id direct)
+        if (selectedPropertyFilter === "all") return true
+        // Pour les loyers et tickets, on ne peut pas filtrer par bien facilement
+        return true
+      })
+      .forEach(ev => {
+        const key = ev.start_date
+        map.set(key, [...(map.get(key) || []), ev])
+      })
     return map
-  }, [extraEvents])
+  }, [extraEvents, selectedEventTypes, selectedPropertyFilter])
 
   const eventsOfSelectedDay = useMemo(() => {
     const key = format(selectedDate, "yyyy-MM-dd")
@@ -254,6 +301,10 @@ const Calendar = () => {
   const handleCreateEvent = async () => {
     if (!newEvent.title || !newEvent.start_date) {
       toast({ title: "Titre requis", description: "Ajoutez un titre et une date.", variant: "destructive" })
+      return
+    }
+    if (!user) {
+      toast({ title: "Erreur", description: "Vous devez être connecté pour créer un événement.", variant: "destructive" })
       return
     }
     try {
@@ -271,14 +322,19 @@ const Calendar = () => {
         unit_id: newEvent.unit_id || null,
         status: newEvent.status || null,
         tenant_id: newEvent.tenant_id || null,
+        user_id: user.id,
       }
 
+      console.log('[CALENDAR] Creating/updating event with payload:', payload)
+
       if (editingEventId) {
-        const { error } = await supabase.from('events').update(payload).eq('id', editingEventId)
+        const { data, error } = await supabase.from('events').update(payload).eq('id', editingEventId).select()
+        console.log('[CALENDAR] Update result:', { data, error })
         if (error) throw error
         toast({ title: "Rendez-vous mis à jour", description: "L'événement a été modifié." })
       } else {
-        const { error } = await supabase.from('events').insert(payload)
+        const { data, error } = await supabase.from('events').insert(payload).select()
+        console.log('[CALENDAR] Insert result:', { data, error })
         if (error) throw error
         toast({ title: "Rendez-vous créé", description: "L'événement a été ajouté au calendrier." })
       }
@@ -290,7 +346,7 @@ const Calendar = () => {
       })
       loadEvents(currentMonth)
     } catch (error) {
-      console.error(error)
+      console.error('[CALENDAR] Error creating event:', error)
       toast({ title: "Erreur", description: "Impossible de créer le rendez-vous", variant: "destructive" })
     }
   }
@@ -309,9 +365,14 @@ const Calendar = () => {
           className="bg-gradient-primary"
           onClick={() => {
             setEditingEventId(null)
+            // Pré-remplir avec la première propriété de l'entité sélectionnée
+            const defaultPropertyId = (!showAll && selectedEntity && properties.length > 0)
+              ? properties[0].id
+              : undefined
             setNewEvent({
               start_date: format(selectedDate, "yyyy-MM-dd"),
               event_type: "visit",
+              property_id: defaultPropertyId,
             })
             setIsCreateOpen(true)
           }}
@@ -338,6 +399,110 @@ const Calendar = () => {
           {events.length + extraEvents.length} événement{(events.length + extraEvents.length) > 1 ? "s" : ""} ce mois
         </div>
       </div>
+
+      {/* Filtres */}
+      <Card>
+        <CardContent className="pt-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Filtre par bien */}
+            <div className="space-y-3">
+              <label className="text-sm font-medium">Filtrer par bien</label>
+              <Select
+                value={selectedPropertyFilter}
+                onValueChange={setSelectedPropertyFilter}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Tous les biens" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-gray-400"></span>
+                      Tous les biens
+                    </div>
+                  </SelectItem>
+                  {properties.length > 0 && properties.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                        {p.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Filtre par type (masquer) */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Masquer les types d'événements</label>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const allTypes = Object.keys(eventTypes)
+                    if (selectedEventTypes.length === allTypes.length) {
+                      setSelectedEventTypes([])
+                    } else {
+                      setSelectedEventTypes(allTypes)
+                    }
+                  }}
+                  className="text-xs h-7"
+                >
+                  {selectedEventTypes.length === 0 ? "Tout masquer" : "Tout afficher"}
+                </Button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {Object.entries(eventTypes).map(([type, config]) => {
+                  const isHidden = selectedEventTypes.includes(type)
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => {
+                        if (isHidden) {
+                          setSelectedEventTypes(prev => prev.filter(t => t !== type))
+                        } else {
+                          setSelectedEventTypes(prev => [...prev, type])
+                        }
+                      }}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all border-2 ${
+                        isHidden
+                          ? "bg-gray-100 text-gray-400 border-gray-200 line-through"
+                          : `${config.color} text-white border-transparent`
+                      }`}
+                    >
+                      {config.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Compteur filtré */}
+          <div className="mt-4 pt-4 border-t">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">
+                {Object.values(eventsByDate).flat().length + Object.values(extraEventsByDate).flat().length} événement(s) affiché(s)
+              </span>
+              {(selectedPropertyFilter !== "all" || selectedEventTypes.length > 0) && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedPropertyFilter("all")
+                    setSelectedEventTypes([])
+                  }}
+                  className="text-xs h-7"
+                >
+                  Réinitialiser les filtres
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Calendar grid */}
       <Card>
@@ -575,16 +740,18 @@ const Calendar = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Bien</label>
+                <label className="text-sm font-medium">
+                  Bien {!showAll && selectedEntity && <span className="text-xs text-muted-foreground">(recommandé pour filtrer)</span>}
+                </label>
                 <Select
                   value={newEvent.property_id || "none"}
                   onValueChange={(val) => setNewEvent({ ...newEvent, property_id: val === "none" ? null : val })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Optionnel" />
+                    <SelectValue placeholder="Sélectionner un bien" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Aucun</SelectItem>
+                    <SelectItem value="none">Aucun bien</SelectItem>
                     {properties.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.name}
