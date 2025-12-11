@@ -5,6 +5,7 @@ import { formatCurrency } from "@/utils/formatters"
 import { format } from "date-fns"
 import { fr } from "date-fns/locale"
 import { useNavigate } from "react-router-dom"
+import { useUpcomingEvents } from "@/hooks/analytics/useUpcomingEvents"
 
 // Types
 interface Invoice {
@@ -90,7 +91,30 @@ interface UpcomingDueDatesCardProps {
   upcomingDueDates: Invoice[]
 }
 
+const eventTypeColors: Record<string, string> = {
+  visit: "bg-blue-500",
+  checkout: "bg-orange-500",
+  maintenance: "bg-red-500",
+  other: "bg-gray-400",
+}
+
+const eventTypeLabels: Record<string, string> = {
+  visit: "Visite",
+  checkout: "État des lieux",
+  maintenance: "Maintenance",
+  other: "Autre",
+}
+
 export function UpcomingDueDatesCard({ upcomingDueDates }: UpcomingDueDatesCardProps) {
+  const navigate = useNavigate()
+
+  // Charger les événements des 7 prochains jours avec le hook dédié
+  const { data: upcomingEvents = [], isLoading } = useUpcomingEvents(7)
+
+  const hasContent = upcomingDueDates.length > 0 || upcomingEvents.length > 0
+
+  console.log('[DASHBOARD] UpcomingDueDatesCard - Invoices:', upcomingDueDates.length, 'Events:', upcomingEvents.length)
+
   return (
     <Card>
       <CardHeader>
@@ -100,20 +124,56 @@ export function UpcomingDueDatesCard({ upcomingDueDates }: UpcomingDueDatesCardP
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {upcomingDueDates.length > 0 ? (
-          <div className="space-y-3">
-            {upcomingDueDates.map((invoice) => (
-              <div key={invoice.id} className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">
-                    {invoice.lease?.tenant?.first_name} {invoice.lease?.tenant?.last_name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {invoice.due_date ? format(new Date(invoice.due_date), 'dd MMMM', { locale: fr }) : '-'}
-                  </p>
+        {isLoading ? (
+          <div className="text-center py-8 text-muted-foreground">
+            <p className="text-sm">Chargement...</p>
+          </div>
+        ) : hasContent ? (
+          <div className="space-y-2">
+            {/* Événements */}
+            {upcomingEvents.map((event) => (
+              <div
+                key={`event-${event.id}`}
+                className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent/50 transition-colors cursor-pointer"
+                onClick={() => navigate('/app/calendar')}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`w-2 h-2 rounded-full mt-1.5 ${eventTypeColors[event.event_type] || 'bg-gray-400'}`} />
+                  <div>
+                    <p className="text-sm font-medium">{event.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {format(new Date(event.start_date), 'dd MMMM', { locale: fr })}
+                      {event.start_time && ` à ${event.start_time.slice(0, 5)}`}
+                    </p>
+                  </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold">{formatCurrency(invoice.total_amount)}</p>
+                  <Badge variant="outline" className="text-xs mb-1">
+                    {eventTypeLabels[event.event_type] || event.event_type}
+                  </Badge>
+                  {event.property?.name && (
+                    <p className="text-xs text-muted-foreground">{event.property.name}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {/* Factures */}
+            {upcomingDueDates.map((invoice) => (
+              <div key={`invoice-${invoice.id}`} className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent/50 transition-colors">
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 mt-1.5" />
+                  <div>
+                    <p className="text-sm font-medium">
+                      Loyer - {invoice.lease?.tenant?.first_name} {invoice.lease?.tenant?.last_name}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {invoice.due_date ? format(new Date(invoice.due_date), 'dd MMMM', { locale: fr }) : '-'}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold mb-1">{formatCurrency(invoice.total_amount)}</p>
                   <Badge variant={invoice.status === 'overdue' ? 'destructive' : 'secondary'} className="text-xs">
                     {invoice.status === 'pending' ? 'En attente' : 'En retard'}
                   </Badge>
