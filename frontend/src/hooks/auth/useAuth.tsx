@@ -121,28 +121,38 @@ const upsertProfileFromUser = async (u: User) => {
    ======================= */
 async function fetchProfile(userId: string): Promise<Profile | null> {
   try {
-    // Timeout de 5 secondes pour éviter les requêtes bloquées
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('fetchProfile timeout after 5s')), 5000);
-    });
+    console.log('🔍 [AUTH] Fetching profile for user:', userId);
 
-    const fetchPromise = supabase
+    // ✅ Comme dans PAJ : faire directement la requête, le JWT est déjà chargé
+    const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('user_id', userId)
       .maybeSingle();
 
-    const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
-
     if (error) {
+      console.error('❌ [AUTH] Erreur chargement profil:', error);
+      console.error('❌ [AUTH] Détails:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+
+      // Comme dans PAJ : retourner null si pas de ligne (codes 406/PGRST116)
+      if (error.code === 'PGRST116' || error.code === '406') {
+        console.log('ℹ️ [AUTH] Aucun profil trouvé (normal en 1ère connexion)');
+        return null;
+      }
+
       // Si erreur réseau, lancer une exception pour que React Query retry
       if (error.message?.includes('Failed to fetch') || error.message?.includes('Load failed')) {
         throw error;
       }
-      console.error('❌ [AUTH] Erreur chargement profil:', error);
       return null;
     }
 
+    console.log('✅ [AUTH] Profile loaded:', data ? 'found' : 'not found');
     return data;
   } catch (err) {
     console.error('❌ [AUTH] Exception profil:', err);
@@ -152,12 +162,10 @@ async function fetchProfile(userId: string): Promise<Profile | null> {
 
 async function fetchSubscription(userId: string): Promise<Subscription | null> {
   try {
-    // Timeout de 5 secondes pour éviter les requêtes bloquées
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('fetchSubscription timeout after 5s')), 5000);
-    });
+    console.log('🔍 [AUTH] Fetching subscription for user:', userId);
 
-    const fetchPromise = supabase
+    // ✅ Comme dans PAJ : faire directement la requête, le JWT est déjà chargé
+    const { data, error } = await supabase
       .from('subscriptions')
       .select('*')
       .eq('user_id', userId)
@@ -165,17 +173,29 @@ async function fetchSubscription(userId: string): Promise<Subscription | null> {
       .limit(1)
       .maybeSingle();
 
-    const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
-
     if (error) {
+      console.error('❌ [AUTH] Erreur chargement abonnement:', error);
+      console.error('❌ [AUTH] Détails:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+
+      // Comme dans PAJ : retourner null si pas de ligne (codes 406/PGRST116)
+      if (error.code === 'PGRST116' || error.code === '406') {
+        console.log('ℹ️ [AUTH] Aucun abonnement trouvé (normal)');
+        return null;
+      }
+
       // Si erreur réseau, lancer une exception pour que React Query retry
       if (error.message?.includes('Failed to fetch') || error.message?.includes('Load failed')) {
         throw error;
       }
-      console.error('❌ [AUTH] Erreur chargement abonnement:', error);
       return null;
     }
 
+    console.log('✅ [AUTH] Subscription loaded:', data ? 'found' : 'not found');
     return data;
   } catch (err) {
     console.error('❌ [AUTH] Exception abonnement:', err);
@@ -311,94 +331,33 @@ const AuthContext = createContext<AuthContextType>({
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const queryClient = useQueryClient();
 
+  // ✅ Comme dans PAJ : Charger la session via useQuery
+  const { data: session, isLoading: sessionIsLoading } = useQuery({
+    queryKey: ['getSession'],
+    queryFn: async () => {
+      console.log('📡 [SESSION] Loading session via useQuery...');
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('✅ [SESSION] Session loaded:', !!session);
+      return session;
+    },
+  });
+
+  // MàJ user si session change (comme dans PAJ)
   useEffect(() => {
-    let isActive = true;
-    let hydrated = false;
+    setUser(session?.user ?? null);
+  }, [session]);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
-      if (!isActive) return;
-
-      const currentSession = nextSession ?? null;
-      const currentUser = currentSession?.user ?? null;
-
-      setSession(currentSession);
-      setUser(currentUser);
-
-      // Créer le profil uniquement lors de la première connexion (pas lors des reconnexions)
-      if (currentUser?.id && event === 'SIGNED_IN' && !hydrated) {
-        try {
-          await upsertProfileFromUser(currentUser);
-        } catch (error) {
-          console.error('❌ [AUTH] Erreur lors de la création du profil après connexion:', error);
-        }
-      }
-
-      if (event === 'SIGNED_OUT') {
-        queryClient.removeQueries({ queryKey: ['profile'] });
-        queryClient.removeQueries({ queryKey: ['subscription'] });
-      } else if (event === 'SIGNED_IN' && !hydrated) {
-        // Invalider uniquement lors de la première connexion, pas lors des reconnexions
-        queryClient.invalidateQueries({ queryKey: ['profile'] });
-        queryClient.invalidateQueries({ queryKey: ['subscription'] });
-      }
-
-      if (!hydrated) {
-        hydrated = true;
-        // Petit délai pour laisser la session JWT se propager
-        setTimeout(() => {
-          if (isActive) {
-            setAuthReady(true);
-          }
-        }, 200);
-      }
+  // Écoute globale des évènements d'auth (comme dans PAJ)
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, sess) => {
+      setUser(sess?.user ?? null);
+      setAuthReady(true);
     });
-
-    (async () => {
-      try {
-        const { data, error } = await supabase.auth.getSession();
-        if (!isActive) return;
-
-        if (error) {
-          console.error('❌ [AUTH] Erreur getSession:', error);
-        }
-
-        const initialSession = data?.session ?? null;
-        setSession(initialSession);
-        setUser(initialSession?.user ?? null);
-      } catch (err) {
-        if (isActive) {
-          console.error('❌ [AUTH] Exception getSession:', err);
-        }
-      } finally {
-        if (isActive && !hydrated) {
-          hydrated = true;
-          // Petit délai pour laisser la session JWT se propager
-          setTimeout(() => {
-            if (isActive) {
-              setAuthReady(true);
-            }
-          }, 200);
-        }
-      }
-    })();
-
-    const safetyTimeout = setTimeout(() => {
-      if (isActive && !hydrated) {
-        hydrated = true;
-        setAuthReady(true);
-      }
-    }, 2000);
-
-    return () => {
-      isActive = false;
-      clearTimeout(safetyTimeout);
-      subscription.unsubscribe();
-    };
-  }, [queryClient]);
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Log pour détecter les changements de user.id
   useEffect(() => {
@@ -408,14 +367,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const profileQuery = useQuery({
     queryKey: ['profile', user?.id],
-    enabled: false, // Désactivé par défaut, on lance manuellement
+    enabled: !!user?.id, // ✅ Comme dans PAJ : simple, juste vérifier que user existe
     queryFn: () => {
       return fetchProfile(user!.id);
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
+    retry: 1,
+    retryDelay: 1000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
@@ -423,66 +382,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const subscriptionQuery = useQuery({
     queryKey: ['subscription', user?.id],
-    enabled: false, // Désactivé par défaut, on lance manuellement
+    enabled: !!user?.id, // ✅ Comme dans PAJ : simple, juste vérifier que user existe
     queryFn: () => {
       return fetchSubscription(user!.id);
     },
     staleTime: 2 * 60 * 1000,
     gcTime: 5 * 60 * 1000,
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
+    retry: 1,
+    retryDelay: 1000,
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
   });
 
-  // Lancer les queries manuellement après que authReady soit true + délai de sécurité
-  useEffect(() => {
-    if (authReady && user?.id && !profileQuery.data && !profileQuery.isFetching) {
-      const timer = setTimeout(() => {
-        profileQuery.refetch();
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [authReady, user?.id, profileQuery]);
-
-  useEffect(() => {
-    if (authReady && user?.id && !subscriptionQuery.data && !subscriptionQuery.isFetching) {
-      const timer = setTimeout(() => {
-        subscriptionQuery.refetch();
-      }, 500);
-      return () => clearTimeout(timer);
-    }
-  }, [authReady, user?.id, subscriptionQuery]);
+  // ✅ Plus besoin de lancer manuellement : enabled: !!user?.id le fait automatiquement
 
   const profileData = profileQuery.data ?? null;
   const subscriptionData = subscriptionQuery.data ?? null;
 
-  const hasUser = !!user?.id;
-  const profileReady = !hasUser || profileQuery.isFetched || profileQuery.isError;
-  const subscriptionReady = !hasUser || subscriptionQuery.isFetched || subscriptionQuery.isError;
+  // ✅ Logique simplifiée comme dans PAJ : inclure sessionIsLoading
+  const loading = !authReady || sessionIsLoading || profileQuery.isLoading || subscriptionQuery.isLoading;
+  const isReady = authReady && !sessionIsLoading && !profileQuery.isLoading && !subscriptionQuery.isLoading;
 
-  const loading = !authReady || !profileReady || !subscriptionReady;
-  const isReady = authReady && profileReady && subscriptionReady;
-
-  // Supprimé: useEffect en double qui lançait les queries trop tôt
-
-  // Debug: log quand on reste bloqué
-  if (import.meta.env.DEV && authReady && (!profileReady || !subscriptionReady)) {
-    console.log('[AUTH] Waiting readiness', {
+  // Debug amélioré
+  if (import.meta.env.DEV) {
+    console.log('[AUTH] State:', {
       authReady,
-      hasUser,
       userId: user?.id,
-      profileReady,
-      subscriptionReady,
+      sessionIsLoading,
+      loading,
+      isReady,
       profileStatus: profileQuery.status,
-      profileFetching: profileQuery.isFetching,
+      profileLoading: profileQuery.isLoading,
       profileError: profileQuery.error,
-      profileEnabled: authReady && !!user?.id,
       subscriptionStatus: subscriptionQuery.status,
-      subscriptionFetching: subscriptionQuery.isFetching,
+      subscriptionLoading: subscriptionQuery.isLoading,
       subscriptionError: subscriptionQuery.error,
-      subscriptionEnabled: authReady && !!user?.id,
     });
   }
 

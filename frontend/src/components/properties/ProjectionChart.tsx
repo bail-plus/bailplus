@@ -100,7 +100,6 @@ export function ProjectionChart({ data, propertyValue }: ProjectionChartProps) {
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis
                 dataKey="year"
-                label={{ value: "Année", position: "insideBottom", offset: 8 }}
                 tickMargin={12}
               />
               <YAxis
@@ -110,6 +109,12 @@ export function ProjectionChart({ data, propertyValue }: ProjectionChartProps) {
               <Tooltip
                 formatter={(value: number) => formatCurrency(value)}
                 labelFormatter={(label) => `Année ${label}`}
+              />
+              <Legend
+                align="right"
+                verticalAlign="bottom"
+                wrapperStyle={{ paddingLeft: "20px" }}
+                payload={[{ value: "Année", type: "none", id: "year" }]}
               />
               <Area
                 type="monotone"
