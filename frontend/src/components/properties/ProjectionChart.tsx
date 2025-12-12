@@ -81,8 +81,8 @@ export function ProjectionChart({ data, propertyValue }: ProjectionChartProps) {
           <CardTitle className="text-lg">Cash-flow cumulé</CardTitle>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={data} margin={{ left: marginCumulative }}>
+          <ResponsiveContainer width="100%" height={350}>
+            <AreaChart data={data} margin={{ left: marginCumulative, bottom: 25, right: 10 }}>
               <defs>
                 <linearGradient id="colorCumulative" x1="0" y1="0" x2="0" y2="1">
                   <stop
@@ -100,17 +100,29 @@ export function ProjectionChart({ data, propertyValue }: ProjectionChartProps) {
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis
                 dataKey="year"
-                label={{ value: "Année", position: "insideBottom", offset: 8 }}
-                tickMargin={12}
+                tickMargin={8}
+                label={{
+                  value: "Année",
+                  position: "insideBottom",
+                  dx: 400,    // Déplacement horizontal (négatif = gauche, positif = droite)
+                  dy: 20    // Déplacement vertical (négatif = haut, positif = bas)
+                }}
               />
               <YAxis
                 tickFormatter={(value) => `${(value / 1000).toFixed(0)}k€`}
-                label={{ value: "Cash-flow cumulé (€)", angle: -90, position: "center", dx: -35 }}
+                label={{
+                  value: "Cash-flow cumulé (€)",
+                  angle: -90,
+                  position: "insideLeft",
+                  dx: -40,   // Déplacement horizontal (pour axe Y, négatif = vers la gauche)
+                  dy: 100      // Déplacement vertical
+                }}
               />
               <Tooltip
                 formatter={(value: number) => formatCurrency(value)}
                 labelFormatter={(label) => `Année ${label}`}
               />
+              <Legend />
               <Area
                 type="monotone"
                 dataKey="cumulativeCashFlow"
@@ -130,17 +142,28 @@ export function ProjectionChart({ data, propertyValue }: ProjectionChartProps) {
           <CardTitle className="text-lg">Evolution du patrimoine net</CardTitle>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={data} margin={{ left: marginNetWorth }}>
+          <ResponsiveContainer width="100%" height={350}>
+            <LineChart data={data} margin={{ left: marginNetWorth, bottom: 25, right: 10 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis
                 dataKey="year"
-                label={{ value: "Année", position: "insideBottom", offset: 8 }}
-                tickMargin={12}
+                tickMargin={8}
+                label={{
+                  value: "Année",
+                  position: "insideBottom",
+                  dx: 400,    // Déplacement horizontal
+                  dy: 20    // Déplacement vertical
+                }}
               />
               <YAxis
                 tickFormatter={(value) => `${(value / 1000).toFixed(0)}k€`}
-                label={{ value: "Valeur (€)", angle: -90, position: "center", dx: -35 }}
+                label={{
+                  value: "Valeur (€)",
+                  angle: -90,
+                  position: "insideLeft",
+                  dx: -30,   // Déplacement horizontal
+                  dy: 50      // Déplacement vertical
+                }}
               />
               <Tooltip
                 formatter={(value: number) => formatCurrency(value)}
@@ -174,17 +197,28 @@ export function ProjectionChart({ data, propertyValue }: ProjectionChartProps) {
           <CardTitle className="text-lg">Revenus vs Charges annuelles</CardTitle>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={data} margin={{ left: marginRevenueExpense }}>
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart data={data} margin={{ left: marginRevenueExpense, bottom: 25, right: 10 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis
                 dataKey="year"
-                label={{ value: "Année", position: "insideBottom", offset: 8 }}
-                tickMargin={12}
+                tickMargin={8}
+                label={{
+                  value: "Année",
+                  position: "insideBottom",
+                  dx: 400,    // Déplacement horizontal
+                  dy: 20    // Déplacement vertical
+                }}
               />
               <YAxis
                 tickFormatter={(value) => `${(value / 1000).toFixed(0)}k€`}
-                label={{ value: "Montant (€)", angle: -90, position: "center", dx: -35 }}
+                label={{
+                  value: "Montant (€)",
+                  angle: -90,
+                  position: "insideLeft",
+                  dx: -20,   // Déplacement horizontal
+                  dy: 50      // Déplacement vertical
+                }}
               />
               <Tooltip
                 formatter={(value: number) => formatCurrency(value)}
@@ -204,17 +238,28 @@ export function ProjectionChart({ data, propertyValue }: ProjectionChartProps) {
           <CardTitle className="text-lg">Cash-flow annuel</CardTitle>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={data} margin={{ left: marginAnnualCashFlow }}>
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart data={data} margin={{ left: marginAnnualCashFlow, bottom: 25, right: 10 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis
                 dataKey="year"
-                label={{ value: "Année", position: "insideBottom", offset: 8 }}
-                tickMargin={12}
+                tickMargin={8}
+                label={{
+                  value: "Année",
+                  position: "insideBottom",
+                  dx: 400,    // Déplacement horizontal
+                  dy: 20    // Déplacement vertical
+                }}
               />
               <YAxis
                 tickFormatter={(value) => `${(value / 1000).toFixed(0)}k€`}
-                label={{ value: "Cash-flow (€)", angle: -90, position: "center", dx: -35 }}
+                label={{
+                  value: "Cash-flow (€)",
+                  angle: -90,
+                  position: "insideLeft",
+                  dx: -20,   // Déplacement horizontal
+                  dy: 50      // Déplacement vertical
+                }}
               />
               <Tooltip
                 formatter={(value: number) => formatCurrency(value)}

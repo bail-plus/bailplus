@@ -5,36 +5,21 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL!;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY!;
 
-// Instance unique, même après HMR
-declare global {
-  // eslint-disable-next-line no-var
-  var __SUPABASE__: SupabaseClient<Database> | undefined;
+// ⚠️ TEST: Recréer le client à chaque fois (pas de singleton)
+console.log('🔧 [SUPABASE] Creating new client...');
+export const supabase: SupabaseClient<Database> = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    flowType: 'pkce',
+    storage: localStorage,
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storageKey: 'gl-edouard-auth',
+  },
+});
+console.log('✅ [SUPABASE] Client created');
+
+// Exposer supabase globalement pour le debugging (DEV uniquement)
+if (import.meta.env.DEV) {
+  (window as any).supabase = supabase;
 }
-
-// Custom storage adapter pour debugging
-const customStorage = {
-  getItem: (key: string) => {
-    const value = localStorage.getItem(key);
-    return value;
-  },
-  setItem: (key: string, value: string) => {
-    localStorage.setItem(key, value);
-  },
-  removeItem: (key: string) => {
-    localStorage.removeItem(key);
-  },
-};
-
-export const supabase: SupabaseClient<Database> =
-  globalThis.__SUPABASE__ ??
-  (globalThis.__SUPABASE__ = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-      flowType: 'pkce',
-      storage: customStorage as any,
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-      // très important : clé unique pour ton app
-      storageKey: 'gl-edouard-auth',
-    },
-  }));
