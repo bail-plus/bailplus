@@ -8,7 +8,7 @@ import {
   Lightbulb,
   MapPin,
   Mail,
-  Calendar,
+  Calendar
   Trophy,
   Heart
 } from "lucide-react";
@@ -57,17 +57,17 @@ const values = [
 
 const team = [
   {
-    name: "MEYER Arthus",
+    name: "Arthus MEYER",
     role: "CEO & Co-fondatrice",
     description: "Ex-directrice produit chez PropTech leader, investisseuse immobilière",
   },
   {
-    name: "GAIGNEROT Edouard",
+    name: "Edouard GAIGNEROT",
     role: "CTO & Co-fondateur", 
     description: "15 ans d'expérience en développement, expert en solutions SaaS",
   },
   {
-    name: "DION Julien",
+    name: "Julien DION",
     role: "Head of Customer Success",
     description: "Spécialiste de l'accompagnement client, experte gestion locative",
   }
