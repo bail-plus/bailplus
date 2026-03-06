@@ -8,7 +8,7 @@ import {
   Lightbulb,
   MapPin,
   Mail,
-  Calendar
+  Calendar,
   Trophy,
   Heart
 } from "lucide-react";
