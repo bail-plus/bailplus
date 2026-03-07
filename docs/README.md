@@ -1,45 +1,101 @@
-# Documentation - BailoGenius
+# Modifier le site vitrine (guide débutant)
 
-Index centralisé de toute la documentation du projet.
+Ce guide est fait pour les personnes qui ne codent pas au quotidien, mais qui doivent faire des modifications sur le site vitrine.
 
-## Structure de la documentation
+## Regle la plus importante
 
-### 📋 [Setup](./setup/)
-Guides de mise en place et configuration initiale du projet.
-- **SETUP-RAPIDE.md** - Guide de démarrage rapide
-- **GITFLOW.md** - Instructions pour utiliser Git Flow
-- **SECRETS-GITHUB.md** - Gestion des secrets et variables d'environnement
+Ne jamais travailler directement dans `main` ou `develop`.
 
-### 🔗 [Integration](./integration/)
-Documentation sur les intégrations avec des services externes.
-- **BRIDGE_API_V3_DEPLOYMENT.md** - Déploiement et configuration de l'API Bridge V3
-- **INTEGRATION_GOCARDLESS.md** - Intégration GoCardless
-- **SPRINTS_GOCARDLESS.md** - Sprints et planification GoCardless
+Tu dois toujours creer une branche `feature`.
 
-### ⚙️ [Configuration](./configuration/)
-Paramètres et configuration des services.
-- **CRON_CONFIGURATION.md** - Configuration des tâches planifiées (CRON)
+## 1) Cloner le projet
 
-### 🚀 [Deployment](./deployment/)
-Guides de déploiement et mise en production.
-- **DEPLOYMENT.md** - Processus de déploiement
+```bash
+git clone https://github.com/bail-plus/bailplus.git
+cd bailplus
+```
 
-### 🏗️ [Infrastructure](./infrastructure/)
-Documentation sur l'infrastructure et le monitoring.
-- **EMAIL-SETUP.md** - Configuration des emails
-- **SERVER-MONITORING.md** - Monitoring du serveur
-- **AUTO-RESTART.md** - Configuration du redémarrage automatique
+## 2) Initialiser Git Flow (une seule fois)
 
-### 📚 [SEO](./deployment/)
-- **SEO-GUIDE.md** - Guide SEO et optimisations
+```bash
+git flow init -d
+```
 
-## Stack technique
+L'option `-d` applique la configuration par defaut.
 
-- **Frontend**: React + TypeScript + Vite
-- **UI**: shadcn-ui + Tailwind CSS
-- **Backend**: Supabase
-- **Intégrations**: Bridge API, GoCardless, Stripe
+## 3) Creer une branche de travail
 
-## Contribution
+Avant chaque modification:
 
-Lors d'ajout de nouvelles features ou modifications importantes, assurez-vous de mettre à jour la documentation correspondante.
+```bash
+git checkout develop
+git pull origin develop
+git flow feature start nom-de-la-feature
+```
+
+Exemple:
+
+```bash
+git flow feature start update-texte-homepage
+```
+
+## 4) Lancer le frontend en local
+
+Depuis la racine du projet:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Le site est disponible sur:
+
+```text
+http://localhost:8080
+```
+
+Laisse ce terminal ouvert pendant que tu fais tes modifications.
+
+Conseil simple:
+- Terminal 1: `npm run dev` (frontend)
+- Terminal 2: commandes Git (`git add`, `git commit`, `git push`)
+
+## 5) Faire les modifications
+
+Tu peux modifier les fichiers:
+- soit avec VS Code (interface visuelle),
+- soit en ligne de commande.
+
+## 6) Commit des changements
+
+### Option A: via VS Code (visuel)
+- Ouvrir l'onglet Source Control.
+- Verifier les fichiers modifies.
+- Ecrire un message de commit clair.
+- Cliquer sur Commit.
+
+### Option B: en ligne de commande
+
+```bash
+git add .
+git commit -m "Texte: mise a jour de la section hero"
+```
+
+## 7) Push de la branche feature
+
+```bash
+git push -u origin feature/nom-de-la-feature
+```
+
+## 8) Creer une Pull Request dans VS Code
+
+1. Faire une premiere Pull Request de `feature/...` vers `develop`.
+2. Une fois valide et merge dans `develop`, faire une Pull Request vers `main` si tu veux rendre la modification visible en production.
+
+## Rappel rapide
+
+- Toujours partir d'une branche `feature`.
+- Jamais de travail direct sur `main` ou `develop`.
+- PR vers `develop` d'abord.
+- PR vers `main` ensuite pour publication.
